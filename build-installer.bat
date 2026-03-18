@@ -1,16 +1,17 @@
 @echo off
-setlocal EnableExtensions
+setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
 title Build - NKBKConnext System
 cd /d "%~dp0"
 
 set "LOG=%~dp0build-last.log"
+set "OUT=%TEMP%\nkbk_build_%RANDOM%.out"
 echo === Build %date% %time% ===> "%LOG%"
 
 echo.
 echo  ========================================
-echo   Build NKBKConnext System
-echo  บันทึก log: build-last.log
+echo   Build NKBKConnext System ^(ตัวติดตั้ง NSIS เท่านั้น^)
+echo   Log: build-last.log
 echo  ========================================
 echo.
 
@@ -37,7 +38,8 @@ if not exist "node_modules" (
     )
 )
 
-echo  ปิดแอป NKBKConnext ก่อน — สคริปต์จะลบ dist เดิมแล้ว build ใหม่ทั้งหมด
+echo  ปิดแอป NKBKConnext ก่อน — จะลบ dist แล้ว build ใหม่
+echo  ผล build จะแสดงด้านล่างนี้ ^(และบันทึกใน build-last.log^)
 echo.
 taskkill /IM "NKBKConnext System.exe" /F >> "%LOG%" 2>&1
 timeout /t 2 /nobreak >nul
@@ -48,46 +50,54 @@ if exist "dist" (
 )
 if exist "dist" (
     echo.
-    echo  [ผิดพลาด] ลบโฟลเดอร์ dist ไม่ได้ — มักเพราะยังเปิดแอปหรือ Explorer อยู่ใน dist
-    echo  ปิด NKBKConnext System และปิดหน้าต่างที่เปิด dist\win-unpacked แล้วรันใหม่
-    echo.
+    echo  [ผิดพลาด] ลบ dist ไม่ได้ — ปิดแอปและ Explorer ที่เปิด dist แล้วลองใหม่
     pause
     exit /b 1
 )
 
-echo  กำลัง build โปรดรอ 1-3 นาที...
+echo  -------- npm run build:installer --------
 echo.
-call npm.cmd run build:installer >> "%LOG%" 2>&1
-if errorlevel 1 (
+call npm.cmd run build:installer > "%OUT%" 2>&1
+set "ERR=!errorlevel!"
+type "%OUT%"
+type "%OUT%" >> "%LOG%"
+del "%OUT%" 2>nul
+
+if !ERR! neq 0 (
     echo.
-    echo  build แบบเต็มล้มเหลว — ลองแบบ portable อย่างเดียว...
-    call npm.cmd run build:portable >> "%LOG%" 2>&1
+    echo  -------- ลอง build:unpacked ^(โฟลเดอร์ win-unpacked^) --------
+    call npm.cmd run build:unpacked > "%OUT%" 2>&1
+    set "ERR=!errorlevel!"
+    type "%OUT%"
+    type "%OUT%" >> "%LOG%"
+    del "%OUT%" 2>nul
 )
 
-if errorlevel 1 (
+if !ERR! neq 0 (
     echo.
-    echo  [ผิดพลาด] build ไม่สำเร็จ ^(npm errorlevel^)
-    echo  เปิด build-last.log ดู error ท้ายไฟล์
-    echo.
+    echo  [ผิดพลาด] build ไม่สำเร็จ — ดูข้อความด้านบน / ท้าย build-last.log
     notepad "%LOG%" 2>nul
     pause
     exit /b 1
 )
 
-if not exist "dist\win-unpacked\NKBKConnext System.exe" (
+set "HAS_SETUP=0"
+for /f "delims=" %%F in ('dir /b /a-d "%~dp0dist\*Setup*.exe" 2^>nul') do set "HAS_SETUP=1"
+
+if "!HAS_SETUP!"=="1" (
     echo.
-    echo  [ผิดพลาด] ไม่มี dist\win-unpacked\NKBKConnext System.exe
-    echo  เปิด build-last.log ดู error ท้ายไฟล์
+    echo  สำเร็จ — แจกไฟล์ติดตั้งใน dist ^(*Setup*.exe^)
+    echo  ติดตั้งครั้งเดียว อัปเดตผ่าน GitHub ^(เมนูถาด: ตรวจสอบอัปเดต / แจ้งบนหน้า login^)
+) else (
     echo.
+    echo  [ผิดพลาด] ไม่พบ *Setup*.exe ใน dist — ดู log ด้านบน ^(มักเป็น NSIS หรือ path^)
+    if exist "dist\win-unpacked\NKBKConnext System.exe" echo  พบแต่ win-unpacked ไม่มี installer
     notepad "%LOG%" 2>nul
     pause
     exit /b 1
 )
 
 echo.
-echo  สำเร็จ — dist ถูกสร้างใหม่ มี NKBKConnext System.exe ใน dist\win-unpacked\
-echo  ตัวติดตั้ง NSIS อยู่ใน dist\ ^(ถ้า build ผ่าน^)
-echo.
-explorer "dist\win-unpacked"
+explorer "dist"
 pause
 exit /b 0

@@ -6,6 +6,8 @@ const fs = require('fs');
 const PORT = 3333;
 let autoUpdater = null;
 let pendingManualUpdateCheck = false;
+/** แจ้งหน้า login เมื่อมีอัปเดต (จาก GitHub Releases) */
+let pendingUpdateInfo = null;
 const APP_DIR = __dirname;
 let mainWindow = null;
 let tray = null;
@@ -284,23 +286,37 @@ function checkForUpdatesManual() {
   });
 }
 
+function broadcastUpdateToRenderer(info) {
+  pendingUpdateInfo = { version: (info && info.version) || '' };
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    try {
+      mainWindow.webContents.send('app-update-available', pendingUpdateInfo);
+    } catch (_) {}
+  }
+}
+
 function setupAutoUpdater() {
   if (!app.isPackaged) return;
   try {
     autoUpdater = require('electron-updater').autoUpdater;
     autoUpdater.autoDownload = false;
     autoUpdater.on('update-available', (info) => {
-      pendingManualUpdateCheck = false;
-      dialog.showMessageBox({
-        type: 'info',
-        buttons: ['ภายหลัง', 'ดาวน์โหลด'],
-        defaultId: 1,
-        cancelId: 0,
-        title: 'NKBKConnext System',
-        message: 'มีเวอร์ชันใหม่ ' + (info && info.version ? info.version : '') + ' ต้องการดาวน์โหลดหรือไม่?'
-      }).then(({ response }) => {
-        if (response === 1) autoUpdater.downloadUpdate();
-      });
+      const ver = (info && info.version) || '';
+      if (pendingManualUpdateCheck) {
+        pendingManualUpdateCheck = false;
+        dialog.showMessageBox({
+          type: 'info',
+          buttons: ['ภายหลัง', 'ดาวน์โหลด'],
+          defaultId: 1,
+          cancelId: 0,
+          title: 'NKBKConnext System',
+          message: 'มีเวอร์ชันใหม่ ' + ver + ' ต้องการดาวน์โหลดหรือไม่?'
+        }).then(({ response }) => {
+          if (response === 1) autoUpdater.downloadUpdate();
+        });
+        return;
+      }
+      broadcastUpdateToRenderer(info);
     });
     autoUpdater.on('update-downloaded', () => {
       dialog.showMessageBox({
@@ -329,7 +345,7 @@ function setupAutoUpdater() {
     });
     setTimeout(() => {
       autoUpdater.checkForUpdates().catch(() => {});
-    }, 15000);
+    }, 5000);
   } catch (e) {
     console.warn('electron-updater:', e.message);
   }
@@ -364,6 +380,17 @@ function quitApp() {
   }
   app.quit();
 }
+
+ipcMain.handle('app-get-pending-update', () => pendingUpdateInfo);
+ipcMain.handle('app-download-update', async () => {
+  if (!autoUpdater) return { ok: false, error: 'no-updater' };
+  try {
+    await autoUpdater.downloadUpdate();
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e && e.message) || String(e) };
+  }
+});
 
 app.whenReady().then(async () => {
   // เก็บไฟล์ข้อมูลตรวจสอบบังคับคดีใน userData (เขียนได้) ไม่ใช้ path ใน app.asar

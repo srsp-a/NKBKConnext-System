@@ -11,8 +11,9 @@
     "icon-white-bg": "node scripts/icon-white-bg.js",
     "icon-transparent-bg": "node scripts/icon-transparent-bg.js",
     "create-monitor-user": "node scripts/create-monitor-user.js",
-    "build": "electron-builder --win",
-    "build:installer": "electron-builder --win",
+    "build": "electron-builder --win --config.win.target=nsis",
+    "build:installer": "electron-builder --win --config.win.target=nsis",
+    "build:unpacked": "electron-builder --win --dir",
     "build:portable": "electron-builder --win --dir",
     "build:nsis": "electron-builder --win --config.win.target=nsis",
     "release": "electron-builder --win --publish always"
@@ -63,12 +64,6 @@
     "win": {
       "icon": "assets/icon.png",
       "target": [
-        {
-          "target": "dir",
-          "arch": [
-            "x64"
-          ]
-        },
         {
           "target": "nsis",
           "arch": [

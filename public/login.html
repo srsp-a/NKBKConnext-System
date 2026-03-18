@@ -169,10 +169,42 @@
       margin: 0 auto 1rem;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .update-banner {
+      display: none;
+      margin-bottom: 1rem;
+      padding: 12px 14px;
+      background: rgba(0, 212, 170, 0.12);
+      border: 1px solid rgba(0, 212, 170, 0.35);
+      border-radius: var(--radius);
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+    .update-banner.show { display: block; }
+    .update-banner p { margin-bottom: 10px; color: var(--text-muted); }
+    .update-banner strong { color: var(--accent); }
+    .update-banner .update-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .update-banner button {
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-family: var(--font);
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+    }
+    .update-banner .btn-dl { background: var(--accent); color: #0d0f14; }
+    .update-banner .btn-skip { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
   </style>
 </head>
 <body>
   <div class="login-wrap">
+    <div id="updateBanner" class="update-banner" role="status">
+      <p>มีเวอร์ชันใหม่ <strong id="updateBannerVer">—</strong> จาก GitHub — แนะนำอัปเดตก่อนเข้าใช้งาน</p>
+      <div class="update-actions">
+        <button type="button" class="btn-dl" id="btnUpdateDl">ดาวน์โหลดอัปเดต</button>
+        <button type="button" class="btn-skip" id="btnUpdateSkip">เข้าใช้งานต่อ</button>
+      </div>
+    </div>
     <div id="authLoading" class="login-card auth-loading">
       <div class="spinner"></div>
       <p>กำลังตรวจสอบการเข้าสู่ระบบ...</p>
@@ -240,6 +272,50 @@
             authLoading.style.display = 'none';
             loginForm.style.display = 'block';
           });
+      }
+
+      var updateBanner = document.getElementById('updateBanner');
+      var btnUpdateDl = document.getElementById('btnUpdateDl');
+      var btnUpdateSkip = document.getElementById('btnUpdateSkip');
+      var updateBannerVer = document.getElementById('updateBannerVer');
+
+      function showUpdateBanner(version) {
+        if (!updateBanner) return;
+        if (updateBanner.classList.contains('show')) return;
+        updateBannerVer.textContent = version || '';
+        updateBanner.classList.add('show');
+      }
+      if (window.electronAPI && typeof window.electronAPI.onUpdateAvailable === 'function') {
+        window.electronAPI.onUpdateAvailable(function(info) {
+          showUpdateBanner(info && info.version);
+        });
+        if (window.electronAPI.getPendingUpdate) {
+          window.electronAPI.getPendingUpdate().then(function(p) {
+            if (p && p.version) showUpdateBanner(p.version);
+          }).catch(function() {});
+        }
+        if (btnUpdateSkip) {
+          btnUpdateSkip.addEventListener('click', function() {
+            updateBanner.classList.remove('show');
+          });
+        }
+        if (btnUpdateDl) {
+          btnUpdateDl.addEventListener('click', function() {
+            btnUpdateDl.disabled = true;
+            btnUpdateDl.textContent = 'กำลังดาวน์โหลด...';
+            window.electronAPI.downloadAppUpdate().then(function(res) {
+              if (!res || !res.ok) {
+                btnUpdateDl.disabled = false;
+                btnUpdateDl.textContent = 'ดาวน์โหลดอัปเดต';
+                showMsg((res && res.error) || 'ดาวน์โหลดไม่สำเร็จ', true);
+              }
+            }).catch(function() {
+              btnUpdateDl.disabled = false;
+              btnUpdateDl.textContent = 'ดาวน์โหลดอัปเดต';
+              showMsg('ดาวน์โหลดไม่สำเร็จ', true);
+            });
+          });
+        }
       }
 
       fetch('/api/config').then(function(r) { return r.json(); }).then(function(c) {
