@@ -5,14 +5,16 @@ title Build - NKBKConnext System
 cd /d "%~dp0"
 
 set "LOG=%~dp0build-last.log"
-set "OUT=%TEMP%\nkbk_build_%RANDOM%.out"
-echo === Build %date% %time% ===> "%LOG%"
+> "%LOG%" echo === Build %date% %time% ===
 
 echo.
 echo  ========================================
-echo   Build NKBKConnext System ^(ตัวติดตั้ง NSIS เท่านั้น^)
+echo   Build NKBKConnext System ^(NSIS installer^)
 echo   Log: build-last.log
 echo  ========================================
+echo.
+echo  *** ช่วง build จะมีข้อความยาวๆ ด้านล่าง — ใช้เวลาประมาณ 2-15 นาที ***
+echo  *** อย่าปิดหน้าต่างนี้ ถ้ายังไม่จบ ***
 echo.
 
 where node >nul 2>nul
@@ -29,48 +31,43 @@ if errorlevel 1 (
 )
 
 if not exist "node_modules" (
-    echo  กำลัง npm install...
-    call npm.cmd install >> "%LOG%" 2>&1
+    echo  กำลัง npm install ^(ครั้งแรกอาจนาน^)...
+    call npm.cmd install
     if errorlevel 1 (
-        echo  npm install ล้มเหลว - ดู build-last.log
+        echo  npm install ล้มเหลว
         pause
         exit /b 1
     )
 )
 
-echo  ปิดแอป NKBKConnext ก่อน — จะลบ dist แล้ว build ใหม่
-echo  ผล build จะแสดงด้านล่างนี้ ^(และบันทึกใน build-last.log^)
+echo  ปิดแอป NKBKConnext ก่อน — จะลบ dist แล้ว build
 echo.
 taskkill /IM "NKBKConnext System.exe" /F >> "%LOG%" 2>&1
 timeout /t 2 /nobreak >nul
 
 if exist "dist" (
     echo  กำลังลบ dist เดิม...
-    rd /s /q "dist" >> "%LOG%" 2>&1
+    rd /s /q "dist"
 )
 if exist "dist" (
     echo.
-    echo  [ผิดพลาด] ลบ dist ไม่ได้ — ปิดแอปและ Explorer ที่เปิด dist แล้วลองใหม่
+    echo  [ผิดพลาด] ลบ dist ไม่ได้ — ปิดแอปและ Explorer ที่เปิด dist
     pause
     exit /b 1
 )
 
+echo.
 echo  -------- npm run build:installer --------
 echo.
-call npm.cmd run build:installer > "%OUT%" 2>&1
+
+node "%~dp0scripts\npm-run-tee.js" build:installer
 set "ERR=!errorlevel!"
-type "%OUT%"
-type "%OUT%" >> "%LOG%"
-del "%OUT%" 2>nul
 
 if !ERR! neq 0 (
     echo.
-    echo  -------- ลอง build:unpacked ^(โฟลเดอร์ win-unpacked^) --------
-    call npm.cmd run build:unpacked > "%OUT%" 2>&1
+    echo  -------- ลอง build:unpacked --------
+    node "%~dp0scripts\npm-run-tee.js" build:unpacked
     set "ERR=!errorlevel!"
-    type "%OUT%"
-    type "%OUT%" >> "%LOG%"
-    del "%OUT%" 2>nul
 )
 
 if !ERR! neq 0 (
@@ -86,12 +83,11 @@ for /f "delims=" %%F in ('dir /b /a-d "%~dp0dist\*Setup*.exe" 2^>nul') do set "H
 
 if "!HAS_SETUP!"=="1" (
     echo.
-    echo  สำเร็จ — แจกไฟล์ติดตั้งใน dist ^(*Setup*.exe^)
-    echo  ติดตั้งครั้งเดียว อัปเดตผ่าน GitHub ^(เมนูถาด: ตรวจสอบอัปเดต / แจ้งบนหน้า login^)
+    echo  สำเร็จ — ไฟล์ติดตั้งใน dist: *Setup*.exe
 ) else (
     echo.
-    echo  [ผิดพลาด] ไม่พบ *Setup*.exe ใน dist — ดู log ด้านบน ^(มักเป็น NSIS หรือ path^)
-    if exist "dist\win-unpacked\NKBKConnext System.exe" echo  พบแต่ win-unpacked ไม่มี installer
+    echo  [ผิดพลาด] ไม่พบ *Setup*.exe ใน dist
+    if exist "dist\win-unpacked\NKBKConnext System.exe" echo  พบแต่ win-unpacked
     notepad "%LOG%" 2>nul
     pause
     exit /b 1
@@ -99,5 +95,6 @@ if "!HAS_SETUP!"=="1" (
 
 echo.
 explorer "dist"
-pause
+echo  กดปุ่มใดๆ เพื่อปิดหน้าต่าง...
+pause >nul
 exit /b 0
