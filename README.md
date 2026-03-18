@@ -1,4 +1,30 @@
-# ระบบตรวจสอบสถานะระบบ (System Status Monitor)
+# NKBKConnext System
+
+**Repository:** [github.com/srsp-a/NKBKConnext-System](https://github.com/srsp-a/NKBKConnext-System)
+
+แอป Electron สำหรับตรวจสอบและจัดการข้อมูลระบบ (CPU, RAM, ดิสก์, เครือข่าย ฯลฯ) — ล็อกอินด้วยชื่อผู้ใช้ + PIN เจ้าหน้าที่ V2
+
+## Push โค้ดขึ้น GitHub (ครั้งแรก)
+
+```bash
+git remote -v
+git push -u origin main
+```
+
+ถ้า push ไม่ได้เพราะ SSH เป็น user อื่น → ดู `push-to-github.bat` หรือ `docs/GITHUB_RELEASE.md`
+
+## ปล่อยเวอร์ชัน (อัปโหลด installer)
+
+```bat
+set GH_TOKEN=ghp_xxxx
+npm run release
+```
+
+รายละเอียด: [docs/GITHUB_RELEASE.md](docs/GITHUB_RELEASE.md)
+
+---
+
+## ระบบตรวจสอบสถานะ (เดิม)
 
 โปรแกรมแสดงสถานะและข้อมูลระบบของคอมพิวเตอร์ เช่น ชื่อเครื่อง, Windows, CPU, RAM, ดิสก์, เครือข่าย, GPU และอื่นๆ
 
