@@ -53,6 +53,13 @@
       "electron-main.js",
       "node_modules/**"
     ],
+    "afterPack": "scripts/after-pack-monitor-config.js",
+    "extraFiles": [
+      {
+        "from": "build-includes/monitor-config.json",
+        "to": "monitor-config.json"
+      }
+    ],
     "win": {
       "icon": "assets/icon.png",
       "target": [

@@ -16,8 +16,8 @@
 
 ถ้าแอป Monitor ตั้งค่าให้เรียก API บนเซิร์ฟเวอร์ (V2 / api.nkbkcoop.com) จะ**ไม่ต้องวางไฟล์ firebase-service-account.json** บนเครื่องลูก — เจ้าหน้าที่ล็อกอินด้วยชื่อ+PIN เดียวกับ V2 ได้เลย ดูรายละเอียดใน [MONITOR_REMOTE_LOGIN_AND_UPDATE.md](MONITOR_REMOTE_LOGIN_AND_UPDATE.md)
 
-- ตั้งค่า: วางไฟล์ **`monitor-config.json`** ข้าง `NKBKConnext System.exe` เนื้อหา `{ "monitorApiUrl": "https://api.nkbkcoop.com" }`  
-  หรือตั้งตัวแปรสภาพแวดล้อม `MONITOR_API_URL=https://api.nkbkcoop.com`
+- **ตัวติดตั้งใหม่:** มี **`monitor-config.json`** แพ็กมาข้าง `.exe` อยู่แล้ว (ชี้ api.nkbkcoop.com) — build ใหม่จาก repo นี้
+- หรือตั้ง `MONITOR_API_URL` แทนได้
 
 ## 1. ไฟล์ Service Account (เมื่อไม่ใช้โหมด API เซิร์ฟเวอร์)
 

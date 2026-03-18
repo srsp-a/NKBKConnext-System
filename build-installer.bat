@@ -1,4 +1,5 @@
 @echo off
+setlocal EnableExtensions
 chcp 65001 >nul
 title Build - NKBKConnext System
 cd /d "%~dp0"
@@ -36,20 +37,36 @@ if not exist "node_modules" (
     )
 )
 
-echo  กำลัง build โปรดรอ 1-3 นาที ปิดแอป NKBKConnext ก่อน
+echo  ปิดแอป NKBKConnext ก่อน — สคริปต์จะลบ dist เดิมแล้ว build ใหม่ทั้งหมด
+echo.
+taskkill /IM "NKBKConnext System.exe" /F >> "%LOG%" 2>&1
+timeout /t 2 /nobreak >nul
+
+if exist "dist" (
+    echo  กำลังลบ dist เดิม...
+    rd /s /q "dist" >> "%LOG%" 2>&1
+)
+if exist "dist" (
+    echo.
+    echo  [ผิดพลาด] ลบโฟลเดอร์ dist ไม่ได้ — มักเพราะยังเปิดแอปหรือ Explorer อยู่ใน dist
+    echo  ปิด NKBKConnext System และปิดหน้าต่างที่เปิด dist\win-unpacked แล้วรันใหม่
+    echo.
+    pause
+    exit /b 1
+)
+
+echo  กำลัง build โปรดรอ 1-3 นาที...
 echo.
 call npm.cmd run build:installer >> "%LOG%" 2>&1
-set ERR=%errorlevel%
-
-if exist "dist\win-unpacked\NKBKConnext System.exe" goto :ok
-
-echo.
-echo  build แบบเต็มไม่ได้ exe ลองแบบ portable อย่างเดียว...
-call npm.cmd run build:portable >> "%LOG%" 2>&1
-
-if not exist "dist\win-unpacked\NKBKConnext System.exe" (
+if errorlevel 1 (
     echo.
-    echo  [ผิดพลาด] ยังไม่มี dist\win-unpacked\NKBKConnext System.exe
+    echo  build แบบเต็มล้มเหลว — ลองแบบ portable อย่างเดียว...
+    call npm.cmd run build:portable >> "%LOG%" 2>&1
+)
+
+if errorlevel 1 (
+    echo.
+    echo  [ผิดพลาด] build ไม่สำเร็จ ^(npm errorlevel^)
     echo  เปิด build-last.log ดู error ท้ายไฟล์
     echo.
     notepad "%LOG%" 2>nul
@@ -57,10 +74,19 @@ if not exist "dist\win-unpacked\NKBKConnext System.exe" (
     exit /b 1
 )
 
-:ok
+if not exist "dist\win-unpacked\NKBKConnext System.exe" (
+    echo.
+    echo  [ผิดพลาด] ไม่มี dist\win-unpacked\NKBKConnext System.exe
+    echo  เปิด build-last.log ดู error ท้ายไฟล์
+    echo.
+    notepad "%LOG%" 2>nul
+    pause
+    exit /b 1
+)
+
 echo.
-echo  สำเร็จ - มี NKBKConnext System.exe ใน dist\win-unpacked\
-if %ERR% neq 0 echo  หมายเหตุ: ตัวติดตั้ง NSIS อาจสร้างไม่สำเร็จ ดู build-last.log
+echo  สำเร็จ — dist ถูกสร้างใหม่ มี NKBKConnext System.exe ใน dist\win-unpacked\
+echo  ตัวติดตั้ง NSIS อยู่ใน dist\ ^(ถ้า build ผ่าน^)
 echo.
 explorer "dist\win-unpacked"
 pause
