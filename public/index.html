@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NKBKConnext System - ระบบตรวจสอบและจัดการข้อมูลสหกรณ์</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    #auth-check { display: flex; align-items: center; justify-content: center; min-height: 100vh; flex-direction: column; gap: 1rem; color: var(--text-muted); font-family: var(--font); }
+    #auth-check .auth-spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: auth-spin 0.8s linear infinite; }
+    @keyframes auth-spin { to { transform: rotate(360deg); } }
+    body.auth-ready .app { display: flex !important; }
+    body.auth-ready #auth-check { display: none !important; }
+    body:not(.auth-ready) .app { display: none !important; }
+  </style>
+</head>
+<body>
+  <div id="auth-check" aria-live="polite">
+    <div class="auth-spinner" aria-hidden="true"></div>
+    <p>กำลังตรวจสอบการเข้าสู่ระบบ...</p>
+  </div>
+  <div class="app">
+    <div class="title-bar" id="titleBar">
+      <div class="title-bar-drag">
+        <span class="title-bar-title">NKBKConnext System v1.0.1</span>
+      </div>
+      <div class="title-bar-controls">
+        <button type="button" class="title-bar-btn" id="btnMinimize" title="ย่อ">−</button>
+        <button type="button" class="title-bar-btn title-bar-btn-close" id="btnClose" title="ปิด">×</button>
+      </div>
+    </div>
+    <header class="header">
+      <div class="header-inner">
+        <div class="logo">
+          <span class="logo-img-wrap"><img src="logo.png" alt="" class="logo-img"></span>
+          <h1>NKBKConnext System</h1>
+          <span class="subtitle">ระบบตรวจสอบและจัดการข้อมูลสหกรณ์</span>
+        </div>
+      </div>
+    </header>
+
+    <nav class="tab-nav" role="tablist">
+      <button type="button" class="tab-nav-btn active" data-tab="overview" role="tab">ภาพรวม</button>
+      <button type="button" class="tab-nav-btn" data-tab="system" role="tab">ระบบ</button>
+      <button type="button" class="tab-nav-btn" data-tab="storage" role="tab">จัดเก็บ</button>
+      <button type="button" class="tab-nav-btn" data-tab="network" role="tab">เครือข่าย</button>
+      <button type="button" class="tab-nav-btn" data-tab="software" role="tab">ซอฟต์แวร์</button>
+      <button type="button" class="tab-nav-btn" data-tab="ledck" role="tab">ตรวจสอบบังคับคดี</button>
+    </nav>
+
+    <main class="main">
+      <div class="tab-panels">
+        <!-- ภาพรวม -->
+        <section id="panel-overview" class="tab-panel active" role="tabpanel">
+          <div class="grid">
+            <section class="card card-wide">
+              <div class="card-header"><span class="card-icon">🖥️</span><h2>ระบบปฏิบัติการ / ชื่อเครื่อง</h2></div>
+              <div class="card-body os-grid">
+                <div class="info-row"><span class="label">ชื่อเครื่อง</span><span class="value" id="hostname">—</span></div>
+                <div class="info-row"><span class="label">ระบบปฏิบัติการ</span><span class="value" id="distro">—</span></div>
+                <div class="info-row"><span class="label">เวอร์ชัน / Build</span><span class="value" id="release">—</span></div>
+                <div class="info-row"><span class="label">สถาปัตยกรรม</span><span class="value" id="arch">—</span></div>
+                <div class="info-row"><span class="label">เคอร์เนล</span><span class="value" id="kernel">—</span></div>
+                <div class="info-row"><span class="label">เวลาทำงาน</span><span class="value" id="uptime">—</span></div>
+              </div>
+            </section>
+            <section class="card">
+              <div class="card-header"><span class="card-icon">⚡</span><h2>CPU</h2></div>
+              <div class="card-body">
+                <div class="info-row"><span class="label">รุ่น</span><span class="value value-wrap" id="cpuBrand">—</span></div>
+                <div class="info-row"><span class="label">ความเร็ว</span><span class="value" id="cpuSpeed">—</span></div>
+                <div class="info-row"><span class="label">จำนวนคอร์</span><span class="value" id="cpuCores">—</span></div>
+                <div class="meter-wrap">
+                  <span class="label">การใช้ CPU</span>
+                  <div class="meter"><div class="meter-fill" id="cpuLoadBar" style="width: 0%"></div></div>
+                  <span class="meter-value" id="cpuLoad">0%</span>
+                </div>
+              </div>
+            </section>
+            <section class="card">
+              <div class="card-header"><span class="card-icon">🧠</span><h2>หน่วยความจำ (RAM)</h2></div>
+              <div class="card-body">
+                <div class="info-row"><span class="label">ใช้แล้ว</span><span class="value" id="memUsed">—</span></div>
+                <div class="info-row"><span class="label">คงเหลือ</span><span class="value" id="memFree">—</span></div>
+                <div class="info-row"><span class="label">รวม</span><span class="value" id="memTotal">—</span></div>
+                <div class="meter-wrap">
+                  <span class="label">การใช้ RAM</span>
+                  <div class="meter"><div class="meter-fill mem" id="memBar" style="width: 0%"></div></div>
+                  <span class="meter-value" id="memPercent">0%</span>
+                </div>
+              </div>
+            </section>
+            <section class="card">
+              <div class="card-header"><span class="card-icon">📋</span><h2>โปรเซส</h2></div>
+              <div class="card-body">
+                <div class="info-row"><span class="label">โปรเซสทั้งหมด</span><span class="value" id="procAll">—</span></div>
+                <div class="info-row"><span class="label">กำลังรัน</span><span class="value" id="procRunning">—</span></div>
+              </div>
+            </section>
+            <section class="card">
+              <div class="card-header"><span class="card-icon">🌐</span><h2>เครือข่าย</h2></div>
+              <div class="card-body">
+                <div class="network-status-row">
+                  <span class="label">สถานะ</span>
+                  <span class="value" id="networkStatus"><span class="status-dot"></span> —</span>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <!-- ระบบ -->
+        <section id="panel-system" class="tab-panel" role="tabpanel">
+          <div class="grid">
+            <section class="card card-wide">
+              <div class="card-header"><span class="card-icon">🔧</span><h2>ข้อมูลเครื่อง (Hardware)</h2></div>
+              <div class="card-body os-grid">
+                <div class="info-row"><span class="label">ผู้ผลิต</span><span class="value" id="sysManufacturer">—</span></div>
+                <div class="info-row"><span class="label">รุ่นเครื่อง</span><span class="value" id="sysModel">—</span></div>
+                <div class="info-row"><span class="label">ซีเรียล</span><span class="value" id="sysSerial">—</span></div>
+                <div class="info-row"><span class="label">UUID</span><span class="value value-mono value-wrap" id="sysUuid">—</span></div>
+              </div>
+            </section>
+            <section class="card">
+              <div class="card-header"><span class="card-icon">🎮</span><h2>การ์ดจอ (GPU)</h2></div>
+              <div class="card-body">
+                <div class="info-row"><span class="label">รุ่น</span><span class="value value-wrap" id="gpuModel">—</span></div>
+                <div class="info-row"><span class="label">VRAM</span><span class="value" id="gpuVram">—</span></div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <!-- จัดเก็บ -->
+        <section id="panel-storage" class="tab-panel" role="tabpanel">
+          <div class="grid">
+            <section class="card">
+              <div class="card-header"><span class="card-icon">💾</span><h2>ดิสก์</h2></div>
+              <div class="card-body" id="disksList"><p class="muted">—</p></div>
+            </section>
+            <section class="card">
+              <div class="card-header"><span class="card-icon">📁</span><h2>พื้นที่เก็บข้อมูล</h2></div>
+              <div class="card-body" id="storageList"><p class="muted">—</p></div>
+            </section>
+            <section class="card">
+              <div class="card-header"><span class="card-icon">🖨️</span><h2>เครื่องพิมพ์ & ไดรเวอร์</h2></div>
+              <div class="card-body">
+                <div class="subsection"><span class="subsection-label">เครื่องพิมพ์</span><div id="printersList"><p class="muted">—</p></div></div>
+                <div class="subsection"><span class="subsection-label">ไดรเวอร์เครื่องพิมพ์</span><div id="printerDriversList"><p class="muted">—</p></div></div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <!-- เครือข่าย -->
+        <section id="panel-network" class="tab-panel" role="tabpanel">
+          <div class="grid">
+            <section class="card card-wide">
+              <div class="card-header"><span class="card-icon">🌐</span><h2>เครือข่าย (Network)</h2></div>
+              <div class="card-body">
+                <div class="network-status-row"><span class="label">สถานะเครือข่าย</span><span class="value" id="networkStatusFull"><span class="status-dot"></span> —</span></div>
+                <div id="networkList"><p class="muted">—</p></div>
+              </div>
+            </section>
+            <section class="card card-wide nas-connect-card">
+              <div class="card-header"><span class="card-icon">📁</span><h2>เชื่อมต่อ NAS / Network Drive</h2></div>
+              <div class="card-body">
+                <div class="nas-form">
+                  <div class="nas-field">
+                    <label for="nasUncPath">UNC Path</label>
+                    <input type="text" id="nasUncPath" autocomplete="off">
+                  </div>
+                  <div class="nas-field">
+                    <label for="nasUsername">ชื่อผู้ใช้</label>
+                    <input type="text" id="nasUsername" placeholder="username หรือ domain\\user" autocomplete="username">
+                  </div>
+                  <div class="nas-field">
+                    <label for="nasPassword">รหัสผ่าน</label>
+                    <input type="password" id="nasPassword" placeholder="รหัสผ่าน" autocomplete="current-password">
+                  </div>
+                  <div class="nas-field nas-field-inline">
+                    <label for="nasDriveLetter">Drive (ไม่บังคับ)</label>
+                    <select id="nasDriveLetter">
+                      <option value="">— ไม่กำหนด —</option>
+                      <option value="Z">Z:</option>
+                      <option value="Y">Y:</option>
+                      <option value="X">X:</option>
+                      <option value="W">W:</option>
+                      <option value="V">V:</option>
+                    </select>
+                  </div>
+                  <label class="nas-remember toggle">
+                    <input type="checkbox" id="nasRemember" checked aria-label="บันทึกการตั้งค่า">
+                    <span class="toggle-slider"></span>
+                    <span class="nas-remember-label">บันทึกการตั้งค่า</span>
+                  </label>
+                  <div class="nas-actions">
+                    <button type="button" class="btn-test" id="btnNasConnect">
+                      <span class="btn-test-icon">📁</span>
+                      เชื่อมต่อ
+                    </button>
+                    <button type="button" class="btn-test btn-secondary" id="btnNasDisconnect">
+                      <span class="btn-test-icon">✕</span>
+                      ยกเลิกการเชื่อมต่อ
+                    </button>
+                    <button type="button" class="btn-test btn-open-drive nas-open-hidden" id="btnNasOpenDrive" title="เปิดโฟลเดอร์ใน Explorer">
+                      <span class="btn-test-icon">📂</span>
+                      เปิดโฟลเดอร์
+                    </button>
+                  </div>
+                </div>
+                <div class="nas-result" id="nasResult" aria-live="polite"></div>
+              </div>
+            </section>
+            <section class="card card-wide web-connect-card">
+              <div class="card-header"><span class="card-icon">🌐</span><h2>เชื่อมต่อกับเว็บไซต์</h2></div>
+              <div class="card-body">
+                <div class="web-form">
+                  <div class="nas-field">
+                    <label for="webUrl">URL</label>
+                    <input type="text" id="webUrl" placeholder="http://oa.nkbkcoop.com/nkh" autocomplete="off">
+                  </div>
+                  <div class="nas-field">
+                    <label for="webDatabase">ฐานข้อมูล (ไม่บังคับ)</label>
+                    <input type="text" id="webDatabase" placeholder="isconkh_SQL" autocomplete="off">
+                  </div>
+                  <div class="nas-field">
+                    <label for="webUsername">ชื่อผู้ใช้</label>
+                    <input type="text" id="webUsername" placeholder="username" autocomplete="username">
+                  </div>
+                  <div class="nas-field">
+                    <label for="webPassword">รหัสผ่าน</label>
+                    <input type="password" id="webPassword" placeholder="รหัสผ่าน" autocomplete="current-password">
+                  </div>
+                  <label class="nas-remember toggle">
+                    <input type="checkbox" id="webRemember" checked aria-label="บันทึกการตั้งค่า">
+                    <span class="toggle-slider"></span>
+                    <span class="nas-remember-label">บันทึกการตั้งค่า</span>
+                  </label>
+                  <div class="nas-actions">
+                    <button type="button" class="btn-test" id="btnWebOpen">
+                      <span class="btn-test-icon">🌐</span>
+                      เปิดเว็บไซต์
+                    </button>
+                    <button type="button" class="btn-test btn-open-in-app" id="btnWebOpenInApp" title="เปิดในแอป แล้วเติม User/Pass ให้อัตโนมัติ">
+                      <span class="btn-test-icon">📱</span>
+                      เปิดในแอป
+                    </button>
+                  </div>
+                </div>
+                <div class="nas-result" id="webResult" aria-live="polite"></div>
+              </div>
+            </section>
+            <section class="card card-wide ledck-connect-card">
+              <div class="card-header"><span class="card-icon">🔍</span><h2>ระบบตรวจสอบ led-ck.com</h2></div>
+              <div class="card-body">
+                <p class="muted ledck-desc">เปิดระบบตรวจสอบจาก led-ck.com ในแอป หรือเปิดในเบราว์เซอร์</p>
+                <div class="web-form ledck-form">
+                  <div class="nas-field">
+                    <label for="ledckUsername">ชื่อผู้ใช้งาน</label>
+                    <input type="text" id="ledckUsername" placeholder="admin" autocomplete="username">
+                  </div>
+                  <div class="nas-field">
+                    <label for="ledckPassword">รหัสผ่าน</label>
+                    <input type="password" id="ledckPassword" placeholder="รหัสผ่าน" autocomplete="current-password">
+                  </div>
+                  <label class="nas-remember toggle">
+                    <input type="checkbox" id="ledckRemember" checked aria-label="จดจำฉันไว้">
+                    <span class="toggle-slider"></span>
+                    <span class="nas-remember-label">จดจำฉันไว้</span>
+                  </label>
+                  <div class="nas-actions">
+                    <button type="button" class="btn-test" id="btnLedckOpen">
+                      <span class="btn-test-icon">🌐</span>
+                      เปิดเว็บไซต์
+                    </button>
+                    <button type="button" class="btn-test btn-open-in-app" id="btnLedckOpenInApp" title="เปิดในแอป แล้วเติม User/Pass ให้อัตโนมัติ">
+                      <span class="btn-test-icon">📱</span>
+                      เปิดในแอป
+                    </button>
+                  </div>
+                </div>
+                <div class="nas-result" id="ledckResult" aria-live="polite"></div>
+              </div>
+            </section>
+            <section class="card card-wide speed-test-card">
+              <div class="card-header"><span class="card-icon">📶</span><h2>ทดสอบความเร็วเน็ต (Speed Test)</h2></div>
+              <div class="card-body speed-test-body">
+                <div class="speed-test-readouts">
+                  <div class="speed-readout">
+                    <span class="speed-readout-label">ดาวน์โหลด Mbps</span>
+                    <span class="speed-readout-value" id="speedDownload">—</span>
+                  </div>
+                  <div class="speed-readout">
+                    <span class="speed-readout-label">อัปโหลด Mbps</span>
+                    <span class="speed-readout-value" id="speedUpload">—</span>
+                  </div>
+                  <div class="speed-readout speed-ping">
+                    <span class="speed-readout-label">Ping ms</span>
+                    <span class="speed-readout-value" id="speedPing">—</span>
+                  </div>
+                </div>
+                <div class="speed-gauge-wrap">
+                  <svg class="speed-gauge" id="speedGauge" viewBox="0 0 200 120" aria-hidden="true">
+                    <defs>
+                      <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="#54a0ff"/>
+                        <stop offset="40%" stop-color="#00d4aa"/>
+                        <stop offset="100%" stop-color="#a855f7"/>
+                      </linearGradient>
+                    </defs>
+                    <path class="gauge-arc" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="url(#gaugeGrad)" stroke-width="12" stroke-linecap="round"/>
+                    <text x="22" y="108" class="gauge-scale" fill="currentColor">0</text>
+                    <text x="95" y="28" class="gauge-scale" fill="currentColor">500</text>
+                    <text x="172" y="108" class="gauge-scale" fill="currentColor">1000</text>
+                    <line id="gaugeNeedle" x1="100" y1="100" x2="100" y2="45" stroke="#eef0f2" stroke-width="3" stroke-linecap="round"/>
+                  </svg>
+                  <div class="speed-gauge-value" id="speedGaugeValue">0</div>
+                  <span class="speed-gauge-unit">Mbps</span>
+                </div>
+                <div class="speed-test-actions">
+                  <button type="button" class="btn-test btn-speed-test" id="btnSpeedTest">
+                    <span class="btn-test-icon" id="speedTestIcon">⟳</span>
+                    ทดสอบความเร็ว
+                  </button>
+                  <span class="speed-test-status" id="speedTestStatus"></span>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <!-- ซอฟต์แวร์ -->
+        <section id="panel-software" class="tab-panel" role="tabpanel">
+          <div class="grid">
+            <section class="card">
+              <div class="card-header"><span class="card-icon">📄</span><h2>Microsoft Office</h2></div>
+              <div class="card-body" id="officeList"><p class="muted">—</p></div>
+            </section>
+            <section class="card">
+              <div class="card-header"><span class="card-icon">💬</span><h2>LINE</h2></div>
+              <div class="card-body" id="lineBody"><p class="muted">—</p></div>
+            </section>
+            <section class="card">
+              <div class="card-header"><span class="card-icon">🔄</span><h2>อัปเดต Windows</h2></div>
+              <div class="card-body" id="windowsUpdateBody"><p class="muted">—</p></div>
+            </section>
+            <section class="card">
+              <div class="card-header"><span class="card-icon">🗑️</span><h2>ล้างไฟล์ชั่วคราว (Temp)</h2></div>
+              <div class="card-body">
+                <p class="muted" style="margin-bottom: 0.75rem;">ล้างโฟลเดอร์ Temp ของผู้ใช้ปัจจุบัน เพื่อปล่อยพื้นที่ดิสก์</p>
+                <button type="button" class="btn-test" id="btnClearTemp">
+                  <span class="btn-test-icon" id="clearTempIcon">🗑️</span>
+                  เคลียร์ Temp
+                </button>
+                <div class="clear-temp-result" id="clearTempResult" aria-live="polite"></div>
+              </div>
+            </section>
+            <section class="card" id="batteryCard">
+              <div class="card-header"><span class="card-icon">🔋</span><h2>แบตเตอรี่</h2></div>
+              <div class="card-body" id="batteryBody"><p class="muted">—</p></div>
+            </section>
+          </div>
+        </section>
+
+        <!-- ตรวจสอบบังคับคดี (ระบบโคลน led-ck.com) -->
+        <section id="panel-ledck" class="tab-panel" role="tabpanel">
+          <div class="ledck-wrap">
+            <div class="ledck-main-wrap" id="ledckMainWrap">
+              <div class="card card-wide ledck-member-card">
+                <div class="card-header ledck-member-header">
+                  <span class="card-icon">📋</span>
+                  <h2>ตรวจสอบบังคับคดี</h2>
+                  <div class="ledck-header-actions">
+                    <button type="button" class="btn-test btn-small" id="ledckBtnCheckStatus" title="ตรวจสอบสถานะ">⚖️ ตรวจสอบสถานะ</button>
+                    <button type="button" class="btn-test btn-small btn-primary" id="ledckBtnAddMember">➕ เพิ่มสมาชิก</button>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div class="ledck-filters">
+                    <input type="text" id="ledckSearch" placeholder="ค้นหา เลขบัตร หรือชื่อ..." class="ledck-search-input">
+                    <select id="ledckStatusFilter">
+                      <option value="">— สถานะทั้งหมด —</option>
+                      <option value="ปกติ">ปกติ</option>
+                      <option value="ล้มละลาย">ล้มละลาย</option>
+                      <option value="ยังไม่ตรวจสอบ">ยังไม่ตรวจสอบ</option>
+                    </select>
+                    <button type="button" class="btn-test btn-small" id="ledckBtnSearch">ค้นหา</button>
+                    <button type="button" class="btn-test btn-small" id="ledckBtnClearFilter">ล้างค่า</button>
+                  </div>
+                  <div class="ledck-table-wrap">
+                    <table class="ledck-table">
+                      <thead>
+                        <tr>
+                          <th>ชื่อ - นามสกุล</th>
+                          <th>สถานะ</th>
+                          <th>ตรวจสอบล่าสุด</th>
+                          <th>จัดการ</th>
+                        </tr>
+                      </thead>
+                      <tbody id="ledckTableBody"></tbody>
+                    </table>
+                  </div>
+                  <p class="muted" id="ledckTableEmpty">ไม่มีข้อมูลสมาชิก</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Modal สถานะบังคับคดี -->
+          <div class="ledck-modal" id="ledckModalStatus" aria-hidden="true">
+            <div class="ledck-modal-backdrop"></div>
+            <div class="ledck-modal-box">
+              <div class="ledck-modal-header">
+                <h3 id="ledckModalStatusTitle">สถานะบังคับคดี</h3>
+                <button type="button" class="ledck-modal-close" id="ledckModalStatusClose" aria-label="ปิด">×</button>
+              </div>
+              <div class="ledck-modal-body" id="ledckModalStatusBody"></div>
+            </div>
+          </div>
+          <!-- Modal รายละเอียดคดี -->
+          <div class="ledck-modal" id="ledckModalCase" aria-hidden="true">
+            <div class="ledck-modal-backdrop"></div>
+            <div class="ledck-modal-box ledck-modal-box-wide">
+              <div class="ledck-modal-header">
+                <h3 id="ledckModalCaseTitle">รายละเอียดคดี</h3>
+                <button type="button" class="ledck-modal-close" id="ledckModalCaseClose" aria-label="ปิด">×</button>
+              </div>
+              <div class="ledck-modal-body" id="ledckModalCaseBody"></div>
+              <div class="ledck-modal-footer">
+                <button type="button" class="btn-test" id="ledckModalCaseCloseBtn">ปิด</button>
+              </div>
+            </div>
+          </div>
+          <!-- Modal เพิ่ม/แก้ไข สมาชิก -->
+          <div class="ledck-modal" id="ledckModalMember" aria-hidden="true">
+            <div class="ledck-modal-backdrop"></div>
+            <div class="ledck-modal-box">
+              <div class="ledck-modal-header">
+                <h3 id="ledckModalMemberTitle">เพิ่มสมาชิก</h3>
+                <button type="button" class="ledck-modal-close" id="ledckModalMemberClose" aria-label="ปิด">×</button>
+              </div>
+              <div class="ledck-modal-body">
+                <div class="web-form">
+                  <div class="nas-field">
+                    <label for="ledckMemberIdCard">เลขบัตรประชาชน</label>
+                    <input type="text" id="ledckMemberIdCard" placeholder="เช่น 3430500521205">
+                  </div>
+                  <div class="nas-field">
+                    <label for="ledckMemberFullName">ชื่อ - นามสกุล</label>
+                    <input type="text" id="ledckMemberFullName" placeholder="นายเอกชัย นารถชัย">
+                  </div>
+                </div>
+              </div>
+              <div class="ledck-modal-footer">
+                <div class="ledck-member-result" id="ledckMemberResult" aria-live="polite"></div>
+                <button type="button" class="btn-test btn-secondary" id="ledckModalMemberCancel">ยกเลิก</button>
+                <button type="button" class="btn-test" id="ledckModalMemberSave">บันทึก</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <span class="footer-left">
+        <label class="toggle theme-toggle footer-toggle" title="โหมดสว่าง / โหมดมืด">
+          <input type="checkbox" id="themeSwitch" aria-label="โหมดสว่าง / โหมดมืด">
+          <span class="toggle-slider"></span>
+        </label>
+        <button type="button" class="btn-refresh footer-refresh" id="btnRefresh" title="รีเฟรช">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6M1 20v-6h6"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+        </button>
+        <span class="last-update footer-update" id="lastUpdate">—</span>
+        <span>NKBKConnext System v1.0.1</span>
+        <span class="dot" aria-hidden="true">•</span>
+        <span class="footer-status">
+          <span class="status-dot footer-status-dot" id="footerStatusDot"></span>
+          <span id="statusText">กำลังโหลด...</span>
+        </span>
+        <span class="dot" aria-hidden="true">•</span>
+        <button type="button" class="btn-logout" id="btnLogout" title="ออกจากระบบ">ออกจากระบบ</button>
+      </span>
+      <span class="footer-copyright">© SIRASUPA CORPORATION (THAILAND) CO., LTD.</span>
+    </footer>
+  </div>
+
+  <script>
+    (function() {
+      var token = localStorage.getItem('monitor_token');
+      var apiBase = '';
+      function redirectToLogin() { window.location.replace('login.html'); }
+      function onAuthReady() {
+        document.body.classList.add('auth-ready');
+        var btn = document.getElementById('btnLogout');
+        if (btn) {
+          btn.addEventListener('click', function() {
+            if (token) {
+              var logoutUrl = apiBase ? (apiBase + '/api/monitor-logout') : '/api/monitor-logout';
+              fetch(logoutUrl, { method: 'POST', headers: { 'X-Monitor-Token': token }, body: JSON.stringify({}) }).catch(function() {});
+            }
+            localStorage.removeItem('monitor_token');
+            window.location.href = 'login.html';
+          });
+        }
+      }
+      if (!token) {
+        redirectToLogin();
+        return;
+      }
+      function checkMe() {
+        var meUrl = apiBase ? (apiBase + '/api/monitor-me') : '/api/monitor-me';
+        fetch(meUrl, { headers: { 'X-Monitor-Token': token } })
+          .then(function(r) {
+            if (r.status === 401) { redirectToLogin(); return null; }
+            return r.json();
+          })
+          .then(function(data) {
+            if (data && data.ok) onAuthReady();
+            else redirectToLogin();
+          })
+          .catch(function() { redirectToLogin(); });
+      }
+      fetch('/api/config').then(function(r) { return r.json(); }).then(function(c) {
+        apiBase = (c.monitorApiUrl || '').trim().replace(/\/$/, '');
+        checkMe();
+      }).catch(function() { checkMe(); });
+    })();
+  </script>
+  <script src="app.js"></script>
+</body>
+</html>

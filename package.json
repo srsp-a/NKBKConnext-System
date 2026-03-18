@@ -1,0 +1,91 @@
+{
+  "name": "system-status-monitor",
+  "version": "1.0.0",
+  "description": "ระบบตรวจสอบและจัดการข้อมูลสหกรณ์",
+  "main": "electron-main.js",
+  "scripts": {
+    "start": "electron .",
+    "server": "node server.js",
+    "prepare-icon": "node scripts/icon-remove-black.js",
+    "copy-icon": "node -e \"require('fs').copyFileSync('public/logo.png','assets/icon.png')\"",
+    "icon-white-bg": "node scripts/icon-white-bg.js",
+    "icon-transparent-bg": "node scripts/icon-transparent-bg.js",
+    "create-monitor-user": "node scripts/create-monitor-user.js",
+    "build": "electron-builder --win",
+    "build:installer": "electron-builder --win",
+    "build:portable": "electron-builder --win --dir",
+    "build:nsis": "electron-builder --win --config.win.target=nsis",
+    "release": "electron-builder --win --publish always"
+  },
+  "keywords": [
+    "system",
+    "monitor",
+    "dashboard"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/srsp-a/NKBKConnext-System.git"
+  },
+  "dependencies": {
+    "electron-updater": "^6.1.7",
+    "express": "^4.18.2",
+    "firebase-admin": "^12.7.0",
+    "systeminformation": "^5.21.20"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1",
+    "jimp": "^0.22.12"
+  },
+  "build": {
+    "appId": "com.systemstatus.monitor",
+    "productName": "NKBKConnext System",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "server.js",
+      "preload.js",
+      "public/**",
+      "assets/**",
+      "electron-main.js",
+      "node_modules/**"
+    ],
+    "win": {
+      "icon": "assets/icon.png",
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "publish": {
+      "provider": "github",
+      "releaseType": "release",
+      "vPrefixedTagName": true
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "installerLanguages": [
+        "en-US"
+      ],
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "NKBKConnext System",
+      "uninstallDisplayName": "NKBKConnext System"
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "folders": [
+    {
+      "name": "IT",
+      "path": "."
+    },
+    {
+      "name": "V2",
+      "path": "../Github/V2"
+    }
+  ],
+  "settings": {}
+}

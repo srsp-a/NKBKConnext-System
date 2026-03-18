@@ -1,0 +1,15 @@
+node_modules/
+dist/
+*.log
+build-last.log
+.firebase-service-account.json
+firebase-service-account.json
+firebase-service-account
+serviceAccountKey.json
+monitor-config.json
+.env
+.env.*
+.DS_Store
+Thumbs.db
+*.asar.unpacked
+create-shortcut.vbs

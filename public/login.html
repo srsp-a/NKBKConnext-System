@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>เข้าสู่ระบบ | NKBKConnext System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d0f14;
+      --bg-card: #14171f;
+      --border: rgba(255, 255, 255, 0.06);
+      --text: #e8eaed;
+      --text-muted: #8b8f99;
+      --accent: #00d4aa;
+      --accent-dim: rgba(0, 212, 170, 0.15);
+      --red: #ff6b6b;
+      --radius: 14px;
+      --font: 'Kanit', sans-serif;
+    }
+    html { font-size: 16px; -webkit-font-smoothing: antialiased; }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background-image:
+        radial-gradient(ellipse 120% 80% at 50% -20%, var(--accent-dim), transparent 50%);
+    }
+    .login-wrap {
+      width: 100%;
+      max-width: 400px;
+    }
+    .login-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2rem;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+    }
+    .login-header {
+      text-align: center;
+      margin-bottom: 1.75rem;
+    }
+    .login-header .logo-img-wrap {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 0.5rem;
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+      border-radius: 50%;
+      overflow: hidden;
+    }
+    .login-header .logo-img-wrap .logo-icon {
+      width: 115%;
+      height: 115%;
+      max-width: none;
+      object-fit: cover;
+      object-position: center;
+      margin: -7.5%;
+      display: block;
+      border: none;
+      background: transparent;
+      box-shadow: none;
+      outline: none;
+    }
+    .login-header h1 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .login-header p {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+    .form-group label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .form-group input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.15);
+    }
+    .form-group input::placeholder {
+      color: var(--text-muted);
+      opacity: 0.8;
+    }
+    .btn-login {
+      width: 100%;
+      padding: 14px;
+      margin-top: 0.5rem;
+      background: var(--accent);
+      color: #0d0f14;
+      border: none;
+      border-radius: 10px;
+      font-family: var(--font);
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .btn-login:hover {
+      background: #00e6b8;
+      transform: translateY(-1px);
+    }
+    .btn-login:active { transform: translateY(0); }
+    .btn-login:disabled {
+      background: var(--text-muted);
+      cursor: not-allowed;
+      transform: none;
+    }
+    .login-msg {
+      margin-top: 1rem;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 0.875rem;
+      display: none;
+    }
+    .login-msg.show { display: block; }
+    .login-msg.error {
+      background: rgba(255, 107, 107, 0.15);
+      border: 1px solid rgba(255, 107, 107, 0.3);
+      color: var(--red);
+    }
+    .login-msg.success {
+      background: rgba(0, 212, 170, 0.15);
+      border: 1px solid rgba(0, 212, 170, 0.3);
+      color: var(--accent);
+    }
+    .auth-loading {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+    }
+    .auth-loading .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 1rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="login-wrap">
+    <div id="authLoading" class="login-card auth-loading">
+      <div class="spinner"></div>
+      <p>กำลังตรวจสอบการเข้าสู่ระบบ...</p>
+    </div>
+    <div id="loginForm" class="login-card" style="display: none;">
+      <div class="login-header">
+        <span class="logo-img-wrap"><img src="logo.png" alt="" class="logo-icon"></span>
+        <h1>NKBKConnext System</h1>
+        <p>ระบบตรวจสอบและจัดการข้อมูลสหกรณ์</p>
+      </div>
+      <form id="form" novalidate>
+        <div class="form-group">
+          <label for="username">ชื่อผู้ใช้</label>
+          <input type="text" id="username" name="username" placeholder="ชื่อผู้ใช้" autocomplete="username" required>
+        </div>
+        <div class="form-group">
+          <label for="pin">รหัส PIN (6 หลัก)</label>
+          <input type="password" id="pin" name="pin" placeholder="••••••" autocomplete="off" inputmode="numeric" pattern="[0-9]*" maxlength="6" required>
+        </div>
+        <div id="loginMsg" class="login-msg"></div>
+        <button type="submit" class="btn-login" id="btnSubmit">เข้าสู่ระบบ</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      var authLoading = document.getElementById('authLoading');
+      var loginForm = document.getElementById('loginForm');
+      var form = document.getElementById('form');
+      var usernameInput = document.getElementById('username');
+      var pinInput = document.getElementById('pin');
+      var loginMsg = document.getElementById('loginMsg');
+      var btnSubmit = document.getElementById('btnSubmit');
+      var apiBase = '';
+
+      function showMsg(text, isError) {
+        loginMsg.textContent = text;
+        loginMsg.className = 'login-msg show ' + (isError ? 'error' : 'success');
+      }
+      function hideMsg() {
+        loginMsg.className = 'login-msg';
+        loginMsg.textContent = '';
+      }
+      function apiUrl(path) { return apiBase ? (apiBase + path) : path; }
+
+      function checkTokenAndShowForm() {
+        var token = localStorage.getItem('monitor_token');
+        if (!token) {
+          authLoading.style.display = 'none';
+          loginForm.style.display = 'block';
+          return;
+        }
+        fetch(apiUrl('/api/monitor-me'), { headers: { 'X-Monitor-Token': token } })
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (data && data.ok) {
+              window.location.replace('index.html');
+              return;
+            }
+            authLoading.style.display = 'none';
+            loginForm.style.display = 'block';
+          })
+          .catch(function() {
+            authLoading.style.display = 'none';
+            loginForm.style.display = 'block';
+          });
+      }
+
+      fetch('/api/config').then(function(r) { return r.json(); }).then(function(c) {
+        apiBase = (c.monitorApiUrl || '').trim().replace(/\/$/, '');
+        checkTokenAndShowForm();
+      }).catch(function() { checkTokenAndShowForm(); });
+
+      pinInput.addEventListener('input', function() {
+        this.value = this.value.replace(/\D/g, '').slice(0, 6);
+      });
+
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var username = (usernameInput.value || '').trim();
+        var pin = (pinInput.value || '').trim();
+        if (!username) {
+          showMsg('กรุณากรอกชื่อผู้ใช้', true);
+          return;
+        }
+        if (!/^\d{6}$/.test(pin)) {
+          showMsg('รหัส PIN ต้องเป็นตัวเลข 6 หลัก', true);
+          return;
+        }
+        hideMsg();
+        btnSubmit.disabled = true;
+        btnSubmit.textContent = 'กำลังเข้าสู่ระบบ...';
+        fetch(apiUrl('/api/monitor-login'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: username, pin: pin })
+        })
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (data && data.ok && data.token) {
+              localStorage.setItem('monitor_token', data.token);
+              showMsg('เข้าสู่ระบบสำเร็จ กำลังเปลี่ยนหน้า...', false);
+              window.location.replace('index.html');
+            } else {
+              btnSubmit.disabled = false;
+              btnSubmit.textContent = 'เข้าสู่ระบบ';
+              showMsg(data && data.message ? data.message : 'ชื่อผู้ใช้หรือรหัส PIN ไม่ถูกต้อง', true);
+            }
+          })
+          .catch(function() {
+            btnSubmit.disabled = false;
+            btnSubmit.textContent = 'เข้าสู่ระบบ';
+            showMsg('เกิดข้อผิดพลาด กรุณาลองใหม่', true);
+          });
+      });
+    })();
+  </script>
+</body>
+</html>
