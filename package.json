@@ -1,6 +1,6 @@
 {
   "name": "system-status-monitor",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "ระบบตรวจสอบและจัดการข้อมูลสหกรณ์",
   "main": "electron-main.js",
   "scripts": {
@@ -11,11 +11,11 @@
     "icon-white-bg": "node scripts/icon-white-bg.js",
     "icon-transparent-bg": "node scripts/icon-transparent-bg.js",
     "create-monitor-user": "node scripts/create-monitor-user.js",
-    "build": "electron-builder --win --config.win.target=nsis",
+    "build": "electron-builder --win",
     "build:installer": "electron-builder --win --config.win.target=nsis",
+    "build:portable": "electron-builder --win --config.win.target=portable",
+    "build:dir": "electron-builder --win --dir",
     "build:unpacked": "electron-builder --win --dir",
-    "build:portable": "electron-builder --win --dir",
-    "build:nsis": "electron-builder --win --config.win.target=nsis",
     "release": "electron-builder --win --publish always"
   },
   "keywords": [
@@ -48,11 +48,16 @@
     },
     "files": [
       "server.js",
+      "thai-public-holidays.json",
       "preload.js",
       "public/**",
       "assets/**",
       "electron-main.js",
+      "preload-first-run.js",
       "node_modules/**"
+    ],
+    "asarUnpack": [
+      "assets/**"
     ],
     "afterPack": "scripts/after-pack-monitor-config.js",
     "extraFiles": [
@@ -69,25 +74,33 @@
           "arch": [
             "x64"
           ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
         }
       ]
-    },
-    "publish": {
-      "provider": "github",
-      "releaseType": "release",
-      "vPrefixedTagName": true
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "allowElevation": true,
-      "installerLanguages": [
-        "en-US"
-      ],
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
+      "include": "build/installer.nsh",
+      "installerHeader": "build/installerHeader.bmp",
+      "installerSidebar": "build/installerSidebar.bmp",
+      "artifactName": "${productName} Setup ${version}.${ext}",
       "shortcutName": "NKBKConnext System",
       "uninstallDisplayName": "NKBKConnext System"
+    },
+    "portable": {
+      "artifactName": "${productName} ${version} Portable.exe"
+    },
+    "publish": {
+      "provider": "github",
+      "releaseType": "release",
+      "vPrefixedTagName": true
     }
   }
 }
