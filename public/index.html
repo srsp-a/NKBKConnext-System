@@ -25,7 +25,7 @@
   <div class="app">
     <div class="title-bar" id="titleBar">
       <div class="title-bar-drag">
-        <span class="title-bar-title">NKBKConnext System v1.0.1</span>
+        <span class="title-bar-title">NKBKConnext System <span id="appVersionTitle"></span></span>
       </div>
       <div class="title-bar-controls">
         <button type="button" class="title-bar-btn" id="btnMinimize" title="ย่อ">−</button>
@@ -48,7 +48,6 @@
       <button type="button" class="tab-nav-btn" data-tab="storage" role="tab">จัดเก็บ</button>
       <button type="button" class="tab-nav-btn" data-tab="network" role="tab">เครือข่าย</button>
       <button type="button" class="tab-nav-btn" data-tab="software" role="tab">ซอฟต์แวร์</button>
-      <button type="button" class="tab-nav-btn" data-tab="ledck" role="tab">ตรวจสอบบังคับคดี</button>
     </nav>
 
     <main class="main">
@@ -56,8 +55,61 @@
         <!-- ภาพรวม -->
         <section id="panel-overview" class="tab-panel active" role="tabpanel">
           <div class="grid">
+            <section class="card card-wide" id="monitorUserCard">
+              <div class="card-header">
+                <span class="card-icon">👤</span>
+                <h2>รายละเอียดผู้ใช้</h2>
+                <div class="card-header-actions">
+                  <button type="button" class="btn-test btn-small btn-primary" id="monitorBtnChangePin" title="เปลี่ยนรหัส PIN">เปลี่ยน PIN</button>
+                </div>
+              </div>
+              <div class="card-body os-grid">
+                <div class="info-row"><span class="label">ชื่อ - สกุล</span><span class="value" id="monitorUserFullname">—</span></div>
+                <div class="info-row"><span class="label">อีเมล</span><span class="value" id="monitorUserEmail">—</span></div>
+                <div class="info-row"><span class="label">ชื่อผู้ใช้</span><span class="value" id="monitorUserUsername">—</span></div>
+                <div class="info-row"><span class="label">กลุ่มผู้ใช้</span><span class="value" id="monitorUserGroup">—</span></div>
+                <div class="info-row"><span class="label">บทบาท</span><span class="value" id="monitorUserRole">—</span></div>
+              </div>
+            </section>
+            <section class="card card-wide" id="monitorWorkCard">
+              <div class="card-header"><span class="card-icon">💼</span><h2>ข้อมูลงาน</h2></div>
+              <div class="card-body os-grid">
+                <div class="info-row"><span class="label">ตำแหน่ง</span><span class="value" id="monitorWorkPosition">—</span></div>
+                <div class="info-row"><span class="label">ฝ่ายงาน</span><span class="value" id="monitorWorkDepartment">—</span></div>
+                <div class="info-row"><span class="label">งาน</span><span class="value" id="monitorWorkJob">—</span></div>
+                <div class="info-row"><span class="label">หน่วยบริการ</span><span class="value" id="monitorWorkUnit">—</span></div>
+                <div class="info-row"><span class="label">ช่องบริการที่</span><span class="value" id="monitorWorkServiceCounter">—</span></div>
+                <div class="info-row"><span class="label">วันเข้าทำงาน</span><span class="value" id="monitorWorkEmploymentStart">—</span></div>
+                <div class="monitor-tenure-strip" role="status">
+                  <span class="label">อายุงาน</span>
+                  <span class="value" id="monitorWorkTenure">—</span>
+                </div>
+              </div>
+            </section>
+            <section class="card card-wide" id="monitorTodayCard">
+              <div class="card-header">
+                <span class="card-icon">🕐</span>
+                <h2>เข้า–ออกงาน วันนี้</h2>
+                <div class="card-header-actions">
+                  <button type="button" class="btn-test btn-small" id="monitorBtnAttendanceHistory" title="ดูย้อนหลังรายเดือน">ดูรายเดือน</button>
+                </div>
+              </div>
+              <div class="card-body os-grid">
+                <div class="info-row"><span class="label">วันที่</span><span class="value" id="monitorTodayDate">—</span></div>
+                <div class="info-row">
+                  <span class="label">เวลาเข้า</span>
+                  <div class="value monitor-checkin-combo" id="monitorTodayCheckInWrap">
+                    <span id="monitorTodayCheckIn">—</span><span id="monitorTodayCheckInLate" class="monitor-late-inline" hidden></span>
+                  </div>
+                </div>
+                <div class="info-row"><span class="label">เวลาออก</span><span class="value" id="monitorTodayCheckOut">—</span></div>
+              </div>
+            </section>
             <section class="card card-wide">
-              <div class="card-header"><span class="card-icon">🖥️</span><h2>ระบบปฏิบัติการ / ชื่อเครื่อง</h2></div>
+              <div class="card-header">
+                <span class="card-icon">🖥️</span>
+                <h2>ระบบปฏิบัติการ / ชื่อเครื่อง</h2>
+              </div>
               <div class="card-body os-grid">
                 <div class="info-row"><span class="label">ชื่อเครื่อง</span><span class="value" id="hostname">—</span></div>
                 <div class="info-row"><span class="label">ระบบปฏิบัติการ</span><span class="value" id="distro">—</span></div>
@@ -254,38 +306,6 @@
                 <div class="nas-result" id="webResult" aria-live="polite"></div>
               </div>
             </section>
-            <section class="card card-wide ledck-connect-card">
-              <div class="card-header"><span class="card-icon">🔍</span><h2>ระบบตรวจสอบ led-ck.com</h2></div>
-              <div class="card-body">
-                <p class="muted ledck-desc">เปิดระบบตรวจสอบจาก led-ck.com ในแอป หรือเปิดในเบราว์เซอร์</p>
-                <div class="web-form ledck-form">
-                  <div class="nas-field">
-                    <label for="ledckUsername">ชื่อผู้ใช้งาน</label>
-                    <input type="text" id="ledckUsername" placeholder="admin" autocomplete="username">
-                  </div>
-                  <div class="nas-field">
-                    <label for="ledckPassword">รหัสผ่าน</label>
-                    <input type="password" id="ledckPassword" placeholder="รหัสผ่าน" autocomplete="current-password">
-                  </div>
-                  <label class="nas-remember toggle">
-                    <input type="checkbox" id="ledckRemember" checked aria-label="จดจำฉันไว้">
-                    <span class="toggle-slider"></span>
-                    <span class="nas-remember-label">จดจำฉันไว้</span>
-                  </label>
-                  <div class="nas-actions">
-                    <button type="button" class="btn-test" id="btnLedckOpen">
-                      <span class="btn-test-icon">🌐</span>
-                      เปิดเว็บไซต์
-                    </button>
-                    <button type="button" class="btn-test btn-open-in-app" id="btnLedckOpenInApp" title="เปิดในแอป แล้วเติม User/Pass ให้อัตโนมัติ">
-                      <span class="btn-test-icon">📱</span>
-                      เปิดในแอป
-                    </button>
-                  </div>
-                </div>
-                <div class="nas-result" id="ledckResult" aria-live="polite"></div>
-              </div>
-            </section>
             <section class="card card-wide speed-test-card">
               <div class="card-header"><span class="card-icon">📶</span><h2>ทดสอบความเร็วเน็ต (Speed Test)</h2></div>
               <div class="card-body speed-test-body">
@@ -366,104 +386,79 @@
           </div>
         </section>
 
-        <!-- ตรวจสอบบังคับคดี (ระบบโคลน led-ck.com) -->
-        <section id="panel-ledck" class="tab-panel" role="tabpanel">
-          <div class="ledck-wrap">
-            <div class="ledck-main-wrap" id="ledckMainWrap">
-              <div class="card card-wide ledck-member-card">
-                <div class="card-header ledck-member-header">
-                  <span class="card-icon">📋</span>
-                  <h2>ตรวจสอบบังคับคดี</h2>
-                  <div class="ledck-header-actions">
-                    <button type="button" class="btn-test btn-small" id="ledckBtnCheckStatus" title="ตรวจสอบสถานะ">⚖️ ตรวจสอบสถานะ</button>
-                    <button type="button" class="btn-test btn-small btn-primary" id="ledckBtnAddMember">➕ เพิ่มสมาชิก</button>
-                  </div>
-                </div>
-                <div class="card-body">
-                  <div class="ledck-filters">
-                    <input type="text" id="ledckSearch" placeholder="ค้นหา เลขบัตร หรือชื่อ..." class="ledck-search-input">
-                    <select id="ledckStatusFilter">
-                      <option value="">— สถานะทั้งหมด —</option>
-                      <option value="ปกติ">ปกติ</option>
-                      <option value="ล้มละลาย">ล้มละลาย</option>
-                      <option value="ยังไม่ตรวจสอบ">ยังไม่ตรวจสอบ</option>
-                    </select>
-                    <button type="button" class="btn-test btn-small" id="ledckBtnSearch">ค้นหา</button>
-                    <button type="button" class="btn-test btn-small" id="ledckBtnClearFilter">ล้างค่า</button>
-                  </div>
-                  <div class="ledck-table-wrap">
-                    <table class="ledck-table">
-                      <thead>
-                        <tr>
-                          <th>ชื่อ - นามสกุล</th>
-                          <th>สถานะ</th>
-                          <th>ตรวจสอบล่าสุด</th>
-                          <th>จัดการ</th>
-                        </tr>
-                      </thead>
-                      <tbody id="ledckTableBody"></tbody>
-                    </table>
-                  </div>
-                  <p class="muted" id="ledckTableEmpty">ไม่มีข้อมูลสมาชิก</p>
-                </div>
-              </div>
-            </div>
-          </div>
-          <!-- Modal สถานะบังคับคดี -->
-          <div class="ledck-modal" id="ledckModalStatus" aria-hidden="true">
-            <div class="ledck-modal-backdrop"></div>
-            <div class="ledck-modal-box">
-              <div class="ledck-modal-header">
-                <h3 id="ledckModalStatusTitle">สถานะบังคับคดี</h3>
-                <button type="button" class="ledck-modal-close" id="ledckModalStatusClose" aria-label="ปิด">×</button>
-              </div>
-              <div class="ledck-modal-body" id="ledckModalStatusBody"></div>
-            </div>
-          </div>
-          <!-- Modal รายละเอียดคดี -->
-          <div class="ledck-modal" id="ledckModalCase" aria-hidden="true">
-            <div class="ledck-modal-backdrop"></div>
-            <div class="ledck-modal-box ledck-modal-box-wide">
-              <div class="ledck-modal-header">
-                <h3 id="ledckModalCaseTitle">รายละเอียดคดี</h3>
-                <button type="button" class="ledck-modal-close" id="ledckModalCaseClose" aria-label="ปิด">×</button>
-              </div>
-              <div class="ledck-modal-body" id="ledckModalCaseBody"></div>
-              <div class="ledck-modal-footer">
-                <button type="button" class="btn-test" id="ledckModalCaseCloseBtn">ปิด</button>
-              </div>
-            </div>
-          </div>
-          <!-- Modal เพิ่ม/แก้ไข สมาชิก -->
-          <div class="ledck-modal" id="ledckModalMember" aria-hidden="true">
-            <div class="ledck-modal-backdrop"></div>
-            <div class="ledck-modal-box">
-              <div class="ledck-modal-header">
-                <h3 id="ledckModalMemberTitle">เพิ่มสมาชิก</h3>
-                <button type="button" class="ledck-modal-close" id="ledckModalMemberClose" aria-label="ปิด">×</button>
-              </div>
-              <div class="ledck-modal-body">
-                <div class="web-form">
-                  <div class="nas-field">
-                    <label for="ledckMemberIdCard">เลขบัตรประชาชน</label>
-                    <input type="text" id="ledckMemberIdCard" placeholder="เช่น 3430500521205">
-                  </div>
-                  <div class="nas-field">
-                    <label for="ledckMemberFullName">ชื่อ - นามสกุล</label>
-                    <input type="text" id="ledckMemberFullName" placeholder="นายเอกชัย นารถชัย">
-                  </div>
-                </div>
-              </div>
-              <div class="ledck-modal-footer">
-                <div class="ledck-member-result" id="ledckMemberResult" aria-live="polite"></div>
-                <button type="button" class="btn-test btn-secondary" id="ledckModalMemberCancel">ยกเลิก</button>
-                <button type="button" class="btn-test" id="ledckModalMemberSave">บันทึก</button>
-              </div>
-            </div>
-          </div>
-        </section>
       </div>
     </main>
+
+    <div class="ledck-modal" id="monitorPinModal" aria-hidden="true">
+      <div class="ledck-modal-backdrop" id="monitorPinModalBackdrop"></div>
+      <div class="ledck-modal-box">
+        <div class="ledck-modal-header">
+          <h3>เปลี่ยนรหัส PIN</h3>
+          <button type="button" class="ledck-modal-close" id="monitorPinModalClose" aria-label="ปิด">×</button>
+        </div>
+        <div class="ledck-modal-body">
+          <p class="muted" style="margin:0 0 1rem;font-size:0.9rem;">กรอกรหัส PIN ปัจจุบัน และรหัสใหม่ 6 หลัก</p>
+          <div class="web-form">
+            <div class="nas-field">
+              <label for="monitorPinCurrent">PIN ปัจจุบัน</label>
+              <input type="password" id="monitorPinCurrent" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="current-password" placeholder="รหัสเดิม">
+            </div>
+            <div class="nas-field">
+              <label for="monitorPinNew">PIN ใหม่ (6 หลัก)</label>
+              <input type="password" id="monitorPinNew" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="new-password" placeholder="000000">
+            </div>
+            <div class="nas-field">
+              <label for="monitorPinNew2">ยืนยัน PIN ใหม่</label>
+              <input type="password" id="monitorPinNew2" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="new-password" placeholder="000000">
+            </div>
+          </div>
+          <div class="nas-result" id="monitorPinResult" aria-live="polite"></div>
+        </div>
+        <div class="ledck-modal-footer">
+          <button type="button" class="btn-test btn-secondary" id="monitorPinCancel">ยกเลิก</button>
+          <button type="button" class="btn-test btn-primary" id="monitorPinSave">บันทึก</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ledck-modal" id="monitorAttendanceMonthModal" aria-hidden="true">
+      <div class="ledck-modal-backdrop" id="monitorAttendanceMonthBackdrop"></div>
+      <div class="ledck-modal-box ledck-modal-box-wide monitor-month-modal-box">
+        <div class="ledck-modal-header">
+          <h3>ข้อมูลเข้า–ออกงาน รายเดือน</h3>
+          <button type="button" class="ledck-modal-close" id="monitorAttendanceMonthClose" aria-label="ปิด">×</button>
+        </div>
+        <div class="ledck-modal-body">
+          <div class="monitor-month-toolbar">
+            <div class="nas-field monitor-month-field">
+              <label for="monitorMonthSelect">เดือน</label>
+              <select id="monitorMonthSelect"></select>
+            </div>
+            <div class="nas-field monitor-month-field">
+              <label for="monitorYearSelect">พ.ศ.</label>
+              <select id="monitorYearSelect"></select>
+            </div>
+            <button type="button" class="btn-test btn-small btn-primary" id="monitorMonthLoadBtn">โหลด</button>
+          </div>
+          <div class="monitor-month-table-wrap">
+            <table class="monitor-month-table">
+              <thead>
+                <tr>
+                  <th>วันที่</th>
+                  <th>เข้า</th>
+                  <th>ออก</th>
+                </tr>
+              </thead>
+              <tbody id="monitorMonthTableBody"></tbody>
+            </table>
+          </div>
+          <p class="muted monitor-month-hint" id="monitorMonthMsg" aria-live="polite"></p>
+        </div>
+        <div class="ledck-modal-footer">
+          <button type="button" class="btn-test" id="monitorAttendanceMonthDone">ปิด</button>
+        </div>
+      </div>
+    </div>
 
     <footer class="footer">
       <span class="footer-left">
@@ -478,7 +473,7 @@
           </svg>
         </button>
         <span class="last-update footer-update" id="lastUpdate">—</span>
-        <span>NKBKConnext System v1.0.1</span>
+        <span>NKBKConnext System <span id="appVersionFooter"></span></span>
         <span class="dot" aria-hidden="true">•</span>
         <span class="footer-status">
           <span class="status-dot footer-status-dot" id="footerStatusDot"></span>
@@ -495,42 +490,479 @@
     (function() {
       var token = localStorage.getItem('monitor_token');
       var apiBase = '';
+      /** ฝั่งที่ออกโทเคน (local = ว่าง, remote = URL) — ต้องตรงกับตอนล็อกอิน รีเฟรชจึงไม่เด้งออก */
+      var monitorSessionBase = '';
+      var MONITOR_LOGIN_API_BASE_KEY = 'monitor_login_api_base';
+      function resolveMonitorSessionBaseFromStorage(configMonitorUrl) {
+        var saved = localStorage.getItem(MONITOR_LOGIN_API_BASE_KEY);
+        if (saved === null || saved === undefined) {
+          return (configMonitorUrl || '').trim().replace(/\/$/, '');
+        }
+        if (saved === 'local') return '';
+        return String(saved).trim().replace(/\/$/, '');
+      }
+      function monitorUrlForBase(base, apiPath) {
+        if (!base) return apiPath;
+        return String(base).replace(/\/$/, '') + apiPath;
+      }
+      function monitorAuthUrl(apiPath) {
+        return monitorUrlForBase(monitorSessionBase, apiPath);
+      }
+      function buildMonitorMeAttempts() {
+        var primary = resolveMonitorSessionBaseFromStorage(apiBase);
+        var attempts = [];
+        if (primary) {
+          attempts.push(primary);
+          attempts.push('');
+        } else {
+          attempts.push('');
+          if (apiBase) attempts.push(String(apiBase).trim().replace(/\/$/, ''));
+        }
+        return attempts;
+      }
+      function meUrlFromAttemptBase(b) {
+        return monitorUrlForBase(b, '/api/monitor-me');
+      }
+      function applySuccessfulSessionBase(b) {
+        monitorSessionBase = b === '' ? '' : String(b).replace(/\/$/, '');
+        if (b === '') localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, 'local');
+        else localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, monitorSessionBase);
+      }
+      function clearMonitorAuth() {
+        localStorage.removeItem('monitor_token');
+        localStorage.removeItem(MONITOR_LOGIN_API_BASE_KEY);
+        if (window.electronAPI && typeof window.electronAPI.clearMonitorPushToken === 'function') {
+          window.electronAPI.clearMonitorPushToken();
+        }
+      }
       function redirectToLogin() { window.location.replace('login.html'); }
       function onAuthReady() {
         document.body.classList.add('auth-ready');
+        initMonitorPinModal();
+        initMonitorAttendanceMonthModal();
         var btn = document.getElementById('btnLogout');
         if (btn) {
           btn.addEventListener('click', function() {
             if (token) {
-              var logoutUrl = apiBase ? (apiBase + '/api/monitor-logout') : '/api/monitor-logout';
+              var logoutUrl = monitorAuthUrl('/api/monitor-logout');
               fetch(logoutUrl, { method: 'POST', headers: { 'X-Monitor-Token': token }, body: JSON.stringify({}) }).catch(function() {});
             }
-            localStorage.removeItem('monitor_token');
+            clearMonitorAuth();
             window.location.href = 'login.html';
           });
         }
+        /* อัปโหลดสเปกไป monitor-api ทันทีหลังล็อกอิน (ไม่ต้องรอรอบ 5 นาที) → Firestore #programs */
+        fetch('/api/trigger-system-snapshot-push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}'
+        })
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (j) {
+            if (j && j.ok === false && j.detail) {
+              console.warn('[NKBKConnext] snapshot push:', j.detail);
+            }
+          })
+          .catch(function () {});
       }
       if (!token) {
         redirectToLogin();
         return;
       }
+      if (window.electronAPI && typeof window.electronAPI.setMonitorPushToken === 'function') {
+        window.electronAPI.setMonitorPushToken(token);
+      }
+      function setMonitorUserField(id, val) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        var s = val != null && String(val).trim() !== '' ? String(val).trim() : '—';
+        el.textContent = s;
+      }
+      function formatMonitorDateDisplay(s) {
+        if (s == null || String(s).trim() === '') return '';
+        var str = String(s).trim();
+        var m = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (m) return m[3] + '/' + m[2] + '/' + m[1];
+        return str;
+      }
+      function applyMonitorWork(w) {
+        w = w || {};
+        setMonitorUserField('monitorWorkPosition', w.position);
+        setMonitorUserField('monitorWorkDepartment', w.department);
+        setMonitorUserField('monitorWorkJob', w.job);
+        setMonitorUserField('monitorWorkUnit', w.unit);
+        setMonitorUserField('monitorWorkServiceCounter', w.serviceCounter);
+        setMonitorUserField('monitorWorkEmploymentStart', formatMonitorDateDisplay(w.employmentStart) || w.employmentStart);
+        setMonitorUserField('monitorWorkTenure', w.tenureText);
+      }
+      var THAI_MONTHS_LONG = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+      var THAI_MONTHS_ABBREV = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+      function formatMonitorDateAbbrevThai(iso) {
+        if (iso == null || String(iso).trim() === '') return '—';
+        var m = String(iso).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (!m) return String(iso);
+        var y = parseInt(m[1], 10);
+        var mo = parseInt(m[2], 10);
+        var d = parseInt(m[3], 10);
+        if (mo < 1 || mo > 12) return String(iso);
+        return d + ' ' + THAI_MONTHS_ABBREV[mo - 1] + ' ' + (y + 543);
+      }
+      function formatMonitorTodayDateThai(dateStr) {
+        if (dateStr == null || String(dateStr).trim() === '') return '—';
+        var s = String(dateStr).trim();
+        var y;
+        var mo;
+        var d;
+        var iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (iso) {
+          y = parseInt(iso[1], 10);
+          mo = parseInt(iso[2], 10);
+          d = parseInt(iso[3], 10);
+        } else if (/^\d{8}$/.test(s)) {
+          d = parseInt(s.slice(0, 2), 10);
+          mo = parseInt(s.slice(2, 4), 10);
+          y = parseInt(s.slice(4, 8), 10);
+        } else {
+          return s;
+        }
+        if (mo < 1 || mo > 12 || d < 1 || d > 31) return s;
+        return d + ' ' + THAI_MONTHS_LONG[mo - 1] + ' ' + (y + 543);
+      }
+      function formatMonitorTimeClock(s) {
+        if (s == null) return '—';
+        var t = String(s).trim();
+        if (t === '' || t === '—' || t === '-') return '—';
+        t = t.replace(/:/g, '.');
+        if (/\s*น\.?\s*$/i.test(t)) return t;
+        return t + ' น.';
+      }
+      function applyMonitorToday(t) {
+        t = t || {};
+        setMonitorUserField('monitorTodayDate', formatMonitorTodayDateThai(t.date));
+        var tIn = document.getElementById('monitorTodayCheckIn');
+        var tLate = document.getElementById('monitorTodayCheckInLate');
+        var lt = (t.lateText && String(t.lateText).trim()) ? String(t.lateText).trim() : '';
+        var lv = (t.lateLevel && String(t.lateLevel).trim()) ? String(t.lateLevel).trim() : '';
+        if (tIn) tIn.textContent = formatMonitorTimeClock(t.checkIn);
+        if (tLate) {
+          if (lt) {
+            tLate.hidden = false;
+            tLate.textContent = '\u00a0' + lt;
+            tLate.className = 'monitor-late-inline ' + (lv === 'over' ? 'monitor-late--over' : 'monitor-late--within');
+          } else {
+            tLate.hidden = true;
+            tLate.textContent = '';
+            tLate.className = 'monitor-late-inline';
+          }
+        }
+        setMonitorUserField('monitorTodayCheckOut', formatMonitorTimeClock(t.checkOut));
+      }
+      function applyMonitorUserProfile(data) {
+        if (!data) return;
+        setMonitorUserField('monitorUserFullname', data.fullname);
+        setMonitorUserField('monitorUserEmail', data.email);
+        setMonitorUserField('monitorUserUsername', data.username);
+        setMonitorUserField('monitorUserGroup', data.group);
+        setMonitorUserField('monitorUserRole', data.role);
+        applyMonitorWork(data.work);
+        applyMonitorToday(data.todayAttendance);
+      }
       function checkMe() {
-        var meUrl = apiBase ? (apiBase + '/api/monitor-me') : '/api/monitor-me';
-        fetch(meUrl, { headers: { 'X-Monitor-Token': token } })
-          .then(function(r) {
-            if (r.status === 401) { redirectToLogin(); return null; }
-            return r.json();
-          })
-          .then(function(data) {
-            if (data && data.ok) onAuthReady();
-            else redirectToLogin();
-          })
-          .catch(function() { redirectToLogin(); });
+        var attempts = buildMonitorMeAttempts();
+        var idx = 0;
+        function next() {
+          if (idx >= attempts.length) {
+            clearMonitorAuth();
+            redirectToLogin();
+            return;
+          }
+          var b = attempts[idx++];
+          fetch(meUrlFromAttemptBase(b), { headers: { 'X-Monitor-Token': token } })
+            .then(function(r) {
+              var st = r.status;
+              if (st === 401) {
+                next();
+                return null;
+              }
+              return r.json().then(function(data) { return { st: st, data: data }; });
+            })
+            .then(function(pack) {
+              if (!pack) return;
+              if (pack.data && pack.data.ok) {
+                applySuccessfulSessionBase(b);
+                applyMonitorUserProfile(pack.data);
+                onAuthReady();
+                return;
+              }
+              if (idx < attempts.length) next();
+              else onAuthReady();
+            })
+            .catch(function(err) {
+              console.warn('monitor-me', err);
+              if (idx < attempts.length) next();
+              else onAuthReady();
+            });
+        }
+        next();
+      }
+      window.__monitorRefreshMe = function() {
+        if (!token) return;
+        var attempts = buildMonitorMeAttempts();
+        var ix = 0;
+        function go() {
+          if (ix >= attempts.length) return;
+          var b = attempts[ix++];
+          fetch(meUrlFromAttemptBase(b), { headers: { 'X-Monitor-Token': token } })
+            .then(function(r) {
+              if (r.status === 401) {
+                go();
+                return null;
+              }
+              return r.json();
+            })
+            .then(function(data) {
+              if (!data) return;
+              if (data && data.ok) {
+                applySuccessfulSessionBase(b);
+                applyMonitorUserProfile(data);
+              } else if (ix < attempts.length) go();
+            })
+            .catch(function() {});
+        }
+        go();
+      };
+      var monitorPinModalInited = false;
+      function openMonitorPinModal() {
+        var modal = document.getElementById('monitorPinModal');
+        if (modal) {
+          modal.setAttribute('aria-hidden', 'false');
+          modal.classList.add('ledck-modal-open');
+        }
+        var r = document.getElementById('monitorPinResult');
+        if (r) r.textContent = '';
+        var a = document.getElementById('monitorPinCurrent');
+        var b = document.getElementById('monitorPinNew');
+        var c = document.getElementById('monitorPinNew2');
+        if (a) a.value = '';
+        if (b) b.value = '';
+        if (c) c.value = '';
+        if (a) setTimeout(function() { a.focus(); }, 50);
+      }
+      function closeMonitorPinModal() {
+        var modal = document.getElementById('monitorPinModal');
+        if (modal) {
+          modal.setAttribute('aria-hidden', 'true');
+          modal.classList.remove('ledck-modal-open');
+        }
+      }
+      function initMonitorPinModal() {
+        if (monitorPinModalInited) return;
+        monitorPinModalInited = true;
+        var btn = document.getElementById('monitorBtnChangePin');
+        if (btn) btn.addEventListener('click', openMonitorPinModal);
+        var bd = document.getElementById('monitorPinModalBackdrop');
+        if (bd) bd.addEventListener('click', closeMonitorPinModal);
+        var cl = document.getElementById('monitorPinModalClose');
+        if (cl) cl.addEventListener('click', closeMonitorPinModal);
+        var ca = document.getElementById('monitorPinCancel');
+        if (ca) ca.addEventListener('click', closeMonitorPinModal);
+        var sv = document.getElementById('monitorPinSave');
+        if (sv) {
+          sv.addEventListener('click', function() {
+            var rEl = document.getElementById('monitorPinResult');
+            var cur = document.getElementById('monitorPinCurrent');
+            var n1 = document.getElementById('monitorPinNew');
+            var n2 = document.getElementById('monitorPinNew2');
+            var currentPin = cur ? String(cur.value || '').trim() : '';
+            var newPin = n1 ? String(n1.value || '').trim() : '';
+            var newPin2 = n2 ? String(n2.value || '').trim() : '';
+            if (!/^\d{6}$/.test(newPin)) {
+              if (rEl) rEl.textContent = 'PIN ใหม่ต้องเป็นตัวเลข 6 หลัก';
+              return;
+            }
+            if (newPin !== newPin2) {
+              if (rEl) rEl.textContent = 'ยืนยัน PIN ไม่ตรงกัน';
+              return;
+            }
+            if (currentPin === newPin) {
+              if (rEl) rEl.textContent = 'รหัสใหม่ต้องไม่ซ้ำกับรหัสเดิม';
+              return;
+            }
+            if (rEl) rEl.textContent = 'กำลังบันทึก...';
+            var pinUrl = monitorAuthUrl('/api/monitor-change-pin');
+            fetch(pinUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-Monitor-Token': token },
+              body: JSON.stringify({ currentPin: currentPin, newPin: newPin })
+            })
+              .then(function(res) { return res.json().then(function(j) { return { ok: res.ok, status: res.status, j: j }; }); })
+              .then(function(x) {
+                if (x.j && x.j.ok) {
+                  if (rEl) rEl.textContent = x.j.message || 'เปลี่ยนรหัส PIN เรียบร้อย';
+                  closeMonitorPinModal();
+                } else {
+                  if (rEl) rEl.textContent = (x.j && x.j.message) ? x.j.message : 'ไม่สามารถเปลี่ยนรหัสได้';
+                }
+              })
+              .catch(function() {
+                if (rEl) rEl.textContent = 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้';
+              });
+          });
+        }
+      }
+      function appendCheckInCell(td, day) {
+        td.textContent = '';
+        var timeSpan = document.createElement('span');
+        timeSpan.textContent = day.checkIn ? formatMonitorTimeClock(day.checkIn) : '—';
+        td.appendChild(timeSpan);
+        var ltx = (day.lateText && String(day.lateText).trim()) ? String(day.lateText).trim() : '';
+        var lv = (day.lateLevel && String(day.lateLevel).trim()) ? String(day.lateLevel).trim() : '';
+        if (ltx && day.checkIn) {
+          var lateSpan = document.createElement('span');
+          lateSpan.className = 'monitor-late-inline ' + (lv === 'over' ? 'monitor-late--over' : 'monitor-late--within');
+          lateSpan.style.fontWeight = '600';
+          lateSpan.textContent = '\u00a0' + ltx;
+          td.appendChild(lateSpan);
+        }
+      }
+      function renderMonitorMonthRows(days) {
+        var tbody = document.getElementById('monitorMonthTableBody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        var sorted = (days || []).slice().sort(function(a, b) {
+          return String(b.date).localeCompare(String(a.date));
+        });
+        sorted.forEach(function(day) {
+          var tr = document.createElement('tr');
+          var isMuted = day.dayKind === 'weekend' || day.dayKind === 'holiday';
+          if (isMuted) tr.className = 'monitor-month-row--muted';
+          var td1 = document.createElement('td');
+          td1.textContent = formatMonitorDateAbbrevThai(day.date);
+          var td2 = document.createElement('td');
+          var td3 = document.createElement('td');
+          if (isMuted) {
+            td1.className = 'monitor-month-muted';
+            td2.className = 'monitor-month-muted';
+            td3.className = 'monitor-month-muted';
+            if (day.hasRecord || day.checkIn || day.checkOut) {
+              appendCheckInCell(td2, day);
+              td3.textContent = day.checkOut ? formatMonitorTimeClock(day.checkOut) : '—';
+            } else {
+              td2.textContent = day.dayLabel || '—';
+              td3.textContent = '—';
+            }
+          } else {
+            appendCheckInCell(td2, day);
+            td3.textContent = day.checkOut ? formatMonitorTimeClock(day.checkOut) : '—';
+          }
+          tr.appendChild(td1);
+          tr.appendChild(td2);
+          tr.appendChild(td3);
+          tbody.appendChild(tr);
+        });
+      }
+      var monitorMonthModalInited = false;
+      function initMonitorAttendanceMonthModal() {
+        if (monitorMonthModalInited) return;
+        monitorMonthModalInited = true;
+        var ms = document.getElementById('monitorMonthSelect');
+        var ys = document.getElementById('monitorYearSelect');
+        if (ms && ms.options.length === 0) {
+          THAI_MONTHS_LONG.forEach(function(name, i) {
+            var o = document.createElement('option');
+            o.value = String(i + 1);
+            o.textContent = name;
+            ms.appendChild(o);
+          });
+        }
+        if (ys && ys.options.length === 0) {
+          var now0 = new Date();
+          var curBE = now0.getFullYear() + 543;
+          for (var y = curBE; y >= curBE - 2; y--) {
+            var opt = document.createElement('option');
+            opt.value = String(y);
+            opt.textContent = String(y);
+            ys.appendChild(opt);
+          }
+        }
+        function openMonitorMonthModal() {
+          var modal = document.getElementById('monitorAttendanceMonthModal');
+          if (modal) {
+            modal.setAttribute('aria-hidden', 'false');
+            modal.classList.add('ledck-modal-open');
+          }
+          var now = new Date();
+          var m = now.getMonth() + 1;
+          var be = now.getFullYear() + 543;
+          if (ms) ms.value = String(m);
+          if (ys) ys.value = String(be);
+          loadMonitorAttendanceMonthTable();
+        }
+        function closeMonitorMonthModal() {
+          var modal = document.getElementById('monitorAttendanceMonthModal');
+          if (modal) {
+            modal.setAttribute('aria-hidden', 'true');
+            modal.classList.remove('ledck-modal-open');
+          }
+        }
+        function loadMonitorAttendanceMonthTable() {
+          var msg = document.getElementById('monitorMonthMsg');
+          var month = ms ? parseInt(ms.value, 10) : 0;
+          var yearBE = ys ? parseInt(ys.value, 10) : 0;
+          if (!month || !yearBE) return;
+          var yearAD = yearBE - 543;
+          if (msg) msg.textContent = 'กำลังโหลด...';
+          var tbody = document.getElementById('monitorMonthTableBody');
+          if (tbody) tbody.innerHTML = '';
+          var url = monitorAuthUrl('/api/monitor-attendance-month?year=' + yearAD + '&month=' + month);
+          fetch(url, { headers: { 'X-Monitor-Token': token } })
+            .then(function(r) { return r.json().then(function(j) { return { ok: r.ok, j: j }; }); })
+            .then(function(x) {
+              if (!x.j || !x.j.ok) {
+                if (msg) msg.textContent = (x.j && x.j.message) ? x.j.message : 'โหลดไม่สำเร็จ';
+                return;
+              }
+              if (msg) msg.textContent = '';
+              renderMonitorMonthRows(x.j.days);
+            })
+            .catch(function() {
+              if (msg) msg.textContent = 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้';
+            });
+        }
+        var histBtn = document.getElementById('monitorBtnAttendanceHistory');
+        if (histBtn) histBtn.addEventListener('click', openMonitorMonthModal);
+        var bd = document.getElementById('monitorAttendanceMonthBackdrop');
+        if (bd) bd.addEventListener('click', closeMonitorMonthModal);
+        var cl = document.getElementById('monitorAttendanceMonthClose');
+        if (cl) cl.addEventListener('click', closeMonitorMonthModal);
+        var dn = document.getElementById('monitorAttendanceMonthDone');
+        if (dn) dn.addEventListener('click', closeMonitorMonthModal);
+        var lb = document.getElementById('monitorMonthLoadBtn');
+        if (lb) lb.addEventListener('click', loadMonitorAttendanceMonthTable);
+      }
+      function setAppVersion(ver) {
+        if (!ver) return;
+        var s = String(ver).trim();
+        var t = /^v/i.test(s) ? s : 'v ' + s;
+        var el1 = document.getElementById('appVersionTitle');
+        var el2 = document.getElementById('appVersionFooter');
+        if (el1) el1.textContent = t;
+        if (el2) el2.textContent = t;
       }
       fetch('/api/config').then(function(r) { return r.json(); }).then(function(c) {
         apiBase = (c.monitorApiUrl || '').trim().replace(/\/$/, '');
+        monitorSessionBase = resolveMonitorSessionBaseFromStorage(apiBase);
+        if (c && c.appVersion) setAppVersion(c.appVersion);
         checkMe();
-      }).catch(function() { checkMe(); });
+      }).catch(function() {
+        monitorSessionBase = resolveMonitorSessionBaseFromStorage('');
+        checkMe();
+      });
+      if (window.electronAPI && window.electronAPI.getAppVersion) {
+        window.electronAPI.getAppVersion().then(function(v) { if (v) setAppVersion(v); }).catch(function() {});
+      }
     })();
   </script>
   <script src="app.js"></script>
