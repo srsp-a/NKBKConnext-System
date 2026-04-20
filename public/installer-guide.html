@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ติดตั้ง NKBKConnext System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0d0f14;
+      --card: #14171f;
+      --accent: #00d4aa;
+      --text: #e8eaed;
+      --muted: #8b8f99;
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Kanit', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 2rem 1.25rem 3rem;
+      background-image: radial-gradient(ellipse 100% 60% at 50% -10%, rgba(0, 212, 170, 0.12), transparent 55%);
+    }
+    .wrap { max-width: 520px; margin: 0 auto; }
+    .logo {
+      width: 88px; height: 88px; border-radius: 50%; margin: 0 auto 1.25rem;
+      object-fit: cover; border: 3px solid rgba(0, 212, 170, 0.35);
+      display: block;
+    }
+    h1 {
+      font-weight: 600; font-size: 1.65rem; text-align: center;
+      letter-spacing: -0.02em; margin-bottom: 0.35rem;
+    }
+    .sub { text-align: center; color: var(--muted); font-weight: 400; font-size: 0.95rem; margin-bottom: 2rem; }
+    .card {
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: var(--radius);
+      padding: 1.5rem 1.35rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+    }
+    .card h2 {
+      font-size: 0.8rem; font-weight: 600; color: var(--accent);
+      text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.75rem;
+    }
+    .steps { counter-reset: s; list-style: none; }
+    .steps li {
+      position: relative; padding-left: 2.5rem; margin-bottom: 1.1rem;
+      font-size: 0.98rem; line-height: 1.5; color: var(--text);
+    }
+    .steps li:last-child { margin-bottom: 0; }
+    .steps li::before {
+      counter-increment: s; content: counter(s);
+      position: absolute; left: 0; top: 0;
+      width: 1.75rem; height: 1.75rem; border-radius: 8px;
+      background: rgba(0, 212, 170, 0.15); color: var(--accent);
+      font-weight: 600; font-size: 0.9rem;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .note {
+      margin-top: 1.5rem; padding: 1rem 1.1rem;
+      background: rgba(255,255,255,0.03);
+      border-radius: 12px; font-size: 0.85rem; color: var(--muted); line-height: 1.55;
+    }
+    .note strong { color: var(--text); font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <img class="logo" src="logo.png" alt="">
+    <h1>NKBKConnext System</h1>
+    <p class="sub">คู่มือติดตั้ง — ฟอนต์ Kanit &amp; ธีมเดียวกับโปรแกรม</p>
+
+    <div class="card">
+      <h2>ขั้นตอนติดตั้ง</h2>
+      <ol class="steps">
+        <li>ดาวน์โหลดไฟล์ <strong>NKBKConnext System Setup … .exe</strong></li>
+        <li>ดับเบิลคลิกเพื่อเปิด — หน้าต่างติดตั้งเป็นของ Windows (ไม่ใช่หน้าแอป)</li>
+        <li>กด Next ตามขั้นตอน แล้วเปิดโปรแกรมจาก Desktop หรือ Start Menu</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>หลังติดตั้ง</h2>
+      <p style="font-size:0.95rem;line-height:1.6;color:var(--muted);">
+        หน้าล็อกอินและแดชบอร์ดใช้ฟอนต์ Kanit และดีไซน์ทันสมัยตามที่ออกแบบไว้
+      </p>
+    </div>
+
+    <p class="note">
+      <strong>ทำไมหน้า Setup ไม่เหมือนแอป?</strong>
+      ตัวติดตั้งสร้างด้วยมาตรฐาน NSIS ของ Windows — เปลี่ยนฟอนต์เป็น Kanit ในปุ่มและข้อความของ wizard ไม่ได้
+      หน้านี้ (เปิดในเบราว์เซอร์) จึงเป็นจุดที่แสดงแบรนด์แบบเต็มรูปแบบได้
+    </p>
+  </div>
+</body>
+</html>

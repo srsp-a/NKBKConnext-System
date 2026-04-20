@@ -34,6 +34,110 @@
       background-image:
         radial-gradient(ellipse 120% 80% at 50% -20%, var(--accent-dim), transparent 50%);
     }
+    body.forced-update-lock {
+      overflow: hidden;
+    }
+    body.forced-update-lock .login-wrap {
+      pointer-events: none;
+      user-select: none;
+      filter: brightness(0.45);
+    }
+    .forced-update-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      box-sizing: border-box;
+      background: rgba(6, 8, 12, 0.78);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+    .forced-update-overlay.show {
+      display: flex;
+    }
+    .forced-update-card {
+      width: 100%;
+      max-width: 420px;
+      padding: 1.75rem 1.5rem 1.5rem;
+      border-radius: 18px;
+      background: linear-gradient(165deg, rgba(26, 32, 44, 0.98) 0%, rgba(14, 18, 26, 0.99) 100%);
+      border: 1px solid rgba(0, 212, 170, 0.28);
+      box-shadow:
+        0 24px 64px rgba(0, 0, 0, 0.55),
+        0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+        0 0 80px rgba(0, 212, 170, 0.06);
+      text-align: center;
+    }
+    .forced-update-card h2 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      margin: 0 0 0.65rem;
+      color: var(--text);
+    }
+    .forced-update-card p {
+      font-size: 0.9rem;
+      line-height: 1.55;
+      color: var(--text-muted);
+      margin: 0 0 1.25rem;
+    }
+    .forced-update-card strong {
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .forced-update-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+    .forced-update-actions .btn-forced-dl {
+      width: 100%;
+      padding: 14px 18px;
+      border: none;
+      border-radius: 12px;
+      -webkit-appearance: none;
+      appearance: none;
+      font-family: var(--font);
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: var(--accent);
+      color: #0d0f14;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .forced-update-actions .btn-forced-dl:hover:not(:disabled) {
+      background: #00e6b8;
+      transform: translateY(-1px);
+    }
+    .forced-update-actions .btn-forced-dl:disabled {
+      background: var(--text-muted);
+      cursor: not-allowed;
+      transform: none;
+    }
+    .forced-update-actions .btn-forced-skip {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 10px;
+      -webkit-appearance: none;
+      appearance: none;
+      font-family: var(--font);
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      transition: background 0.2s, color 0.2s;
+    }
+    .forced-update-actions .btn-forced-skip:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+    }
+    .forced-update-actions .btn-forced-skip.hidden {
+      display: none;
+    }
     .login-wrap {
       width: 100%;
       max-width: 400px;
@@ -136,6 +240,43 @@
       cursor: not-allowed;
       transform: none;
     }
+    .btn-line {
+      width: 100%;
+      padding: 12px 14px;
+      margin-top: 0.75rem;
+      background: #06c755;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-family: var(--font);
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .btn-line.show { display: flex; }
+    .btn-line:hover { background: #05b34c; transform: translateY(-1px); }
+    .btn-line:disabled { opacity: 0.65; cursor: not-allowed; transform: none; }
+    .login-divider {
+      margin: 1rem 0 0.25rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .login-sa-hint {
+      margin: 0 0 1rem;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 0.8125rem;
+      line-height: 1.45;
+      color: #e8c96b;
+      background: rgba(232, 201, 107, 0.12);
+      border: 1px solid rgba(232, 201, 107, 0.35);
+    }
     .login-msg {
       margin-top: 1rem;
       padding: 10px 12px;
@@ -169,51 +310,47 @@
       margin: 0 auto 1rem;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .update-banner {
-      display: none;
-      margin-bottom: 1rem;
-      padding: 12px 14px;
-      background: rgba(0, 212, 170, 0.12);
-      border: 1px solid rgba(0, 212, 170, 0.35);
-      border-radius: var(--radius);
-      font-size: 0.9rem;
-      color: var(--text);
+    .login-version {
+      text-align: center;
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      letter-spacing: 0.02em;
     }
-    .update-banner.show { display: block; }
-    .update-banner p { margin-bottom: 10px; color: var(--text-muted); }
-    .update-banner strong { color: var(--accent); }
-    .update-banner .update-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-    .update-banner button {
-      padding: 8px 14px;
-      border-radius: 8px;
-      font-family: var(--font);
-      font-size: 0.875rem;
-      font-weight: 600;
-      cursor: pointer;
-      border: none;
+    .login-version--in-card {
+      margin-top: 1.15rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
     }
-    .update-banner .btn-dl { background: var(--accent); color: #0d0f14; }
-    .update-banner .btn-skip { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+    .auth-loading .login-version--in-card {
+      margin-top: 1.5rem;
+      padding-top: 0;
+      border-top: none;
+    }
   </style>
 </head>
 <body>
-  <div class="login-wrap">
-    <div id="updateBanner" class="update-banner" role="status">
-      <p>มีเวอร์ชันใหม่ <strong id="updateBannerVer">—</strong> จาก GitHub — แนะนำอัปเดตก่อนเข้าใช้งาน</p>
-      <div class="update-actions">
-        <button type="button" class="btn-dl" id="btnUpdateDl">ดาวน์โหลดอัปเดต</button>
-        <button type="button" class="btn-skip" id="btnUpdateSkip">เข้าใช้งานต่อ</button>
+  <div id="forcedUpdateOverlay" class="forced-update-overlay" role="dialog" aria-modal="true" aria-labelledby="forcedUpdateTitle" aria-hidden="true">
+    <div class="forced-update-card">
+      <h2 id="forcedUpdateTitle">ต้องอัปเดตโปรแกรม</h2>
+      <p>มีเวอร์ชันใหม่ <strong id="forcedUpdateVer">—</strong><span id="forcedUpdateTail"></span></p>
+      <div class="forced-update-actions">
+        <button type="button" class="btn-forced-dl" id="btnForcedUpdateDl">ดาวน์โหลดอัปเดต</button>
+        <button type="button" class="btn-forced-skip hidden" id="btnForcedUpdateSkip">ดำเนินการภายหลัง</button>
       </div>
     </div>
+  </div>
+  <div class="login-wrap">
     <div id="authLoading" class="login-card auth-loading">
       <div class="spinner"></div>
       <p>กำลังตรวจสอบการเข้าสู่ระบบ...</p>
+      <p class="login-version login-version--in-card" id="loginVerLoading"></p>
     </div>
     <div id="loginForm" class="login-card" style="display: none;">
       <div class="login-header">
         <span class="logo-img-wrap"><img src="logo.png" alt="" class="logo-icon"></span>
         <h1>NKBKConnext System</h1>
         <p>ระบบตรวจสอบและจัดการข้อมูลสหกรณ์</p>
+        <p id="saFirestoreHint" class="login-sa-hint" style="display: none;" role="status"></p>
       </div>
       <form id="form" novalidate>
         <div class="form-group">
@@ -221,15 +358,22 @@
           <input type="text" id="username" name="username" placeholder="ชื่อผู้ใช้" autocomplete="username" required>
         </div>
         <div class="form-group">
-          <label for="pin">รหัส PIN (6 หลัก)</label>
-          <input type="password" id="pin" name="pin" placeholder="••••••" autocomplete="off" inputmode="numeric" pattern="[0-9]*" maxlength="6" required>
+          <label for="pin">รหัส PIN / หรือรหัสผ่าน</label>
+          <input type="password" id="pin" name="pin" placeholder="PIN 6 หลัก หรือรหัสผ่าน" autocomplete="current-password" maxlength="6" required>
         </div>
         <div id="loginMsg" class="login-msg"></div>
         <button type="submit" class="btn-login" id="btnSubmit">เข้าสู่ระบบ</button>
+        <div id="lineLoginDivider" class="login-divider" style="display: none;">หรือ</div>
+        <button type="button" class="btn-line" id="btnLine" aria-label="เข้าสู่ระบบด้วย LINE">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.383c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.936c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.142h1.755c.348 0 .629.283.629.63 0 .344-.282.629-.63.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.084.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.04.647 1.28-.54 6.885-4.051 9.396-6.918C22.205 15.042 24 12.912 24 10.314"/></svg>
+          เข้าสู่ระบบด้วย LINE
+        </button>
       </form>
+      <p class="login-version login-version--in-card" id="loginVersion"></p>
     </div>
   </div>
 
+  <script src="update-flow-overlay.js"></script>
   <script>
     (function() {
       var authLoading = document.getElementById('authLoading');
@@ -239,7 +383,26 @@
       var pinInput = document.getElementById('pin');
       var loginMsg = document.getElementById('loginMsg');
       var btnSubmit = document.getElementById('btnSubmit');
-      var apiBase = '';
+      var btnLine = document.getElementById('btnLine');
+      var lineLoginDivider = document.getElementById('lineLoginDivider');
+      var linePollTimer = null;
+      var LINE_BC_NAME = 'nkbk-line-oauth';
+      var LINE_STATE_KEY = 'line_oauth_state';
+      var LINE_STARTED_KEY = 'line_oauth_started';
+      var pendingGithubRelease = null;
+      try {
+        var _sp = new URLSearchParams(window.location.search);
+        if (_sp.get('line_resume') === '1') {
+          var _rst = String(_sp.get('state') || '').trim();
+          if (/^[a-f0-9]{48}$/i.test(_rst)) {
+            sessionStorage.setItem(LINE_STATE_KEY, _rst);
+            sessionStorage.setItem(LINE_STARTED_KEY, String(Date.now()));
+            if (window.history && window.history.replaceState) {
+              window.history.replaceState({}, '', 'login.html');
+            }
+          }
+        }
+      } catch (eResume) {}
 
       function showMsg(text, isError) {
         loginMsg.textContent = text;
@@ -249,8 +412,19 @@
         loginMsg.className = 'login-msg';
         loginMsg.textContent = '';
       }
-      function apiUrl(path) { return apiBase ? (apiBase + path) : path; }
-
+      var MONITOR_LOGIN_API_BASE_KEY = 'monitor_login_api_base';
+      function resolveMonitorSessionBaseFromStorage(configMonitorUrl) {
+        var saved = localStorage.getItem(MONITOR_LOGIN_API_BASE_KEY);
+        if (saved === null || saved === undefined) {
+          return (configMonitorUrl || '').trim().replace(/\/$/, '');
+        }
+        if (saved === 'local') return '';
+        return String(saved).trim().replace(/\/$/, '');
+      }
+      function monitorMeUrl(sessionBase) {
+        if (!sessionBase) return '/api/monitor-me';
+        return String(sessionBase).replace(/\/$/, '') + '/api/monitor-me';
+      }
       function checkTokenAndShowForm() {
         var token = localStorage.getItem('monitor_token');
         if (!token) {
@@ -258,74 +432,421 @@
           loginForm.style.display = 'block';
           return;
         }
-        fetch(apiUrl('/api/monitor-me'), { headers: { 'X-Monitor-Token': token } })
-          .then(function(r) { return r.json(); })
-          .then(function(data) {
-            if (data && data.ok) {
-              window.location.replace('index.html');
-              return;
-            }
+        var primary = resolveMonitorSessionBaseFromStorage(apiBase);
+        var attempts = [];
+        if (primary) {
+          attempts.push(primary);
+          attempts.push('');
+        } else {
+          attempts.push('');
+          if (apiBase) attempts.push(String(apiBase).trim().replace(/\/$/, ''));
+        }
+        var ai = 0;
+        function tryMe() {
+          if (ai >= attempts.length) {
             authLoading.style.display = 'none';
             loginForm.style.display = 'block';
+            return;
+          }
+          var b = attempts[ai++];
+          fetch(monitorMeUrl(b), { headers: { 'X-Monitor-Token': token } })
+            .then(function(r) {
+              if (r.status === 401) {
+                tryMe();
+                return null;
+              }
+              return r.json();
+            })
+            .then(function(data) {
+              if (!data) return;
+              if (data && data.ok) {
+                if (b === '') localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, 'local');
+                else localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, String(b).replace(/\/$/, ''));
+                window.location.replace('index.html');
+                return;
+              }
+              tryMe();
+            })
+            .catch(function() {
+              tryMe();
+            });
+        }
+        tryMe();
+      }
+
+      var forcedUpdateOverlay = document.getElementById('forcedUpdateOverlay');
+      var btnForcedUpdateDl = document.getElementById('btnForcedUpdateDl');
+      var btnForcedUpdateSkip = document.getElementById('btnForcedUpdateSkip');
+      var forcedUpdateVer = document.getElementById('forcedUpdateVer');
+      var forcedUpdateTail = document.getElementById('forcedUpdateTail');
+      var forcedUpdateTitle = document.getElementById('forcedUpdateTitle');
+      var lastForcedUpdateVersion = '';
+
+      function showForcedUpdateOverlay(version) {
+        if (!forcedUpdateOverlay || forcedUpdateOverlay.classList.contains('show')) return;
+        lastForcedUpdateVersion = version != null ? String(version) : '';
+        if (forcedUpdateVer) forcedUpdateVer.textContent = lastForcedUpdateVersion;
+        forcedUpdateOverlay.classList.add('show');
+        forcedUpdateOverlay.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('forced-update-lock');
+      }
+      function hideForcedUpdateOverlay() {
+        if (!forcedUpdateOverlay) return;
+        forcedUpdateOverlay.classList.remove('show');
+        forcedUpdateOverlay.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('forced-update-lock');
+      }
+      function wireUpdateFlow(installedPackaged) {
+        if (forcedUpdateTitle) {
+          forcedUpdateTitle.textContent = installedPackaged
+            ? 'ต้องอัปเดตโปรแกรม'
+            : 'มีเวอร์ชันใหม่';
+        }
+        if (forcedUpdateTail) {
+          forcedUpdateTail.textContent = installedPackaged
+            ? ' — ตัวติดตั้ง: ดาวน์โหลดแล้วติดตั้งทับอัตโนมัติ จากนั้นกดรีสตาร์ทตามที่หน้าจอแจ้ง (จำเป็นต้องอัปเดตก่อนใช้งานต่อ)'
+            : ' — แบบพกพา: จาก GitHub ดาวน์โหลดไฟล์ใหม่แล้วแทนไฟล์ .exe เดิม';
+        }
+        if (btnForcedUpdateSkip) {
+          if (installedPackaged) btnForcedUpdateSkip.classList.add('hidden');
+          else btnForcedUpdateSkip.classList.remove('hidden');
+        }
+        if (btnForcedUpdateSkip) {
+          btnForcedUpdateSkip.addEventListener('click', function() {
+            hideForcedUpdateOverlay();
+          });
+        }
+        if (!btnForcedUpdateDl || !window.electronAPI) return;
+        if (installedPackaged) {
+          if (window.electronAPI.onUpdateAvailable) {
+            window.electronAPI.onUpdateAvailable(function(info) {
+              showForcedUpdateOverlay(info && info.version);
+            });
+          }
+          if (window.electronAPI.getPendingUpdate) {
+            window.electronAPI.getPendingUpdate().then(function(p) {
+              if (p && p.version) showForcedUpdateOverlay(p.version);
+            }).catch(function() {});
+          }
+          if (window.electronAPI.checkAppUpdatesNow) {
+            window.electronAPI.checkAppUpdatesNow().catch(function() {});
+          }
+          if (window.electronAPI.downloadAppUpdate) {
+            btnForcedUpdateDl.addEventListener('click', function() {
+              hideForcedUpdateOverlay();
+              btnForcedUpdateDl.disabled = true;
+              btnForcedUpdateDl.textContent = 'กำลังดาวน์โหลด...';
+              window.electronAPI
+                .downloadAppUpdate()
+                .then(function(res) {
+                  btnForcedUpdateDl.disabled = false;
+                  btnForcedUpdateDl.textContent = 'ดาวน์โหลดอัปเดต';
+                  if (res && res.ok) {
+                    hideMsg();
+                  } else {
+                    showForcedUpdateOverlay(lastForcedUpdateVersion);
+                    showMsg((res && res.error) || 'ดาวน์โหลดไม่สำเร็จ', true);
+                  }
+                })
+                .catch(function() {
+                  btnForcedUpdateDl.disabled = false;
+                  btnForcedUpdateDl.textContent = 'ดาวน์โหลดอัปเดต';
+                  showForcedUpdateOverlay(lastForcedUpdateVersion);
+                  showMsg('ดาวน์โหลดไม่สำเร็จ', true);
+                });
+            });
+          }
+          return;
+        }
+        if (window.electronAPI.checkGithubRelease) {
+          window.electronAPI
+            .checkGithubRelease()
+            .then(function(u) {
+              if (u && u.hasUpdate && u.latestVersion) {
+                pendingGithubRelease = u;
+                showForcedUpdateOverlay(u.latestVersion);
+              }
+            })
+            .catch(function() {});
+        }
+        if (window.electronAPI.downloadGithubRelease) {
+          btnForcedUpdateDl.addEventListener('click', function() {
+            if (!pendingGithubRelease) return;
+            btnForcedUpdateDl.disabled = true;
+            btnForcedUpdateDl.textContent = 'กำลังดาวน์โหลด...';
+            window.electronAPI
+              .downloadGithubRelease({
+                url: pendingGithubRelease.downloadUrl,
+                fileName: pendingGithubRelease.fileName
+              })
+              .then(function(res) {
+                btnForcedUpdateDl.disabled = false;
+                btnForcedUpdateDl.textContent = 'ดาวน์โหลดอัปเดต';
+                if (res && res.ok) {
+                  hideForcedUpdateOverlay();
+                  showMsg('ดาวน์โหลดแล้ว — ปิดโปรแกรมแล้วแทนไฟล์ .exe เดิมด้วยไฟล์ในโฟลเดอร์ที่เปิด', false);
+                } else {
+                  showMsg((res && res.error) || 'ดาวน์โหลดไม่สำเร็จ', true);
+                }
+              })
+              .catch(function() {
+                btnForcedUpdateDl.disabled = false;
+                btnForcedUpdateDl.textContent = 'ดาวน์โหลดอัปเดต';
+                showMsg('ดาวน์โหลดไม่สำเร็จ', true);
+              });
+          });
+        }
+      }
+      if (window.electronAPI && window.electronAPI.isPortableApp && window.electronAPI.isPackagedApp) {
+        Promise.all([window.electronAPI.isPortableApp(), window.electronAPI.isPackagedApp()])
+          .then(function(arr) {
+            var portable = arr[0] === true;
+            var packaged = arr[1] === true;
+            wireUpdateFlow(packaged && !portable);
           })
           .catch(function() {
-            authLoading.style.display = 'none';
-            loginForm.style.display = 'block';
+            wireUpdateFlow(false);
           });
+      } else {
+        wireUpdateFlow(false);
       }
 
-      var updateBanner = document.getElementById('updateBanner');
-      var btnUpdateDl = document.getElementById('btnUpdateDl');
-      var btnUpdateSkip = document.getElementById('btnUpdateSkip');
-      var updateBannerVer = document.getElementById('updateBannerVer');
-
-      function showUpdateBanner(version) {
-        if (!updateBanner) return;
-        if (updateBanner.classList.contains('show')) return;
-        updateBannerVer.textContent = version || '';
-        updateBanner.classList.add('show');
+      function setLoginVersion(ver) {
+        if (!ver) return;
+        var s = String(ver).trim();
+        var t = /^v/i.test(s) ? s : 'v ' + s;
+        var el1 = document.getElementById('loginVerLoading');
+        var el2 = document.getElementById('loginVersion');
+        if (el1) el1.textContent = t;
+        if (el2) el2.textContent = t;
       }
-      if (window.electronAPI && typeof window.electronAPI.onUpdateAvailable === 'function') {
-        window.electronAPI.onUpdateAvailable(function(info) {
-          showUpdateBanner(info && info.version);
+      if (window.electronAPI && window.electronAPI.getAppVersion) {
+        window.electronAPI.getAppVersion().then(function(v) {
+          if (v) setLoginVersion(v);
+        }).catch(function() {});
+      }
+      var monitorRemoteLogin = false;
+      var apiBase = '';
+      var saFirestoreHint = document.getElementById('saFirestoreHint');
+      fetch('/api/config', { cache: 'no-store' })
+        .then(function(r) { return r.json(); })
+        .then(function(c) {
+          if (c && c.appVersion) setLoginVersion(c.appVersion);
+          apiBase = (c && c.monitorApiUrl) ? String(c.monitorApiUrl).trim().replace(/\/$/, '') : '';
+          monitorRemoteLogin = !!(c && c.remoteLogin);
+          if (saFirestoreHint) {
+            if (c && c.monitorFirestoreReady === false) {
+              saFirestoreHint.style.display = 'block';
+              saFirestoreHint.textContent =
+                'ยังไม่เชื่อม Firestore บนเครื่องนี้ — วางไฟล์ firebase-service-account.json (หรือ serviceAccountKey.json) ในโฟลเดอร์เดียวกับโปรแกรม หรือตั้งค่า FIREBASE_SERVICE_ACCOUNT_PATH ชี้ไปที่ไฟล์ JSON จาก Firebase Console (โปรเจกต์ > บริการบัญชี) — ไฟล์นี้ไม่รวมใน Git';
+            } else {
+              saFirestoreHint.style.display = 'none';
+              saFirestoreHint.textContent = '';
+            }
+          }
+          if (monitorRemoteLogin) {
+            pinInput.removeAttribute('maxlength');
+            pinInput.removeAttribute('pattern');
+            pinInput.removeAttribute('inputmode');
+            pinInput.placeholder = 'รหัส PIN หรือรหัสผ่าน';
+          } else {
+            pinInput.setAttribute('maxlength', '6');
+            pinInput.setAttribute('inputmode', 'numeric');
+            pinInput.placeholder = 'PIN 6 หลัก';
+          }
+          if (c && c.lineLoginEnabled && btnLine && lineLoginDivider) {
+            lineLoginDivider.style.display = 'block';
+            btnLine.classList.add('show');
+          }
+          try {
+            var savedSt = sessionStorage.getItem(LINE_STATE_KEY);
+            var started = parseInt(sessionStorage.getItem(LINE_STARTED_KEY) || '0', 10);
+            if (
+              savedSt &&
+              started &&
+              Date.now() - started < 10 * 60 * 1000 &&
+              !linePollTimer &&
+              !localStorage.getItem('monitor_token')
+            ) {
+              showMsg('กำลังรอผลจาก LINE (เบราว์เซอร์)...', false);
+              if (btnLine) btnLine.disabled = true;
+              startLineLoginPoll(savedSt);
+            }
+          } catch (xResume) {}
+          checkTokenAndShowForm();
+        })
+        .catch(function() {
+          checkTokenAndShowForm();
         });
-        if (window.electronAPI.getPendingUpdate) {
-          window.electronAPI.getPendingUpdate().then(function(p) {
-            if (p && p.version) showUpdateBanner(p.version);
-          }).catch(function() {});
-        }
-        if (btnUpdateSkip) {
-          btnUpdateSkip.addEventListener('click', function() {
-            updateBanner.classList.remove('show');
-          });
-        }
-        if (btnUpdateDl) {
-          btnUpdateDl.addEventListener('click', function() {
-            btnUpdateDl.disabled = true;
-            btnUpdateDl.textContent = 'กำลังดาวน์โหลด...';
-            window.electronAPI.downloadAppUpdate().then(function(res) {
-              if (!res || !res.ok) {
-                btnUpdateDl.disabled = false;
-                btnUpdateDl.textContent = 'ดาวน์โหลดอัปเดต';
-                showMsg((res && res.error) || 'ดาวน์โหลดไม่สำเร็จ', true);
-              }
-            }).catch(function() {
-              btnUpdateDl.disabled = false;
-              btnUpdateDl.textContent = 'ดาวน์โหลดอัปเดต';
-              showMsg('ดาวน์โหลดไม่สำเร็จ', true);
-            });
-          });
-        }
-      }
-
-      fetch('/api/config').then(function(r) { return r.json(); }).then(function(c) {
-        apiBase = (c.monitorApiUrl || '').trim().replace(/\/$/, '');
-        checkTokenAndShowForm();
-      }).catch(function() { checkTokenAndShowForm(); });
 
       pinInput.addEventListener('input', function() {
+        if (monitorRemoteLogin) return;
         this.value = this.value.replace(/\D/g, '').slice(0, 6);
       });
+
+      function stopLinePoll() {
+        if (linePollTimer) {
+          clearInterval(linePollTimer);
+          linePollTimer = null;
+        }
+      }
+      function clearLineOAuthSessionStorage() {
+        try {
+          sessionStorage.removeItem(LINE_STATE_KEY);
+          sessionStorage.removeItem(LINE_STARTED_KEY);
+        } catch (eClr) {}
+      }
+      function finishLineLoginWithToken(d) {
+        stopLinePoll();
+        clearLineOAuthSessionStorage();
+        localStorage.setItem('monitor_token', d.token);
+        localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, 'local');
+        if (window.electronAPI && typeof window.electronAPI.setMonitorPushToken === 'function') {
+          window.electronAPI.setMonitorPushToken(d.token);
+        }
+        showMsg('เข้าสู่ระบบสำเร็จ กำลังเปลี่ยนหน้า...', false);
+        window.location.replace('index.html');
+      }
+      function applyLinePollJson(d) {
+        if (!d) return false;
+        if (d.pending) return false;
+        if (d.ok && d.token) {
+          finishLineLoginWithToken(d);
+          return true;
+        }
+        if (d.ok === false && d.message) {
+          stopLinePoll();
+          clearLineOAuthSessionStorage();
+          showMsg(d.message, true);
+          if (btnLine) btnLine.disabled = false;
+          return true;
+        }
+        return false;
+      }
+      function fetchLinePollOnce(state, done) {
+        fetch('/api/line-login-poll?state=' + encodeURIComponent(state), { cache: 'no-store' })
+          .then(function(r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+          })
+          .then(function(d) {
+            if (done) done(null, d);
+            else applyLinePollJson(d);
+          })
+          .catch(function(err) {
+            if (done) done(err);
+            else console.warn('[LINE poll]', err && err.message);
+          });
+      }
+      function runLinePollBurst(state, burstsLeft) {
+        fetchLinePollOnce(state, function(err, d) {
+          if (!err && applyLinePollJson(d)) return;
+          if (burstsLeft > 0 && (err || !d || d.pending)) {
+            setTimeout(function() {
+              runLinePollBurst(state, burstsLeft - 1);
+            }, 300);
+          }
+        });
+      }
+      try {
+        var lineBc = new BroadcastChannel(LINE_BC_NAME);
+        lineBc.onmessage = function(ev) {
+          if (!ev || !ev.data || ev.data.type !== 'line-callback-ok') return;
+          var st = sessionStorage.getItem(LINE_STATE_KEY);
+          if (!st) return;
+          showMsg('ได้รับผลจาก LINE แล้ว — กำลังเข้าสู่ระบบ...', false);
+          runLinePollBurst(st, 30);
+        };
+      } catch (eBc) {}
+      if (window.electronAPI && typeof window.electronAPI.onLineOAuthDone === 'function') {
+        window.electronAPI.onLineOAuthDone(function(stateFromMain) {
+          if (!stateFromMain) return;
+          try {
+            sessionStorage.setItem(LINE_STATE_KEY, stateFromMain);
+          } catch (eSt) {}
+          showMsg('ได้รับผลจาก LINE — กำลังเข้าสู่ระบบ...', false);
+          runLinePollBurst(stateFromMain, 60);
+        });
+      }
+      function startLineLoginPoll(state) {
+        stopLinePoll();
+        try {
+          sessionStorage.setItem(LINE_STATE_KEY, state);
+          sessionStorage.setItem(LINE_STARTED_KEY, String(Date.now()));
+        } catch (eSs) {}
+        var n = 0;
+        var maxTicks = 180;
+        var tick = function() {
+          n++;
+          if (n > maxTicks) {
+            stopLinePoll();
+            clearLineOAuthSessionStorage();
+            showMsg('หมดเวลารอ LINE — ลองใหม่', true);
+            if (btnLine) btnLine.disabled = false;
+            return;
+          }
+          fetchLinePollOnce(state, function(err, d) {
+            if (err) return;
+            applyLinePollJson(d);
+          });
+        };
+        tick();
+        linePollTimer = setInterval(tick, 1000);
+      }
+      if (btnLine) {
+        btnLine.addEventListener('click', function() {
+          hideMsg();
+          btnLine.disabled = true;
+          showMsg('กำลังเปิด LINE ในเบราว์เซอร์...', false);
+          var rb = window.location.origin;
+          fetch('/api/line-login-start?redirect_base=' + encodeURIComponent(rb))
+            .then(function(r) {
+              return r.json();
+            })
+            .then(function(d) {
+              if (!d || !d.url || !d.state) {
+                btnLine.disabled = false;
+                hideMsg();
+                showMsg((d && d.message) || 'ไม่สามารถเริ่ม LINE Login ได้', true);
+                return;
+              }
+              showMsg(
+                window.electronAPI && typeof window.electronAPI.openLineOAuthWindow === 'function'
+                  ? 'ลงชื่อเข้า LINE ในหน้าต่างที่เปิด — กำลังรอผล...'
+                  : 'ลงชื่อเข้า LINE ในเบราว์เซอร์แล้วกลับมาหน้านี้ — กำลังรอ...',
+                false
+              );
+              var url = d.url;
+              if (window.electronAPI && typeof window.electronAPI.openLineOAuthWindow === 'function') {
+                window.electronAPI
+                  .openLineOAuthWindow(url)
+                  .then(function(r) {
+                    if (r && r.ok) return;
+                    if (window.electronAPI.openExternalUrl) return window.electronAPI.openExternalUrl(url);
+                  })
+                  .catch(function() {
+                    if (window.electronAPI && window.electronAPI.openExternalUrl) {
+                      return window.electronAPI.openExternalUrl(url);
+                    }
+                  })
+                  .finally(function() {
+                    startLineLoginPoll(d.state);
+                  });
+              } else if (window.electronAPI && typeof window.electronAPI.openExternalUrl === 'function') {
+                window.electronAPI.openExternalUrl(url);
+                startLineLoginPoll(d.state);
+              } else {
+                window.open(url, '_blank', 'noopener,noreferrer');
+                startLineLoginPoll(d.state);
+              }
+            })
+            .catch(function() {
+              btnLine.disabled = false;
+              hideMsg();
+              showMsg('เชื่อมต่อโปรแกรมไม่ได้ — ตรวจว่าแอปยังรันอยู่', true);
+            });
+        });
+      }
 
       form.addEventListener('submit', function(e) {
         e.preventDefault();
@@ -335,34 +856,105 @@
           showMsg('กรุณากรอกชื่อผู้ใช้', true);
           return;
         }
-        if (!/^\d{6}$/.test(pin)) {
+        if (monitorRemoteLogin) {
+          if (!pin) {
+            showMsg('กรุณากรอกรหัส PIN หรือรหัสผ่าน', true);
+            return;
+          }
+          if (pin.length > 512) {
+            showMsg('รหัสยาวเกินไป', true);
+            return;
+          }
+        } else if (!/^\d{6}$/.test(pin)) {
           showMsg('รหัส PIN ต้องเป็นตัวเลข 6 หลัก', true);
           return;
         }
         hideMsg();
         btnSubmit.disabled = true;
         btnSubmit.textContent = 'กำลังเข้าสู่ระบบ...';
-        fetch(apiUrl('/api/monitor-login'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: username, pin: pin })
-        })
-          .then(function(r) { return r.json(); })
-          .then(function(data) {
-            if (data && data.ok && data.token) {
-              localStorage.setItem('monitor_token', data.token);
-              showMsg('เข้าสู่ระบบสำเร็จ กำลังเปลี่ยนหน้า...', false);
-              window.location.replace('index.html');
-            } else {
-              btnSubmit.disabled = false;
-              btnSubmit.textContent = 'เข้าสู่ระบบ';
-              showMsg(data && data.message ? data.message : 'ชื่อผู้ใช้หรือรหัส PIN ไม่ถูกต้อง', true);
+        var body = JSON.stringify({ username: username, pin: pin });
+        function parseLoginResponse(r) {
+          return r.text().then(function(t) {
+            try {
+              return { okHttp: r.ok, status: r.status, data: JSON.parse(t) };
+            } catch (e) {
+              return {
+                okHttp: false,
+                status: r.status,
+                data: { message: t ? t.slice(0, 120) : 'ตอบกลับไม่ถูกต้อง' }
+              };
             }
-          })
-          .catch(function() {
+          });
+        }
+        function finishLogin(res) {
+          var data = res.data;
+          if (data && data.ok && data.token) {
+            localStorage.setItem('monitor_token', data.token);
+            localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, sessionBaseToStore);
+            if (window.electronAPI && typeof window.electronAPI.setMonitorPushToken === 'function') {
+              window.electronAPI.setMonitorPushToken(data.token);
+            }
+            showMsg('เข้าสู่ระบบสำเร็จ กำลังเปลี่ยนหน้า...', false);
+            window.location.replace('index.html');
+          } else {
             btnSubmit.disabled = false;
             btnSubmit.textContent = 'เข้าสู่ระบบ';
-            showMsg('เกิดข้อผิดพลาด กรุณาลองใหม่', true);
+            showMsg(
+              (data && data.message) ||
+                (res.status === 502
+                  ? 'เซิร์ฟเวอร์ล็อกอินไม่ตอบ — ตรวจเน็ตหรือ API'
+                  : 'ชื่อผู้ใช้หรือรหัส PIN ไม่ถูกต้อง'),
+              true
+            );
+          }
+        }
+        var directUrl = apiBase ? (apiBase + '/api/monitor-login') : '';
+        var sessionBaseToStore = directUrl ? String(apiBase).trim().replace(/\/$/, '') : 'local';
+        var loginPromise = directUrl
+          ? fetch(directUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: body
+            }).then(parseLoginResponse)
+          : fetch('/api/monitor-login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: body
+            }).then(parseLoginResponse);
+        loginPromise
+          .then(function(res) {
+            if (directUrl && res.status === 403 && res.data && String(res.data.message || '').indexOf('<') >= 0) {
+              sessionBaseToStore = 'local';
+              return fetch('/api/monitor-login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: body
+              }).then(parseLoginResponse);
+            }
+            return res;
+          })
+          .then(function(res) {
+            finishLogin(res);
+          })
+          .catch(function() {
+            if (directUrl) {
+              sessionBaseToStore = 'local';
+              return fetch('/api/monitor-login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: body
+              })
+                .then(parseLoginResponse)
+                .then(finishLogin)
+                .catch(function() {
+                  btnSubmit.disabled = false;
+                  btnSubmit.textContent = 'เข้าสู่ระบบ';
+                  showMsg('เชื่อมต่อโปรแกรมไม่ได้ — ตรวจว่าแอปยังรันอยู่', true);
+                });
+            }
+            btnSubmit.disabled = false;
+            btnSubmit.textContent = 'เข้าสู่ระบบ';
+            showMsg('เชื่อมต่อโปรแกรมไม่ได้ — ตรวจว่าแอปยังรันอยู่', true);
           });
       });
     })();

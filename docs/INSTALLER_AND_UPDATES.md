@@ -9,7 +9,8 @@
 
 ## Build
 
-- `build-installer.bat` → สร้าง **NSIS เท่านั้น** (ไฟล์ Setup ใน `dist/`)  
+- `build-installer.bat` หรือ `npm run build` / `npm run build:installer` → สร้าง **NSIS Setup** (`dist/*Setup*.exe`)  
+- `npm run build:portable` → สร้าง **Portable .exe** แยกต่างหาก (ถ้าต้องการ)  
 - Log แสดงบนหน้าต่าง CMD และบันทึก `build-last.log` — ถ้าไม่มี `dist` ให้ดู error ใน log  
 - โฟลเดอร์ไม่บีบอัดทดสอบ: `npm run build:unpacked` → `dist/win-unpacked/`
 

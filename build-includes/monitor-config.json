@@ -1,3 +1,6 @@
 {
-  "monitorApiUrl": "https://api.nkbkcoop.com"
+  "monitorApiUrl": "https://nkbk.srsp.app/monitor-api",
+  "programSyncAliases": [],
+  "systemSnapshotUploadSecret": "fd517d102e524ce816745424c01f8283114657cf5a954aade09d1425fb3c71d8",
+  "monitorSystemPublicReadKey": "cc72e4bf02a1471a7ae2c45ee36a83d0167ae382b82d3524"
 }

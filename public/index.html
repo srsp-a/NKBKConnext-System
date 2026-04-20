@@ -44,6 +44,8 @@
 
     <nav class="tab-nav" role="tablist">
       <button type="button" class="tab-nav-btn active" data-tab="overview" role="tab">ภาพรวม</button>
+      <button type="button" class="tab-nav-btn" data-tab="webapp" role="tab">เว็บแอป</button>
+      <button type="button" class="tab-nav-btn" data-tab="leave" role="tab">ลางาน</button>
       <button type="button" class="tab-nav-btn" data-tab="system" role="tab">ระบบ</button>
       <button type="button" class="tab-nav-btn" data-tab="storage" role="tab">จัดเก็บ</button>
       <button type="button" class="tab-nav-btn" data-tab="network" role="tab">เครือข่าย</button>
@@ -164,6 +166,136 @@
           </div>
         </section>
 
+        <!-- เว็บแอป -->
+        <section id="panel-webapp" class="tab-panel" role="tabpanel">
+          <div class="grid">
+            <section class="card card-wide nas-connect-card">
+              <div class="card-header"><span class="card-icon">📁</span><h2>เชื่อมต่อ NAS / Network Drive</h2></div>
+              <div class="card-body">
+                <div class="nas-form">
+                  <div class="nas-field">
+                    <label for="nasUncPath">UNC Path <span class="nas-unc-lock" title="ค่านี้ล็อคเป็นค่าเริ่มต้นของทุกเครื่อง">🔒</span></label>
+                    <input type="text" id="nasUncPath" autocomplete="off" readonly value="\\NKBKCOOP-DRIVE\home">
+                  </div>
+                  <div class="nas-field">
+                    <label for="nasUsername">ชื่อผู้ใช้</label>
+                    <input type="text" id="nasUsername" placeholder="username หรือ domain\\user" autocomplete="username">
+                  </div>
+                  <div class="nas-field">
+                    <label for="nasPassword">รหัสผ่าน</label>
+                    <input type="password" id="nasPassword" placeholder="รหัสผ่าน" autocomplete="current-password">
+                  </div>
+                  <label class="nas-remember toggle">
+                    <input type="checkbox" id="nasRemember" checked aria-label="บันทึกการตั้งค่า">
+                    <span class="toggle-slider"></span>
+                    <span class="nas-remember-label">บันทึกการตั้งค่า</span>
+                  </label>
+                  <div class="nas-actions">
+                    <button type="button" class="btn-test" id="btnNasConnect">
+                      <span class="btn-test-icon">📁</span>
+                      เชื่อมต่อ
+                    </button>
+                    <button type="button" class="btn-test btn-secondary" id="btnNasDisconnect">
+                      <span class="btn-test-icon">✕</span>
+                      ยกเลิกการเชื่อมต่อ
+                    </button>
+                    <button type="button" class="btn-test btn-open-drive nas-open-hidden" id="btnNasOpenDrive" title="เปิดโฟลเดอร์ใน Explorer">
+                      <span class="btn-test-icon">📂</span>
+                      เปิดโฟลเดอร์
+                    </button>
+                  </div>
+                </div>
+                <div class="nas-result" id="nasResult" aria-live="polite"></div>
+              </div>
+            </section>
+            <section class="card card-wide web-connect-card">
+              <div class="card-header"><span class="card-icon">🌐</span><h2>เชื่อมต่อกับเว็บไซต์</h2></div>
+              <div class="card-body">
+                <div class="web-form">
+                  <div class="nas-field">
+                    <label for="webUrl">URL</label>
+                    <input type="text" id="webUrl" placeholder="http://oa.nkbkcoop.com/nkh" autocomplete="off">
+                  </div>
+                  <div class="nas-field">
+                    <label for="webDatabase">ฐานข้อมูล (ไม่บังคับ)</label>
+                    <input type="text" id="webDatabase" placeholder="isconkh_SQL" autocomplete="off">
+                  </div>
+                  <div class="nas-field">
+                    <label for="webUsername">ชื่อผู้ใช้</label>
+                    <input type="text" id="webUsername" placeholder="username" autocomplete="username">
+                  </div>
+                  <div class="nas-field">
+                    <label for="webPassword">รหัสผ่าน</label>
+                    <div class="pw-field-wrap">
+                      <input type="password" id="webPassword" placeholder="รหัสผ่าน" autocomplete="current-password">
+                      <button type="button" class="pw-toggle" data-pw-toggle="webPassword" aria-label="แสดง/ซ่อนรหัสผ่าน" title="แสดง/ซ่อนรหัสผ่าน">
+                        <span class="pw-eye-on">👁</span>
+                        <span class="pw-eye-off" hidden>🙈</span>
+                      </button>
+                    </div>
+                  </div>
+                  <label class="nas-remember toggle">
+                    <input type="checkbox" id="webRemember" checked aria-label="บันทึกการตั้งค่า">
+                    <span class="toggle-slider"></span>
+                    <span class="nas-remember-label">บันทึกการตั้งค่า</span>
+                  </label>
+                  <div class="nas-actions">
+                    <button type="button" class="btn-test btn-open-in-app" id="btnWebOpenInApp" title="เปิดในแอป แล้วเติม User/Pass ให้อัตโนมัติ">
+                      <span class="btn-test-icon">📱</span>
+                      เปิดในแอป
+                    </button>
+                  </div>
+                </div>
+                <div class="nas-result" id="webResult" aria-live="polite"></div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <!-- ลางาน -->
+        <section id="panel-leave" class="tab-panel" role="tabpanel">
+          <div class="grid">
+            <section class="card card-wide leave-balance-card">
+              <div class="card-header"><span class="card-icon">📊</span><h2>ยอดลาคงเหลือปีนี้</h2>
+                <div class="leave-header-actions">
+                  <span class="leave-year-badge" id="leaveYearBadge">—</span>
+                  <button type="button" class="btn-mini" id="btnLeaveRefresh" title="รีเฟรช">↻</button>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="leave-balance-grid" id="leaveBalanceGrid"><p class="muted">กำลังโหลด...</p></div>
+              </div>
+            </section>
+
+            <section class="card card-wide leave-approvals-card" id="leaveApprovalsCard" hidden>
+              <div class="card-header"><span class="card-icon">✅</span><h2>คำขอรออนุมัติของฉัน</h2>
+                <span class="leave-pill leave-pill-warning" id="leavePendingCount">0</span>
+              </div>
+              <div class="card-body">
+                <div id="leaveApprovalsList"><p class="muted">กำลังโหลด...</p></div>
+              </div>
+            </section>
+
+            <section class="card card-wide leave-my-card">
+              <div class="card-header"><span class="card-icon">📝</span><h2>รายการลาของฉัน</h2>
+                <div class="leave-header-actions">
+                  <select id="leaveMyFilter" class="leave-filter-sel" aria-label="กรองสถานะ">
+                    <option value="all">ทุกสถานะ</option>
+                    <option value="pending">รออนุมัติ</option>
+                    <option value="approved_lv1">รอผู้จัดการ</option>
+                    <option value="approved">อนุมัติแล้ว</option>
+                    <option value="rejected">ไม่อนุมัติ</option>
+                    <option value="cancelled">ยกเลิก</option>
+                  </select>
+                </div>
+              </div>
+              <div class="card-body">
+                <div id="leaveMyList"><p class="muted">กำลังโหลด...</p></div>
+              </div>
+            </section>
+          </div>
+        </section>
+
         <!-- ระบบ -->
         <section id="panel-system" class="tab-panel" role="tabpanel">
           <div class="grid">
@@ -215,95 +347,6 @@
               <div class="card-body">
                 <div class="network-status-row"><span class="label">สถานะเครือข่าย</span><span class="value" id="networkStatusFull"><span class="status-dot"></span> —</span></div>
                 <div id="networkList"><p class="muted">—</p></div>
-              </div>
-            </section>
-            <section class="card card-wide nas-connect-card">
-              <div class="card-header"><span class="card-icon">📁</span><h2>เชื่อมต่อ NAS / Network Drive</h2></div>
-              <div class="card-body">
-                <div class="nas-form">
-                  <div class="nas-field">
-                    <label for="nasUncPath">UNC Path</label>
-                    <input type="text" id="nasUncPath" autocomplete="off">
-                  </div>
-                  <div class="nas-field">
-                    <label for="nasUsername">ชื่อผู้ใช้</label>
-                    <input type="text" id="nasUsername" placeholder="username หรือ domain\\user" autocomplete="username">
-                  </div>
-                  <div class="nas-field">
-                    <label for="nasPassword">รหัสผ่าน</label>
-                    <input type="password" id="nasPassword" placeholder="รหัสผ่าน" autocomplete="current-password">
-                  </div>
-                  <div class="nas-field nas-field-inline">
-                    <label for="nasDriveLetter">Drive (ไม่บังคับ)</label>
-                    <select id="nasDriveLetter">
-                      <option value="">— ไม่กำหนด —</option>
-                      <option value="Z">Z:</option>
-                      <option value="Y">Y:</option>
-                      <option value="X">X:</option>
-                      <option value="W">W:</option>
-                      <option value="V">V:</option>
-                    </select>
-                  </div>
-                  <label class="nas-remember toggle">
-                    <input type="checkbox" id="nasRemember" checked aria-label="บันทึกการตั้งค่า">
-                    <span class="toggle-slider"></span>
-                    <span class="nas-remember-label">บันทึกการตั้งค่า</span>
-                  </label>
-                  <div class="nas-actions">
-                    <button type="button" class="btn-test" id="btnNasConnect">
-                      <span class="btn-test-icon">📁</span>
-                      เชื่อมต่อ
-                    </button>
-                    <button type="button" class="btn-test btn-secondary" id="btnNasDisconnect">
-                      <span class="btn-test-icon">✕</span>
-                      ยกเลิกการเชื่อมต่อ
-                    </button>
-                    <button type="button" class="btn-test btn-open-drive nas-open-hidden" id="btnNasOpenDrive" title="เปิดโฟลเดอร์ใน Explorer">
-                      <span class="btn-test-icon">📂</span>
-                      เปิดโฟลเดอร์
-                    </button>
-                  </div>
-                </div>
-                <div class="nas-result" id="nasResult" aria-live="polite"></div>
-              </div>
-            </section>
-            <section class="card card-wide web-connect-card">
-              <div class="card-header"><span class="card-icon">🌐</span><h2>เชื่อมต่อกับเว็บไซต์</h2></div>
-              <div class="card-body">
-                <div class="web-form">
-                  <div class="nas-field">
-                    <label for="webUrl">URL</label>
-                    <input type="text" id="webUrl" placeholder="http://oa.nkbkcoop.com/nkh" autocomplete="off">
-                  </div>
-                  <div class="nas-field">
-                    <label for="webDatabase">ฐานข้อมูล (ไม่บังคับ)</label>
-                    <input type="text" id="webDatabase" placeholder="isconkh_SQL" autocomplete="off">
-                  </div>
-                  <div class="nas-field">
-                    <label for="webUsername">ชื่อผู้ใช้</label>
-                    <input type="text" id="webUsername" placeholder="username" autocomplete="username">
-                  </div>
-                  <div class="nas-field">
-                    <label for="webPassword">รหัสผ่าน</label>
-                    <input type="password" id="webPassword" placeholder="รหัสผ่าน" autocomplete="current-password">
-                  </div>
-                  <label class="nas-remember toggle">
-                    <input type="checkbox" id="webRemember" checked aria-label="บันทึกการตั้งค่า">
-                    <span class="toggle-slider"></span>
-                    <span class="nas-remember-label">บันทึกการตั้งค่า</span>
-                  </label>
-                  <div class="nas-actions">
-                    <button type="button" class="btn-test" id="btnWebOpen">
-                      <span class="btn-test-icon">🌐</span>
-                      เปิดเว็บไซต์
-                    </button>
-                    <button type="button" class="btn-test btn-open-in-app" id="btnWebOpenInApp" title="เปิดในแอป แล้วเติม User/Pass ให้อัตโนมัติ">
-                      <span class="btn-test-icon">📱</span>
-                      เปิดในแอป
-                    </button>
-                  </div>
-                </div>
-                <div class="nas-result" id="webResult" aria-live="polite"></div>
               </div>
             </section>
             <section class="card card-wide speed-test-card">
@@ -472,18 +515,45 @@
             <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
           </svg>
         </button>
-        <span class="last-update footer-update" id="lastUpdate">—</span>
-        <span>NKBKConnext System <span id="appVersionFooter"></span></span>
-        <span class="dot" aria-hidden="true">•</span>
-        <span class="footer-status">
-          <span class="status-dot footer-status-dot" id="footerStatusDot"></span>
-          <span id="statusText">กำลังโหลด...</span>
+        <span class="footer-mid">
+          <span class="footer-status">
+            <span class="status-dot footer-status-dot" id="footerStatusDot"></span>
+            <span id="statusText">กำลังโหลด...</span>
+          </span>
+          <span class="dot footer-mid-dot" aria-hidden="true">•</span>
+          <span class="last-update footer-update" id="lastUpdate">—</span>
+          <span id="appVersionFooter" class="footer-app-ver"></span>
         </span>
-        <span class="dot" aria-hidden="true">•</span>
-        <button type="button" class="btn-logout" id="btnLogout" title="ออกจากระบบ">ออกจากระบบ</button>
       </span>
-      <span class="footer-copyright">© SIRASUPA CORPORATION (THAILAND) CO., LTD.</span>
+      <span class="footer-trail">
+        <span class="footer-copyright">© SIRASUPA CORPORATION (THAILAND) CO., LTD.</span>
+        <button type="button" class="btn-logout-icon" id="btnLogout" title="ออกจากระบบ" aria-label="ออกจากระบบ">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+        </button>
+      </span>
     </footer>
+
+    <div id="logoutConfirmBackdrop" class="logout-modal-backdrop" aria-hidden="true">
+      <div class="logout-modal-card" role="dialog" aria-modal="true" aria-labelledby="logoutModalTitle">
+        <div class="logout-modal-icon" aria-hidden="true">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+        </div>
+        <h3 id="logoutModalTitle" class="logout-modal-title">ออกจากระบบ</h3>
+        <p class="logout-modal-text">ต้องการออกจากระบบและกลับไปหน้าเข้าสู่ระบบหรือไม่?</p>
+        <div class="logout-modal-actions">
+          <button type="button" class="logout-modal-btn logout-modal-btn-cancel" id="btnLogoutCancel">ยกเลิก</button>
+          <button type="button" class="logout-modal-btn logout-modal-btn-confirm" id="btnLogoutConfirm">ออกจากระบบ</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -536,21 +606,115 @@
         }
       }
       function redirectToLogin() { window.location.replace('login.html'); }
+      function performMonitorLogout() {
+        if (token) {
+          var logoutUrl = monitorAuthUrl('/api/monitor-logout');
+          fetch(logoutUrl, { method: 'POST', headers: { 'X-Monitor-Token': token }, body: JSON.stringify({}) }).catch(function() {});
+        }
+        clearMonitorAuth();
+        window.location.href = 'login.html';
+      }
+      function openLogoutConfirmModal() {
+        var bd = document.getElementById('logoutConfirmBackdrop');
+        if (!bd) return;
+        bd.classList.add('logout-modal-backdrop--open');
+        bd.setAttribute('aria-hidden', 'false');
+        var c = document.getElementById('btnLogoutCancel');
+        if (c) try { c.focus(); } catch (e) {}
+      }
+      function closeLogoutConfirmModal() {
+        var bd = document.getElementById('logoutConfirmBackdrop');
+        if (!bd) return;
+        bd.classList.remove('logout-modal-backdrop--open');
+        bd.setAttribute('aria-hidden', 'true');
+      }
+      function applyMenuPermissionsFromApi(data) {
+        if (!data || !data.ok) return;
+        var allowed = Array.isArray(data.allowedMenus) ? data.allowedMenus.slice() : null;
+        if (!allowed) return;
+        var allowSet = {};
+        for (var i = 0; i < allowed.length; i++) allowSet[allowed[i]] = true;
+        var anyVisible = false;
+        var firstVisibleBtn = null;
+        document.querySelectorAll('.tab-nav-btn').forEach(function(btn) {
+          var tabId = btn.getAttribute('data-tab');
+          var show = !!allowSet[tabId];
+          btn.hidden = !show;
+          btn.style.display = show ? '' : 'none';
+          if (show && !firstVisibleBtn) firstVisibleBtn = btn;
+          if (show) anyVisible = true;
+        });
+        document.querySelectorAll('.tab-panel').forEach(function(panel) {
+          var tabId = (panel.id || '').replace(/^panel-/, '');
+          var show = !!allowSet[tabId];
+          if (!show) {
+            panel.classList.remove('active');
+            panel.hidden = true;
+          } else {
+            panel.hidden = false;
+          }
+        });
+        var activeBtn = document.querySelector('.tab-nav-btn.active:not([hidden])');
+        if (!activeBtn && firstVisibleBtn) {
+          document.querySelectorAll('.tab-nav-btn').forEach(function(b) { b.classList.remove('active'); });
+          document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+          firstVisibleBtn.classList.add('active');
+          var tabId = firstVisibleBtn.getAttribute('data-tab');
+          var panel = document.getElementById('panel-' + tabId);
+          if (panel) panel.classList.add('active');
+        }
+        if (!anyVisible && typeof console !== 'undefined') {
+          console.warn('[permissions] no menu allowed for this user — role/position may not be configured');
+        }
+      }
+      window.__nkbkAuthFetch = function(apiPath, options) {
+        var url = monitorAuthUrl(apiPath);
+        var opts = options || {};
+        var headers = opts.headers ? Object.assign({}, opts.headers) : {};
+        if (token) headers['X-Monitor-Token'] = token;
+        if (opts.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
+        return fetch(url, Object.assign({}, opts, { headers: headers }));
+      };
+      window.__nkbkPermissionsRefresh = function() {
+        if (!token) return;
+        var attempts = buildMonitorMeAttempts();
+        var ix = 0;
+        function tryOne() {
+          if (ix >= attempts.length) return;
+          var b = attempts[ix++];
+          var url = (b || '') + '/api/me-permissions';
+          fetch(url, { headers: { 'X-Monitor-Token': token } })
+            .then(function(r) { return r.status === 401 ? null : r.json(); })
+            .then(function(data) {
+              if (!data) { if (ix < attempts.length) tryOne(); return; }
+              if (data.ok) applyMenuPermissionsFromApi(data);
+            })
+            .catch(function() { if (ix < attempts.length) tryOne(); });
+        }
+        tryOne();
+      };
       function onAuthReady() {
         document.body.classList.add('auth-ready');
         initMonitorPinModal();
         initMonitorAttendanceMonthModal();
+        try { window.__nkbkPermissionsRefresh(); } catch (_) {}
         var btn = document.getElementById('btnLogout');
-        if (btn) {
-          btn.addEventListener('click', function() {
-            if (token) {
-              var logoutUrl = monitorAuthUrl('/api/monitor-logout');
-              fetch(logoutUrl, { method: 'POST', headers: { 'X-Monitor-Token': token }, body: JSON.stringify({}) }).catch(function() {});
-            }
-            clearMonitorAuth();
-            window.location.href = 'login.html';
+        if (btn) btn.addEventListener('click', openLogoutConfirmModal);
+        var btnCancel = document.getElementById('btnLogoutCancel');
+        var btnConfirm = document.getElementById('btnLogoutConfirm');
+        var bd = document.getElementById('logoutConfirmBackdrop');
+        if (btnCancel) btnCancel.addEventListener('click', closeLogoutConfirmModal);
+        if (btnConfirm) btnConfirm.addEventListener('click', function() { closeLogoutConfirmModal(); performMonitorLogout(); });
+        if (bd) {
+          bd.addEventListener('click', function(ev) {
+            if (ev.target === bd) closeLogoutConfirmModal();
           });
         }
+        document.addEventListener('keydown', function(ev) {
+          if (ev.key !== 'Escape') return;
+          var b = document.getElementById('logoutConfirmBackdrop');
+          if (b && b.classList.contains('logout-modal-backdrop--open')) closeLogoutConfirmModal();
+        });
         /* อัปโหลดสเปกไป monitor-api ทันทีหลังล็อกอิน (ไม่ต้องรอรอบ 5 นาที) → Firestore #programs */
         fetch('/api/trigger-system-snapshot-push', {
           method: 'POST',
@@ -965,6 +1129,7 @@
       }
     })();
   </script>
+  <script src="update-flow-overlay.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -16,6 +16,8 @@
 
 ถ้าแอป Monitor ตั้งค่าให้เรียก API บนเซิร์ฟเวอร์ (V2 / api.nkbkcoop.com) จะ**ไม่ต้องวางไฟล์ firebase-service-account.json** บนเครื่องลูก — เจ้าหน้าที่ล็อกอินด้วยชื่อ+PIN เดียวกับ V2 ได้เลย ดูรายละเอียดใน [MONITOR_REMOTE_LOGIN_AND_UPDATE.md](MONITOR_REMOTE_LOGIN_AND_UPDATE.md)
 
+**อย่าวางไฟล์ service account ในชื่อ `monitor-config.json`** — ไฟล์นี้ต้องมีแค่ `{"monitorApiUrl":"..."}` เท่านั้น ถ้าวาง JSON คีย์ Firebase ผิดไฟล์ แอปจะไม่เห็น URL และจะไปถาม `firebase-service-account.json` แทน
+
 - **ตัวติดตั้งใหม่:** มี **`monitor-config.json`** แพ็กมาข้าง `.exe` อยู่แล้ว (ชี้ api.nkbkcoop.com) — build ใหม่จาก repo นี้
 - หรือตั้ง `MONITOR_API_URL` แทนได้
 

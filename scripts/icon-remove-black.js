@@ -10,6 +10,10 @@ const APP_DIR = path.join(__dirname, '..');
 
 // ถ้า R,G,B ต่ำกว่านี้ถือว่าเป็น "ดำ" (เฉพาะที่นอกรัศมีวงกลมจะทำให้โปร่งใส)
 const BLACK_THRESHOLD = 45;
+/** แถบริมวงในด้านใน — ตัดขอบวงดำหนาที่หุ้มโลโก้ (ไม่แตะส่วนกลางที่มีตัวหนังสือ) */
+const OUTER_RING_FRAC = 0.058;
+const RING_LUM_MAX = 62;
+const RING_RGB_MAX = 98;
 
 function processImage(filePath) {
   try {
@@ -22,17 +26,28 @@ function processImage(filePath) {
         const cy = h / 2;
         const r = Math.min(w, h) / 2; // รัศมีวงกลมในภาพ
         const rSq = r * r;
+        const band = Math.max(3, Math.round(r * OUTER_RING_FRAC));
+        const innerR = Math.max(1, r - band);
+        const innerEdgeSq = innerR * innerR;
 
         img.scan(0, 0, w, h, function (x, y, idx) {
           const dx = x - cx;
           const dy = y - cy;
           const distSq = dx * dx + dy * dy;
+          const red = this.bitmap.data[idx];
+          const green = this.bitmap.data[idx + 1];
+          const blue = this.bitmap.data[idx + 2];
           // เฉพาะพิกเซลที่อยู่นอกวงกลม (มุม/ขอบสี่เหลี่ยม) และเป็นสีดำ → ทำให้โปร่งใส
           if (distSq > rSq) {
-            const red = this.bitmap.data[idx];
-            const green = this.bitmap.data[idx + 1];
-            const blue = this.bitmap.data[idx + 2];
             if (red <= BLACK_THRESHOLD && green <= BLACK_THRESHOLD && blue <= BLACK_THRESHOLD) {
+              this.bitmap.data[idx + 3] = 0;
+            }
+            return;
+          }
+          // ขอบวงด้านใน: เฉพาะชั้นนอกของวงกลม + สีเข้ม → ตัดขอบดำหนา (ไม่กินโซนชมพูที่สว่าง)
+          if (distSq >= innerEdgeSq) {
+            const lum = 0.299 * red + 0.587 * green + 0.114 * blue;
+            if (lum < RING_LUM_MAX && red < RING_RGB_MAX && green < RING_RGB_MAX && blue < RING_RGB_MAX) {
               this.bitmap.data[idx + 3] = 0;
             }
           }

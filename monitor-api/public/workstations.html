@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>สถานะเครื่อง — NKBK Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a2332;
+      --border: #2d3a4d;
+      --text: #e7edf4;
+      --muted: #8b9cb3;
+      --accent: #3dd68c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Kanit', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+    h1 { font-weight: 600; font-size: 1.35rem; margin: 0 0 0.25rem; }
+    .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.25rem; }
+    .err { background: #3d1f24; border: 1px solid #8b3a44; color: #ffb4b4; padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1rem; }
+    .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.1rem;
+    }
+    .card h2 { font-size: 1.05rem; margin: 0 0 0.5rem; color: var(--accent); }
+    .row { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.88rem; padding: 0.2rem 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .row:last-child { border-bottom: none; }
+    .label { color: var(--muted); flex-shrink: 0; }
+    .val { text-align: right; word-break: break-all; }
+    .meta { font-size: 0.75rem; color: var(--muted); margin-top: 0.75rem; }
+    button {
+      font-family: inherit;
+      background: var(--accent);
+      color: #0a0f14;
+      border: none;
+      padding: 0.45rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:hover { filter: brightness(1.08); }
+    .sub a, .err a { color: #7ee3ff; text-decoration: underline; }
+    .sub a:hover, .err a:hover { color: #b8f0ff; }
+    .hint { font-size: 0.82rem; padding: 0.65rem 0.85rem; border-radius: 8px; margin-bottom: 0.75rem; line-height: 1.45; }
+    .hint.ok { background: #14231c; border: 1px solid #2d5c40; color: #9ee6b8; }
+    .hint.bad { background: #2d1818; border: 1px solid #6b3030; color: #ffb4b4; }
+    .hint.warn { background: #2a2614; border: 1px solid #6a6230; color: #f5e6a8; }
+    details.blk { margin-top: 0.45rem; border: 1px solid var(--border); border-radius: 8px; padding: 0.35rem 0.55rem; background: rgba(0,0,0,0.2); }
+    details.blk summary { cursor: pointer; color: var(--accent); font-size: 0.82rem; font-weight: 600; }
+    pre.json { margin: 0.45rem 0 0; font-size: 0.7rem; line-height: 1.35; overflow: auto; max-height: 14rem; background: #0a0e14; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border); }
+    .st-ok { color: #3dd68c !important; }
+    .st-warn { color: #ffb86c !important; }
+    .st-mid { color: var(--muted) !important; }
+    .sync-panel { margin-bottom: 1rem; max-width: 42rem; border: 1px solid var(--border); border-radius: 12px; padding: 0.65rem 0.85rem; background: rgba(0,0,0,0.15); }
+    .sync-panel summary { cursor: pointer; color: #7eb8ff; font-weight: 600; font-size: 0.9rem; }
+    #manualSyncSecret { flex: 1; min-width: 200px; padding: 0.45rem 0.6rem; border-radius: 8px; border: 1px solid var(--border); background: #0a0e14; color: var(--text); font-family: inherit; }
+    #btnManualSync { background: #5b8cff; color: #fff; }
+  </style>
+</head>
+<body>
+  <h1>สถานะเครื่อง (จากแอป NKBKConnext)</h1>
+  <p class="sub">ข้อมูลจากเซิร์ฟเวอร์ — ใส่ <code>?key=</code> ใน URL ถ้า Node อยู่ใต้โฟลเดอร์ (เช่น <code>/monitor-api/</code>) ให้กดลิงก์ด้านล่าง หรือใส่ <code>?api=...</code><br />
+  อย่าเปิดจาก <code>file:///</code></p>
+  <p id="quickLinks" class="sub" style="display: none"></p>
+  <div id="msg"></div>
+  <div id="syncHint"></div>
+  <details class="sync-panel">
+    <summary>บังคับซิงก์ไป Firebase → คอลเลกชัน programs (หน้าแอดมิน)</summary>
+    <p class="sub" style="margin: 0.5rem 0 0.35rem">
+      ใส่รหัสเดียวกับ <code>MONITOR_SYSTEM_UPLOAD_SECRET</code> บนเซิร์ฟเวอร์ (ในแอป = <code>systemSnapshotUploadSecret</code> ใน monitor-config)<br />
+      กดปุ่มเพื่อเขียน snapshot ที่เซิร์ฟเวอร์ถืออยู่ตอนนี้ — กด <strong>โหลด/รีเฟรช</strong> ให้สำเร็จก่อนเพื่อให้รู้ฐาน API
+    </p>
+    <p style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0.5rem 0 0">
+      <input type="password" id="manualSyncSecret" autocomplete="off" placeholder="รหัสอัปโหลด (upload secret)" />
+      <button type="button" id="btnManualSync">ซิงก์ตอนนี้ → Firestore</button>
+    </p>
+    <div id="manualSyncOut" style="margin-top: 0.5rem"></div>
+  </details>
+  <p><button type="button" id="btn">โหลด / รีเฟรช</button></p>
+  <div class="grid" id="grid"></div>
+
+  <script>
+    /** ฐาน API ที่ใช้ได้ล่าสุด (จากรอบโหลด snapshot) — ใช้กับปุ่มบังคับซิงก์ */
+    let lastWorkingApiBase = '';
+
+    function uptimeTh(sec) {
+      if (sec == null || sec < 0) return '—';
+      const d = Math.floor(sec / 86400);
+      const h = Math.floor((sec % 86400) / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const p = [];
+      if (d) p.push(d + ' วัน');
+      if (h) p.push(h + ' ชม.');
+      p.push(m + ' นาที');
+      return p.join(' ');
+    }
+
+    function esc(s) {
+      if (s == null) return '';
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    const ONLINE_MS = 15 * 60 * 1000;
+
+    function jsonSection(title, obj) {
+      if (obj == null) return '';
+      if (Array.isArray(obj) && obj.length === 0) return '';
+      if (typeof obj === 'object' && !Array.isArray(obj) && Object.keys(obj).length === 0) return '';
+      let raw;
+      try {
+        raw = JSON.stringify(obj, null, 2);
+      } catch (_) {
+        raw = String(obj);
+      }
+      return (
+        '<details class="blk"><summary>' +
+        esc(title) +
+        '</summary><pre class="json">' +
+        esc(raw) +
+        '</pre></details>'
+      );
+    }
+
+    function presenceRow(updatedAt) {
+      const t = updatedAt ? new Date(updatedAt).getTime() : 0;
+      const online = t && Date.now() - t < ONLINE_MS;
+      let label;
+      let cls;
+      if (!t) {
+        label = 'ไม่ทราบ';
+        cls = 'st-mid';
+      } else if (online) {
+        label = 'กำลังรายงาน (น่าจะเปิดเครื่อง/แอป)';
+        cls = 'st-ok';
+      } else {
+        label = 'ไม่รายงานเกิน 15 นาที (อาจปิดเครื่องหรือไม่ส่งข้อมูล)';
+        cls = 'st-warn';
+      }
+      return (
+        '<div class="row"><span class="label">สถานะจากแอป</span><span class="val ' +
+        cls +
+        '">' +
+        esc(label) +
+        '</span></div>'
+      );
+    }
+
+    function card(ws) {
+      const s = ws.snapshot || {};
+      const os = s.os || {};
+      const cpu = s.cpu || {};
+      const mem = s.memory || {};
+      const sys = s.system || {};
+      const net0 = (s.network && s.network[0]) || {};
+      const uuid = sys.uuid || os.serial || '';
+      const when = ws.updatedAt ? new Date(ws.updatedAt).toLocaleString('th-TH') : '—';
+      return (
+        '<div class="card">' +
+        '<h2>' +
+        esc(ws.hostname || os.hostname || '—') +
+        '</h2>' +
+        presenceRow(ws.updatedAt) +
+        '<div class="row"><span class="label">UUID / เครื่อง</span><span class="val">' +
+        esc(uuid || '—') +
+        '</span></div>' +
+        '<div class="row"><span class="label">ระบบปฏิบัติการ</span><span class="val">' +
+        esc([os.distro, os.release].filter(Boolean).join(' ') || '—') +
+        '</span></div>' +
+        '<div class="row"><span class="label">สถาปัตยกรรม</span><span class="val">' +
+        esc(os.arch || '—') +
+        '</span></div>' +
+        '<div class="row"><span class="label">เวลาทำงาน</span><span class="val">' +
+        esc(uptimeTh(os.uptime)) +
+        '</span></div>' +
+        '<div class="row"><span class="label">CPU (สรุป)</span><span class="val">' +
+        esc(cpu.brand || '—') +
+        '</span></div>' +
+        '<div class="row"><span class="label">คอร์</span><span class="val">' +
+        esc(cpu.cores != null ? cpu.cores + ' (' + (cpu.physicalCores || '—') + ' ฟิสิกัล)' : '—') +
+        '</span></div>' +
+        '<div class="row"><span class="label">RAM (สรุป)</span><span class="val">' +
+        esc((mem.usedGB != null ? mem.usedGB + ' / ' : '') + (mem.totalGB != null ? mem.totalGB + ' GB' : '—')) +
+        '</span></div>' +
+        '<div class="row"><span class="label">IP (อินเทอร์เฟซแรก)</span><span class="val">' +
+        esc(net0.ip4 || '—') +
+        '</span></div>' +
+        jsonSection('CPU — ข้อมูลทั้งหมด', cpu) +
+        jsonSection('RAM / memory — ข้อมูลทั้งหมด', mem) +
+        jsonSection('โหลดระบบ (load)', s.load) +
+        jsonSection('กระบวนการ', s.processes) +
+        jsonSection('ดิสก์ / พาร์ติชัน', s.disks) +
+        jsonSection('พื้นที่จัดเก็บ (storage)', s.storage) +
+        jsonSection('ไดรฟ์เครือข่าย / NAS', s.networkDrives) +
+        jsonSection('GPU', s.gpu) +
+        jsonSection('จอและการ์ดจอ (graphics)', s.graphics) +
+        jsonSection('เครือข่าย (ทุกอินเทอร์เฟซ)', s.network) +
+        jsonSection('สถานะเน็ต', s.networkStatus) +
+        jsonSection('เครื่องพิมพ์', s.printers) +
+        jsonSection('ไดรเวอร์พิมพ์', s.printerDrivers) +
+        jsonSection('Microsoft Office', s.office) +
+        jsonSection('LINE', s.line) +
+        jsonSection('แบตเตอรี่', s.battery) +
+        jsonSection('Windows Update', s.windowsUpdate) +
+        jsonSection('ข้อมูลระบบ (system)', sys) +
+        jsonSection('อื่น ๆ / extras', s.extras) +
+        jsonSection('สแนปชอตดิบ (ทั้งก้อน)', s) +
+        '<div class="meta">อัปเดตล่าสุด: ' +
+        esc(when) +
+        '</div>' +
+        '</div>'
+      );
+    }
+
+    /** ลอง path สั้นก่อน แล้วค่อยชื่อเต็ม (กรณี proxy / เวอร์ชัน server) */
+    const PROGRAMS_SYNC_STATUS_PATHS = ['/api/programs-sync-status', '/api/monitor-programs-sync-status'];
+    const PROGRAMS_MANUAL_SYNC_PATHS = ['/api/programs-manual-sync', '/api/monitor-programs-manual-sync'];
+
+    async function showProgramsSyncHint(key, apiBase) {
+      const el = document.getElementById('syncHint');
+      if (!el || !key || !apiBase) return;
+      try {
+        const b = apiBase.replace(/\/$/, '');
+        let st = null;
+        let r = null;
+        for (let pi = 0; pi < PROGRAMS_SYNC_STATUS_PATHS.length; pi++) {
+          const url = b + PROGRAMS_SYNC_STATUS_PATHS[pi] + '?key=' + encodeURIComponent(key);
+          r = await fetch(url);
+          if (r.status === 404) continue;
+          try {
+            st = await r.json();
+          } catch (_) {
+            continue;
+          }
+          break;
+        }
+        if (!st) {
+          el.innerHTML =
+            '<div class="hint bad"><strong>HTTP 404</strong> — โฟลเดอร์ <code>monitor-api</code> บน Plesk ยังใช้ <code>server.js</code> เก่า (ไม่มี API ซิงก์)<br />ให้อัปโหลด <code>server.js</code> + <code>public/workstations.html</code> จากโปรเจกต์ล่าสุด แล้ว <strong>รีสตาร์ท Node.js</strong></div>';
+          return;
+        }
+        if (!st.ok) return;
+        let html = '';
+        if (st.programFirestoreSyncDisabled) {
+          html =
+            '<div class="hint warn"><strong>ซิงก์ไป Firestore ปิดอยู่</strong> (MONITOR_DISABLE_PROGRAM_FIRESTORE_SYNC)</div>';
+        } else if (!st.firebaseAdminFirestoreReady) {
+          html =
+            '<div class="hint bad"><strong>แอดมินจะไม่เห็นเครื่องใน Firestore จนกว่าจะตั้งค่านี้</strong><br />' +
+            esc(st.hint || '') +
+            ' — โปรเจกต์: <code>' +
+            esc(st.firebaseProjectId || '') +
+            '</code></div>';
+        } else {
+          html =
+            '<div class="hint ok">ซิงก์ไป Firestore พร้อม (Admin SDK) — ดูคอลเลกชัน <code>programs</code> ใน Console หลังแอปส่ง snapshot</div>';
+        }
+        const last = st.lastProgramsSyncAttempt;
+        if (last && last.skipped && last.reason) {
+          html += '<div class="hint warn">' + esc(last.reason) + '</div>';
+        } else if (last && last.ok === false && last.error) {
+          html +=
+            '<div class="hint bad">ครั้งล่าสุดซิงก์ <code>programs</code> ล้มเหลว: ' + esc(last.error) + '</div>';
+        } else if (last && last.ok && last.docId) {
+          html +=
+            '<div class="hint ok" style="margin-top:0.35rem">ซิงก์ล่าสุดสำเร็จ → <code>programs/' +
+            esc(last.docId) +
+            '</code> (' +
+            esc(last.mode || '') +
+            ')</div>';
+        }
+        el.innerHTML = html;
+      } catch (_) {
+        el.innerHTML =
+          '<div class="hint warn">เรียก API สถานะซิงก์ไม่ได้ — ตรวจเครือข่าย หรืออัปโหลด <code>server.js</code> ใหม่แล้วรีสตาร์ท Node</div>';
+      }
+    }
+
+    async function manualSyncToFirestore() {
+      const out = document.getElementById('manualSyncOut');
+      const secretEl = document.getElementById('manualSyncSecret');
+      const secret = secretEl && secretEl.value ? secretEl.value.trim() : '';
+      if (!secret) {
+        if (out) out.innerHTML = '<div class="hint bad">ใส่รหัสอัปโหลดก่อน</div>';
+        return;
+      }
+      if (!lastWorkingApiBase) {
+        if (out) {
+          out.innerHTML =
+            '<div class="hint warn">กด <strong>โหลด/รีเฟรช</strong> ให้เห็นการ์ดเครื่องก่อน — ระบบจะได้รู้ที่อยู่ API ที่ถูกต้อง</div>';
+        }
+        return;
+      }
+      if (out) out.innerHTML = '<div class="hint ok">กำลังซิงก์...</div>';
+      try {
+        const b = lastWorkingApiBase.replace(/\/$/, '');
+        let r = null;
+        let j = null;
+        for (let pi = 0; pi < PROGRAMS_MANUAL_SYNC_PATHS.length; pi++) {
+          const url = b + PROGRAMS_MANUAL_SYNC_PATHS[pi];
+          r = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Monitor-Manual-Sync-Secret': secret
+            },
+            body: '{}'
+          });
+          if (r.status === 404) continue;
+          const text = await r.text();
+          try {
+            j = JSON.parse(text);
+          } catch (parseErr) {
+            if (out) {
+              out.innerHTML =
+                '<div class="hint bad">ตอบกลับไม่ใช่ JSON (HTTP ' + r.status + ') — อาจยังเป็น <code>server.js</code> เก่า</div>';
+            }
+            return;
+          }
+          break;
+        }
+        if (!r || r.status === 404) {
+          if (out) {
+            out.innerHTML =
+              '<div class="hint bad"><strong>HTTP 404</strong> — ยังไม่มี route บังคับซิงก์บนเซิร์ฟเวอร์<br />อัปโหลด <code>server.js</code> ชุดล่าสุด (มี <code>POST /api/programs-manual-sync</code>) แล้วรีสตาร์ท Node</div>';
+          }
+          return;
+        }
+        if (!r.ok || !j.ok) {
+          if (out) {
+            out.innerHTML =
+              '<div class="hint bad">' + esc(j.message || 'HTTP ' + r.status) + '</div>';
+          }
+          return;
+        }
+        let html = '';
+        if (j.emptySnapshots) {
+          html = '<div class="hint warn">' + esc(j.message || 'ไม่มี snapshot') + '</div>';
+        } else {
+          html =
+            '<div class="hint ok"><strong>ส่งคำสั่งซิงก์แล้ว</strong> — ' +
+            j.count +
+            ' เครื่อง</div><ul style="margin:0.45rem 0 0 1.1rem; font-size:0.82rem; line-height:1.5">';
+          (j.results || []).forEach(function (row) {
+            html += '<li><b>' + esc(row.hostname || '') + '</b>: ';
+            if (row.ok) {
+              html +=
+                'สำเร็จ → <code>programs/' +
+                esc(row.docId || '') +
+                '</code> (' +
+                esc(row.mode || '') +
+                ')';
+            } else {
+              html +=
+                '<span style="color:#ffb4b4">' +
+                esc(row.error || row.reason || 'ล้มเหลว') +
+                '</span>';
+            }
+            html += '</li>';
+          });
+          html += '</ul>';
+        }
+        if (j.lastProgramsSyncAttempt) {
+          html +=
+            '<pre class="json" style="max-height: 7rem; margin-top: 0.5rem">' +
+            esc(JSON.stringify(j.lastProgramsSyncAttempt, null, 2)) +
+            '</pre>';
+        }
+        if (out) out.innerHTML = html;
+      } catch (e) {
+        if (out) out.innerHTML = '<div class="hint bad">' + esc(e.message || e) + '</div>';
+      }
+    }
+
+    function pageOrigin() {
+      if (location.protocol === 'file:') return 'https://nkbk.srsp.app';
+      return location.origin;
+    }
+
+    function hrefMonitorApiPage(key) {
+      return pageOrigin() + '/monitor-api/workstations.html?key=' + encodeURIComponent(key);
+    }
+
+    function hrefSamePageWithApi(key) {
+      const origin = pageOrigin();
+      const api = origin + '/monitor-api';
+      if (location.protocol === 'file:') {
+        return origin + '/workstations.html?key=' + encodeURIComponent(key) + '&api=' + encodeURIComponent(api);
+      }
+      return (
+        origin +
+        location.pathname +
+        '?key=' +
+        encodeURIComponent(key) +
+        '&api=' +
+        encodeURIComponent(api)
+      );
+    }
+
+    function fillQuickLinks(key) {
+      const el = document.getElementById('quickLinks');
+      if (!el || !key) return;
+      const u1 = hrefMonitorApiPage(key);
+      const u2 = hrefSamePageWithApi(key);
+      el.style.display = 'block';
+      el.innerHTML =
+        '<strong>ลิงก์ด่วน</strong> (ใส่ key ให้แล้ว): ' +
+        "<a href='" +
+        u1.replace(/'/g, '%27') +
+        "'>เปิด /monitor-api/workstations.html</a> · " +
+        "<a href='" +
+        u2.replace(/'/g, '%27') +
+        "'>อยู่หน้านี้ + บังคับ api=/monitor-api</a>";
+    }
+
+    function htmlPathWrongWithLinks(key) {
+      const u1 = hrefMonitorApiPage(key).replace(/'/g, '%27');
+      const u2 = hrefSamePageWithApi(key).replace(/'/g, '%27');
+      return (
+        '<div class="err"><strong>ได้หน้า HTML แทน JSON</strong> (เรียก API ไม่เจอ)<br />' +
+        'กดลิงก์ — key เดิมถูกใส่ให้แล้ว:<br />' +
+        "1) <a href='" +
+        u1 +
+        "'>เปิดหน้าใต้ /monitor-api/</a><br />" +
+        "2) <a href='" +
+        u2 +
+        "'>หรือโหลดจาก URL นี้พร้อมพารามิเตอร์ api</a></div>"
+      );
+    }
+
+    function snapshotsUrl(apiBase, key) {
+      const path = '/api/monitor-system-snapshots?key=' + encodeURIComponent(key);
+      const b = (apiBase || '').replace(/\/$/, '');
+      if (b) return b + path;
+      return path;
+    }
+
+    /** ลำดับ URL ฐานของ API — กรณี Plesk วาง HTML ที่รากโดเมน แต่ Express อยู่ใต้ /monitor-api */
+    function apiBaseCandidates(params) {
+      const explicit = (params.get('api') || '').trim().replace(/\/$/, '');
+      if (explicit) return [explicit];
+
+      if (location.protocol === 'file:') {
+        return ['https://nkbk.srsp.app/monitor-api'];
+      }
+
+      const origin = location.origin;
+      const segs = (location.pathname || '/').split('/').filter(Boolean);
+      const out = [];
+
+      if (segs.length >= 2) {
+        out.push(origin + '/' + segs.slice(0, -1).join('/'));
+      } else if (segs.length === 1 && /\.html?$/i.test(segs[0])) {
+        out.push(origin + '/monitor-api');
+      }
+
+      if (out.indexOf(origin) === -1) out.push(origin);
+
+      return out;
+    }
+
+    async function load() {
+      const params = new URLSearchParams(location.search);
+      const key = params.get('key') || '';
+      const isFile = location.protocol === 'file:';
+      const bases = apiBaseCandidates(params);
+      const msg = document.getElementById('msg');
+      const grid = document.getElementById('grid');
+      if (!key) {
+        const o = pageOrigin();
+        const ex = o + '/monitor-api/workstations.html?key=';
+        msg.innerHTML =
+          '<div class="err"><strong>ยังไม่มี key ใน URL</strong><br />' +
+          'ตัวอย่าง: <code>' +
+          esc(ex) +
+          'รหัสของคุณ</code> (ค่าเดียวกับ <code>MONITOR_SYSTEM_PUBLIC_READ_KEY</code>)<br />' +
+          "<a href='" +
+          o.replace(/'/g, '%27') +
+          "/monitor-api/workstations.html'>เปิดหน้า /monitor-api/workstations.html</a> แล้วต่อท้าย <code>?key=...</code></div>";
+        grid.innerHTML = '';
+        return;
+      }
+
+      fillQuickLinks(key);
+      const syncEl = document.getElementById('syncHint');
+      if (syncEl) syncEl.innerHTML = '';
+      if (isFile && !params.get('api')) {
+        msg.innerHTML =
+          '<div class="err" style="background:#2a2f1f;border-color:#6a8f3a;color:#d4e8b0">' +
+          'เปิดจากไฟล์ในเครื่อง — ลองเรียก API ที่ <code>' +
+          esc(bases[0]) +
+          '</code> (ปรับด้วย <code>?api=...</code>)</div>';
+      } else {
+        msg.innerHTML = '';
+      }
+      grid.innerHTML = '<p class="sub">กำลังโหลด...</p>';
+      let lastErr = '';
+      try {
+        for (let i = 0; i < bases.length; i++) {
+          const base = bases[i];
+          const url = snapshotsUrl(base, key);
+          const r = await fetch(url);
+          const text = await r.text();
+          let j;
+          try {
+            j = JSON.parse(text);
+          } catch (parseErr) {
+            const looksHtml = /^\s*</.test(text) || (r.headers.get('content-type') || '').toLowerCase().indexOf('html') !== -1;
+            if (looksHtml) {
+              lastErr = htmlPathWrongWithLinks(key);
+              continue;
+            }
+            throw parseErr;
+          }
+          if (!j.ok) {
+            msg.innerHTML = '<div class="err">' + esc(j.message || 'โหลดไม่สำเร็จ') + '</div>';
+            grid.innerHTML = '';
+            return;
+          }
+          if (!j.workstations || j.workstations.length === 0) {
+            lastWorkingApiBase = base;
+            grid.innerHTML = '<p class="sub">ยังไม่มีข้อมูล — เปิดแอป NKBKConnext บนเครื่องและตั้งรหัสอัปโหลดให้ตรงกับเซิร์ฟเวอร์</p>';
+            showProgramsSyncHint(key, base);
+            return;
+          }
+          lastWorkingApiBase = base;
+          grid.innerHTML = j.workstations.map(card).join('');
+          showProgramsSyncHint(key, base);
+          return;
+        }
+        if (lastErr.indexOf('<div class="err">') === 0) {
+          msg.innerHTML = lastErr;
+        } else if (lastErr) {
+          msg.innerHTML = '<div class="err">' + esc(lastErr) + '</div>';
+        } else {
+          msg.innerHTML = htmlPathWrongWithLinks(key);
+        }
+        grid.innerHTML = '';
+      } catch (e) {
+        msg.innerHTML = '<div class="err">' + esc(e.message || 'เครือข่ายผิดพลาด') + '</div>';
+        grid.innerHTML = '';
+      }
+    }
+
+    document.getElementById('btn').addEventListener('click', load);
+    document.getElementById('btnManualSync')?.addEventListener('click', manualSyncToFirestore);
+    load();
+  </script>
+</body>
+</html>

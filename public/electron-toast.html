@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NKBKConnext</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      font-family: 'Kanit', 'Segoe UI', system-ui, sans-serif;
+      background: linear-gradient(155deg, #f0f4fb 0%, #e2eaf8 50%, #dce8f4 100%);
+      color: #132238;
+      -webkit-app-region: drag;
+      user-select: none;
+      overflow: hidden;
+    }
+    .card {
+      height: 100%;
+      padding: 1.25rem 1.4rem 1.1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    .icon-wrap {
+      width: 58px;
+      height: 58px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 0.75rem;
+      flex-shrink: 0;
+    }
+    .icon-wrap.success {
+      background: linear-gradient(145deg, #10b981, #059669);
+      box-shadow: 0 10px 28px rgba(5, 150, 105, 0.35);
+    }
+    .icon-wrap.info {
+      background: linear-gradient(145deg, #3b82f6, #2563eb);
+      box-shadow: 0 10px 28px rgba(37, 99, 235, 0.3);
+    }
+    .icon-wrap.update {
+      background: linear-gradient(145deg, #00c9a7, #00a389);
+      box-shadow: 0 10px 28px rgba(0, 201, 167, 0.35);
+    }
+    .icon-wrap.ready {
+      background: linear-gradient(145deg, #7c3aed, #5b21b6);
+      box-shadow: 0 10px 28px rgba(91, 33, 182, 0.32);
+    }
+    .icon-wrap svg { width: 30px; height: 30px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    h1 {
+      font-size: 1.08rem;
+      font-weight: 600;
+      margin: 0 0 0.4rem;
+      letter-spacing: 0.02em;
+    }
+    p {
+      margin: 0;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      color: #3d4f6a;
+      max-width: 24rem;
+    }
+    .ver {
+      display: inline-block;
+      margin-top: 0.45rem;
+      padding: 0.22rem 0.65rem;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #0f766e;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.28);
+    }
+    .ver-warn {
+      color: #92400e;
+      background: rgba(251, 191, 36, 0.15);
+      border-color: rgba(245, 158, 11, 0.35);
+    }
+    .btn-row {
+      -webkit-app-region: no-drag;
+      display: flex;
+      gap: 0.65rem;
+      margin-top: auto;
+      padding-top: 1rem;
+      width: 100%;
+      max-width: 22rem;
+      justify-content: center;
+    }
+    button {
+      -webkit-app-region: no-drag;
+      -webkit-appearance: none;
+      appearance: none;
+      font-family: 'Kanit', 'Segoe UI', system-ui, sans-serif;
+      padding: 0.52rem 1.1rem;
+      border: none;
+      border-radius: 12px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.12s ease, filter 0.15s ease, box-shadow 0.15s ease;
+    }
+    button:active { transform: translateY(1px); }
+    .btn-primary {
+      flex: 1;
+      min-width: 0;
+      background: linear-gradient(180deg, #00c9a7 0%, #00a889 100%);
+      color: #fff;
+      box-shadow: 0 4px 16px rgba(0, 168, 137, 0.38);
+    }
+    .btn-primary:hover { filter: brightness(1.05); box-shadow: 0 6px 20px rgba(0, 168, 137, 0.45); }
+    .btn-row-single {
+      max-width: 16rem;
+    }
+    .btn-primary-full {
+      flex: none;
+      width: 100%;
+      min-width: 11rem;
+    }
+    .btn-secondary {
+      flex: 1;
+      min-width: 0;
+      background: #fff;
+      color: #334155;
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+    }
+    .btn-secondary:hover { background: #f8fafc; border-color: rgba(15, 23, 42, 0.18); }
+    .btn-ok-single {
+      margin-top: auto;
+      padding: 0.48rem 1.5rem;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      font-family: 'Kanit', 'Segoe UI', system-ui, sans-serif;
+      cursor: pointer;
+      background: linear-gradient(180deg, #1e3a5f 0%, #152a45 100%);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(21, 42, 69, 0.28);
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .btn-ok-single:hover { filter: brightness(1.06); }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="card" id="viewSimple">
+    <div class="icon-wrap" id="iconWrap">
+      <svg viewBox="0 0 24 24" id="iconSvg"><path d="M20 6L9 17l-5-5"/></svg>
+    </div>
+    <h1 id="title">NKBKConnext System</h1>
+    <p id="message"></p>
+    <div id="verBox" class="ver" style="display:none"></div>
+    <button type="button" class="btn-ok-single" id="okBtn">ตกลง</button>
+  </div>
+  <div class="card hidden" id="viewUpdate">
+    <div class="icon-wrap update" id="updIcon">
+      <svg viewBox="0 0 24 24"><path d="M12 5v10M8 9l4-4 4 4M5 19h14"/></svg>
+    </div>
+    <h1 id="updTitle">มีอัปเดตใหม่</h1>
+    <p id="updMsg"></p>
+    <div id="updBadge" class="ver ver-warn" style="display:inline-block;margin-top:0.5rem"></div>
+    <div class="btn-row btn-row-single">
+      <button type="button" class="btn-primary btn-primary-full" id="btnDownload">อัปเดต</button>
+    </div>
+  </div>
+  <div class="card hidden" id="viewReady">
+    <div class="icon-wrap ready">
+      <svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+    </div>
+    <h1>พร้อมติดตั้งแล้ว</h1>
+    <p>ดาวน์โหลดอัปเดตเสร็จแล้ว รีสตาร์ทเพื่อใช้เวอร์ชันใหม่</p>
+    <div class="btn-row">
+      <button type="button" class="btn-secondary" id="btnReadyLater">ทีหลัง</button>
+      <button type="button" class="btn-primary" id="btnRestart">รีสตาร์ทและติดตั้ง</button>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var p = new URLSearchParams(window.location.search);
+      var variant = (p.get('variant') || 'info').toLowerCase();
+      if (variant === 'update') {
+        document.getElementById('viewSimple').classList.add('hidden');
+        document.getElementById('viewUpdate').classList.remove('hidden');
+        var nv = p.get('newVersion') || '';
+        var cv = p.get('currentVersion') || '';
+        document.getElementById('updMsg').textContent =
+          'มีเวอร์ชันใหม่ ' + nv + ' (ติดตั้งอยู่ ' + cv + ')';
+        document.getElementById('updBadge').textContent = 'เวอร์ชันใหม่ ' + nv;
+        function pick(a) {
+          try {
+            if (window.toastApi && window.toastApi.updatePrompt) window.toastApi.updatePrompt('available', a);
+          } catch (e) {}
+        }
+        document.getElementById('btnDownload').addEventListener('click', function () { pick('download'); });
+        return;
+      }
+      if (variant === 'update-ready') {
+        document.getElementById('viewSimple').classList.add('hidden');
+        document.getElementById('viewReady').classList.remove('hidden');
+        function pickR(a) {
+          try {
+            if (window.toastApi && window.toastApi.updatePrompt) window.toastApi.updatePrompt('ready', a);
+          } catch (e) {}
+        }
+        document.getElementById('btnReadyLater').addEventListener('click', function () { pickR('later'); });
+        document.getElementById('btnRestart').addEventListener('click', function () { pickR('restart'); });
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape') pickR('later');
+        });
+        return;
+      }
+      var title = p.get('title') || 'NKBKConnext System';
+      var message = p.get('message') || '';
+      var sub = p.get('sub') || '';
+      document.getElementById('title').textContent = title;
+      document.getElementById('message').textContent = message;
+      var wrap = document.getElementById('iconWrap');
+      wrap.classList.remove('success', 'info');
+      wrap.classList.add(variant === 'success' ? 'success' : 'info');
+      if (variant !== 'success') {
+        document.getElementById('iconSvg').innerHTML =
+          '<circle cx="12" cy="12" r="9" fill="none" stroke="#fff" stroke-width="2"/>' +
+          '<path d="M12 8v4.5M12 16h.01" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>';
+      }
+      if (sub) {
+        var vb = document.getElementById('verBox');
+        vb.style.display = 'inline-block';
+        vb.textContent = sub;
+      }
+      function close() {
+        try {
+          if (window.toastApi && window.toastApi.close) window.toastApi.close();
+        } catch (e) {}
+      }
+      document.getElementById('okBtn').addEventListener('click', close);
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === 'Escape') close();
+      });
+    })();
+  </script>
+</body>
+</html>

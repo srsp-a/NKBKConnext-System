@@ -1,6 +1,6 @@
 {
   "name": "system-status-monitor",
-  "version": "1.0.2",
+  "version": "1.0.5",
   "description": "ระบบตรวจสอบและจัดการข้อมูลสหกรณ์",
   "main": "electron-main.js",
   "scripts": {
@@ -23,7 +23,9 @@
     "monitor",
     "dashboard"
   ],
-  "author": "",
+  "author": {
+    "name": "SIRASUPA CORPORATION (THAILAND) CO., LTD."
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -43,6 +45,7 @@
   "build": {
     "appId": "com.systemstatus.monitor",
     "productName": "NKBKConnext System",
+    "copyright": "© SIRASUPA CORPORATION (THAILAND) CO., LTD.",
     "directories": {
       "output": "dist"
     },
@@ -54,6 +57,7 @@
       "assets/**",
       "electron-main.js",
       "preload-first-run.js",
+      "preload-toast.js",
       "node_modules/**"
     ],
     "asarUnpack": [

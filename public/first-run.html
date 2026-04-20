@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NKBKConnext System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d0f14;
+      --card: #14171f;
+      --accent: #00d4aa;
+      --text: #e8eaed;
+      --muted: #8b8f99;
+    }
+    html, body { height: 100%; }
+    body {
+      font-family: 'Kanit', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      -webkit-app-region: drag;
+      background-image: radial-gradient(ellipse 100% 80% at 50% -30%, rgba(0, 212, 170, 0.14), transparent 50%);
+    }
+    .logo {
+      width: 96px; height: 96px; border-radius: 50%;
+      border: 3px solid rgba(0, 212, 170, 0.35);
+      object-fit: cover;
+      margin-bottom: 1.25rem;
+    }
+    h1 { font-size: 1.4rem; font-weight: 600; text-align: center; margin-bottom: 0.35rem; }
+    .tagline { color: var(--muted); font-size: 0.92rem; text-align: center; margin-bottom: 1.75rem; line-height: 1.45; }
+    .card {
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 14px;
+      padding: 1.15rem 1.2rem;
+      width: 100%;
+      max-width: 340px;
+      margin-bottom: 1.5rem;
+      -webkit-app-region: no-drag;
+    }
+    .card p { font-size: 0.88rem; color: var(--muted); line-height: 1.55; }
+    .btn {
+      -webkit-app-region: no-drag;
+      width: 100%;
+      max-width: 340px;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      background: var(--accent);
+      color: #0d0f14;
+      font-family: 'Kanit', sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.12s, filter 0.12s;
+    }
+    .btn:hover { filter: brightness(1.06); transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    .hint { margin-top: 1rem; font-size: 0.75rem; color: var(--muted); text-align: center; max-width: 320px; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <img class="logo" src="logo.png" alt="">
+  <h1>NKBKConnext System</h1>
+  <p class="tagline">ระบบตรวจสอบและจัดการข้อมูลสหกรณ์</p>
+  <div class="card">
+    <p>โปรแกรมแบบ Portable — หลังกดเริ่มใช้งาน ระบบจะ<strong>สร้างไอคอนบน Desktop</strong>ให้อัตโนมัติ (ชี้ไปที่ไฟล์ .exe นี้)</p>
+  </div>
+  <button type="button" class="btn" id="btnStart">เริ่มใช้งาน</button>
+  <p class="hint">ไอคอนถาด (Tray) จะอยู่มุมล่างขวา — คลิกขวาเพื่อตั้งค่าและออกจากโปรแกรม</p>
+  <script>
+    document.getElementById('btnStart').addEventListener('click', function() {
+      if (window.electronAPI && window.electronAPI.firstRunDone) {
+        window.electronAPI.firstRunDone();
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,1 +1,6 @@
-{"monitorApiUrl": "https://api.nkbkcoop.com"}
+{
+  "monitorApiUrl": "https://api.nkbkcoop.com",
+  "monitorApiUrlFallback": "http://192.168.1.244:3001",
+  "lineLoginChannelId": "",
+  "lineLoginChannelSecret": ""
+}
