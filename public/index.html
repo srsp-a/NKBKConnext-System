@@ -527,6 +527,13 @@
       </span>
       <span class="footer-trail">
         <span class="footer-copyright">© SIRASUPA CORPORATION (THAILAND) CO., LTD.</span>
+        <button type="button" class="btn-notif-bell" id="btnNotifBell" title="การแจ้งเตือน" aria-label="การแจ้งเตือน">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+          <span class="notif-badge" id="notifBadge" hidden>0</span>
+        </button>
         <button type="button" class="btn-logout-icon" id="btnLogout" title="ออกจากระบบ" aria-label="ออกจากระบบ">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -536,6 +543,28 @@
         </button>
       </span>
     </footer>
+
+    <!-- Notification toast stack (top-right) -->
+    <div id="notifToastStack" class="notif-toast-stack" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Notification panel (slide-in from right) -->
+    <div id="notifPanel" class="notif-panel" hidden>
+      <div class="notif-panel-backdrop"></div>
+      <aside class="notif-panel-card" role="dialog" aria-label="การแจ้งเตือน">
+        <header class="notif-panel-header">
+          <div class="notif-panel-title">
+            <span class="notif-panel-icon">🔔</span>
+            <span>การแจ้งเตือน</span>
+            <span class="notif-panel-count" id="notifPanelCount">0</span>
+          </div>
+          <div class="notif-panel-actions">
+            <button type="button" class="notif-panel-btn" id="btnNotifReadAll" title="ทำเครื่องหมายอ่านทั้งหมด">✓ อ่านทั้งหมด</button>
+            <button type="button" class="notif-panel-close" id="btnNotifClose" aria-label="ปิด">✕</button>
+          </div>
+        </header>
+        <div class="notif-panel-body" id="notifPanelBody"><p class="notif-empty">กำลังโหลด...</p></div>
+      </aside>
+    </div>
 
     <div id="logoutConfirmBackdrop" class="logout-modal-backdrop" aria-hidden="true">
       <div class="logout-modal-card" role="dialog" aria-modal="true" aria-labelledby="logoutModalTitle">

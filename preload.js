@@ -43,5 +43,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getPendingUpdate: () => ipcRenderer.invoke('app-get-pending-update'),
   downloadAppUpdate: () => ipcRenderer.invoke('app-download-update'),
   checkGithubRelease: () => ipcRenderer.invoke('github-check-update'),
-  downloadGithubRelease: (opts) => ipcRenderer.invoke('github-download-update', opts || {})
+  downloadGithubRelease: (opts) => ipcRenderer.invoke('github-download-update', opts || {}),
+  /** แสดงแจ้งเตือนแบบ OS (Windows toast/Action Center) */
+  showNativeNotification: (opts) => ipcRenderer.invoke('show-native-notification', opts || {}),
+  onNativeNotificationClick: (cb) => {
+    const ch = 'native-notification-click';
+    ipcRenderer.removeAllListeners(ch);
+    ipcRenderer.on(ch, (_e, payload) => {
+      try { if (typeof cb === 'function') cb(payload); } catch (_) {}
+    });
+  }
 });

@@ -1699,6 +1699,175 @@ app.post('/api/programs-push-admin-web', routePostProgramsPushAdminWeb);
 app.post('/api/monitor-programs-push-admin-web', routePostProgramsPushAdminWeb);
 
 // =====================================================
+// Notification system
+// Collection: notifications/{id}
+// =====================================================
+async function _notifCreate(data) {
+  const adb = getMonitorAdminFirestore();
+  const doc = {
+    userId: String(data.userId || ''),
+    targetType: String(data.targetType || 'user'),
+    targetValue: String(data.targetValue || ''),
+    source: String(data.source || 'system'),
+    category: String(data.category || 'info'),
+    title: String(data.title || ''),
+    body: String(data.body || ''),
+    severity: String(data.severity || 'info'),
+    icon: String(data.icon || ''),
+    relatedType: String(data.relatedType || ''),
+    relatedId: String(data.relatedId || ''),
+    url: String(data.url || ''),
+    read: false,
+    readAt: null,
+    createdBy: String(data.createdBy || 'system'),
+    createdAt: new Date()
+  };
+  if (adb) {
+    const ref = await adb.collection('notifications').add(doc);
+    return { ok: true, id: ref.id, via: 'admin' };
+  }
+  // fallback: auto id via REST
+  const id = 'n_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+  await firebaseSet('notifications', id, doc);
+  return { ok: true, id, via: 'rest' };
+}
+
+async function _notifMatchForUser(user) {
+  const role = String((user && user.role) || '').trim();
+  const position = String((user && user.position) || '').trim();
+  const uid = user && user.id ? String(user.id) : '';
+  const matched = [];
+  // 1) ถึงตัวเอง
+  if (uid) {
+    const mine = await firebaseQueryAll('notifications', 'userId', uid, 200);
+    (mine || []).forEach((n) => matched.push(n));
+  }
+  // 2) broadcast
+  const bc = await firebaseQueryAll('notifications', 'targetType', 'broadcast', 100);
+  (bc || []).forEach((n) => matched.push(n));
+  // 3) role / position filter เพิ่มเติม — ดึงแบบ query
+  if (role) {
+    const r = await firebaseQueryAll('notifications', 'targetValue', role, 100);
+    (r || []).forEach((n) => { if (n.targetType === 'role') matched.push(n); });
+  }
+  if (position) {
+    const p = await firebaseQueryAll('notifications', 'targetValue', position, 100);
+    (p || []).forEach((n) => { if (n.targetType === 'position') matched.push(n); });
+  }
+  // dedupe by id
+  const map = new Map();
+  matched.forEach((n) => { if (n && n.id) map.set(n.id, n); });
+  return Array.from(map.values());
+}
+
+function _notifNormalize(n) {
+  return {
+    id: n.id,
+    source: String(n.source || 'system'),
+    category: String(n.category || 'info'),
+    title: String(n.title || ''),
+    body: String(n.body || ''),
+    severity: String(n.severity || 'info'),
+    icon: String(n.icon || ''),
+    relatedType: String(n.relatedType || ''),
+    relatedId: String(n.relatedId || ''),
+    url: String(n.url || ''),
+    read: !!n.read,
+    createdAtMs: _leaveCreatedMs(n.createdAt)
+  };
+}
+
+app.get('/api/monitor-notifications', async (req, res) => {
+  const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
+  const session = token ? MONITOR_SESSIONS.get(token) : null;
+  if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
+  try {
+    const u = await findUserForMonitor(session.username);
+    if (!u) return res.status(404).json({ ok: false, reason: 'no_user' });
+    const raw = await _notifMatchForUser(u);
+    const items = raw.map(_notifNormalize)
+      .sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0))
+      .slice(0, 50);
+    const unread = items.filter((n) => !n.read).length;
+    return res.json({ ok: true, items, unread });
+  } catch (e) {
+    return res.status(500).json({ ok: false, reason: 'error', message: (e && e.message) || String(e) });
+  }
+});
+
+app.post('/api/monitor-notification-read', async (req, res) => {
+  const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
+  const session = token ? MONITOR_SESSIONS.get(token) : null;
+  if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
+  const ids = Array.isArray(req.body && req.body.ids) ? req.body.ids.map(String) : [];
+  const all = !!(req.body && req.body.all);
+  try {
+    const u = await findUserForMonitor(session.username);
+    if (!u) return res.status(404).json({ ok: false, reason: 'no_user' });
+    let targets = [];
+    if (all) {
+      const raw = await _notifMatchForUser(u);
+      targets = raw.filter((n) => !n.read).map((n) => n.id);
+    } else {
+      targets = ids;
+    }
+    let ok = 0;
+    for (const id of targets) {
+      if (!id) continue;
+      try {
+        await _leaveWriteDoc('notifications', id, { read: true, readAt: new Date() });
+        ok++;
+      } catch (_) {}
+    }
+    return res.json({ ok: true, updated: ok });
+  } catch (e) {
+    return res.status(500).json({ ok: false, reason: 'error', message: (e && e.message) || String(e) });
+  }
+});
+
+/** สร้าง notification โดย admin (broadcast / role / position / user) */
+app.post('/api/monitor-notification-create', async (req, res) => {
+  const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
+  const session = token ? MONITOR_SESSIONS.get(token) : null;
+  if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
+  try {
+    const u = await findUserForMonitor(session.username);
+    if (!u) return res.status(404).json({ ok: false, reason: 'no_user' });
+    const role = String(u.role || '').trim();
+    if (role !== 'ผู้ดูแลระบบ' && role !== 'แอดมิน') {
+      return res.status(403).json({ ok: false, reason: 'forbidden', message: 'เฉพาะผู้ดูแลระบบ/แอดมิน' });
+    }
+    const b = req.body || {};
+    const targetType = String(b.targetType || 'user').toLowerCase();
+    if (!['user', 'role', 'position', 'broadcast'].includes(targetType)) {
+      return res.status(400).json({ ok: false, reason: 'bad_target_type' });
+    }
+    if (!b.title || !b.body) return res.status(400).json({ ok: false, reason: 'need_title_body' });
+    const record = {
+      source: 'admin',
+      category: String(b.category || 'admin.announce'),
+      title: String(b.title).trim(),
+      body: String(b.body).trim(),
+      severity: String(b.severity || 'info'),
+      icon: String(b.icon || ''),
+      targetType,
+      createdBy: u.id || ''
+    };
+    if (targetType === 'user') {
+      record.userId = String(b.targetValue || '').trim();
+      if (!record.userId) return res.status(400).json({ ok: false, reason: 'need_user' });
+    } else if (targetType === 'role' || targetType === 'position') {
+      record.targetValue = String(b.targetValue || '').trim();
+      if (!record.targetValue) return res.status(400).json({ ok: false, reason: 'need_target' });
+    }
+    const out = await _notifCreate(record);
+    return res.json(out);
+  } catch (e) {
+    return res.status(500).json({ ok: false, reason: 'error', message: (e && e.message) || String(e) });
+  }
+});
+
+// =====================================================
 // Leave system — (my-leaves / balance / pending-approvals / approve / reject / form-data)
 // สอดคล้องกับ schema V2 LIFF (leaves, leave_types, leave_balances)
 // =====================================================
@@ -1900,6 +2069,36 @@ app.post('/api/monitor-leave-approve', async (req, res) => {
       patch.approverName2 = approverName;
     }
     await _leaveWriteDoc('leaves', leaveId, patch);
+    // แจ้งเตือนผู้ลา
+    try {
+      const typesMap = await _leaveLoadTypes();
+      const typeName = (typesMap[d.type] && (typesMap[d.type].nameTH || typesMap[d.type].name)) || d.type;
+      if (cls.isLevel1) {
+        await _notifCreate({
+          userId: d.userId,
+          source: 'system',
+          category: 'leave.approved',
+          title: '✅ การลาได้รับอนุมัติแล้ว',
+          body: 'คำขอลา ' + typeName + ' ' + (d.startDate || '') + ' จำนวน ' + (d.durationDays || 0) + ' วัน ได้รับการอนุมัติขั้นสุดท้ายจาก ' + approverName,
+          severity: 'success',
+          icon: 'fa-check-circle',
+          relatedType: 'leave',
+          relatedId: leaveId
+        });
+      } else {
+        await _notifCreate({
+          userId: d.userId,
+          source: 'system',
+          category: 'leave.approved_lv1',
+          title: '👤 หัวหน้าอนุมัติแล้ว — รอผู้จัดการ',
+          body: 'คำขอลา ' + typeName + ' ' + (d.startDate || '') + ' ได้รับการอนุมัติระดับ 2 จาก ' + approverName + ' — รอผู้จัดการอนุมัติขั้นสุดท้าย',
+          severity: 'info',
+          icon: 'fa-user-check',
+          relatedType: 'leave',
+          relatedId: leaveId
+        });
+      }
+    } catch (e) { console.warn('[leave-approve] notify:', e.message); }
     return res.json({ ok: true, status: patch.status });
   } catch (e) {
     return res.status(500).json({ ok: false, reason: 'error', message: (e && e.message) || String(e) });
@@ -1937,6 +2136,21 @@ app.post('/api/monitor-leave-reject', async (req, res) => {
       rejectorName: rejectorName,
       rejectReason: reason
     });
+    try {
+      const typesMap = await _leaveLoadTypes();
+      const typeName = (typesMap[d.type] && (typesMap[d.type].nameTH || typesMap[d.type].name)) || d.type;
+      await _notifCreate({
+        userId: d.userId,
+        source: 'system',
+        category: 'leave.rejected',
+        title: '❌ การลาไม่ได้รับอนุมัติ',
+        body: 'คำขอลา ' + typeName + ' ' + (d.startDate || '') + ' ถูกปฏิเสธโดย ' + rejectorName + (reason ? ' — เหตุผล: ' + reason : ''),
+        severity: 'danger',
+        icon: 'fa-times-circle',
+        relatedType: 'leave',
+        relatedId: leaveId
+      });
+    } catch (e) { console.warn('[leave-reject] notify:', e.message); }
     return res.json({ ok: true, status: 'rejected' });
   } catch (e) {
     return res.status(500).json({ ok: false, reason: 'error', message: (e && e.message) || String(e) });

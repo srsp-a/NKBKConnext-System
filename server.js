@@ -3102,6 +3102,38 @@ app.get('/api/monitor-me', async (req, res) => {
 // Leave system — sync กับ Firestore (V2 schema)
 // =====================================================
 
+/** สร้าง notification — ใช้ firebase-admin ของเครื่อง (ถ้ามี) หรือ fallback REST */
+async function _notifCreate(data) {
+  if (!ensureMonitorFirestore()) return { ok: false, reason: 'no_firestore' };
+  try {
+    const db = getMonitorDb();
+    const adminSdk = require('firebase-admin');
+    const FieldValue = adminSdk.firestore.FieldValue;
+    const ref = await db.collection('notifications').add({
+      userId: String(data.userId || ''),
+      targetType: String(data.targetType || 'user'),
+      targetValue: String(data.targetValue || ''),
+      source: String(data.source || 'system'),
+      category: String(data.category || 'info'),
+      title: String(data.title || ''),
+      body: String(data.body || ''),
+      severity: String(data.severity || 'info'),
+      icon: String(data.icon || ''),
+      relatedType: String(data.relatedType || ''),
+      relatedId: String(data.relatedId || ''),
+      url: String(data.url || ''),
+      read: false,
+      readAt: null,
+      createdBy: String(data.createdBy || 'system'),
+      createdAt: FieldValue.serverTimestamp()
+    });
+    return { ok: true, id: ref.id };
+  } catch (e) {
+    console.warn('[notif] create fail:', e.message);
+    return { ok: false, reason: 'error', message: e.message };
+  }
+}
+
 /** Proxy request ไป remote monitor-api เมื่อเครื่องไม่มี firebase-service-account.json */
 async function proxyLeaveToRemote(req, res, apiPath) {
   const remoteBase = getMonitorApiUrl();
@@ -3389,6 +3421,27 @@ app.post('/api/monitor-leave-approve', async (req, res) => {
       update.approverName2 = approverName;
     }
     await ref.update(update);
+    try {
+      const types = await _leaveLoadTypes(db);
+      const tName = (types[d.type] && (types[d.type].nameTH || types[d.type].name)) || d.type;
+      if (cls.isLevel1) {
+        await _notifCreate({
+          userId: d.userId, category: 'leave.approved',
+          title: '✅ การลาได้รับอนุมัติแล้ว',
+          body: 'คำขอลา ' + tName + ' ' + (d.startDate || '') + ' จำนวน ' + (d.durationDays || 0) + ' วัน ได้รับการอนุมัติขั้นสุดท้ายจาก ' + approverName,
+          severity: 'success', icon: 'fa-check-circle',
+          relatedType: 'leave', relatedId: leaveId
+        });
+      } else {
+        await _notifCreate({
+          userId: d.userId, category: 'leave.approved_lv1',
+          title: '👤 หัวหน้าอนุมัติแล้ว — รอผู้จัดการ',
+          body: 'คำขอลา ' + tName + ' ' + (d.startDate || '') + ' ได้รับการอนุมัติระดับ 2 จาก ' + approverName,
+          severity: 'info', icon: 'fa-user-check',
+          relatedType: 'leave', relatedId: leaveId
+        });
+      }
+    } catch (e) { console.warn('[leave-approve] notify:', e.message); }
     return res.json({ ok: true, status: update.status });
   } catch (e) {
     return res.status(500).json({ ok: false, reason: 'error', message: (e && e.message) || String(e) });
@@ -3550,7 +3603,142 @@ app.post('/api/monitor-leave-reject', async (req, res) => {
       rejectorName: rejectorName,
       rejectReason: reason
     });
+    try {
+      const types = await _leaveLoadTypes(db);
+      const tName = (types[d.type] && (types[d.type].nameTH || types[d.type].name)) || d.type;
+      await _notifCreate({
+        userId: d.userId, category: 'leave.rejected',
+        title: '❌ การลาไม่ได้รับอนุมัติ',
+        body: 'คำขอลา ' + tName + ' ' + (d.startDate || '') + ' ถูกปฏิเสธโดย ' + rejectorName + (reason ? ' — เหตุผล: ' + reason : ''),
+        severity: 'danger', icon: 'fa-times-circle',
+        relatedType: 'leave', relatedId: leaveId
+      });
+    } catch (e) { console.warn('[leave-reject] notify:', e.message); }
     return res.json({ ok: true, status: 'rejected' });
+  } catch (e) {
+    return res.status(500).json({ ok: false, reason: 'error', message: (e && e.message) || String(e) });
+  }
+});
+
+// =====================================================
+// Notification — list / mark-read / create (fallback proxy เมื่อไม่มี SA)
+// =====================================================
+app.get('/api/monitor-notifications', async (req, res) => {
+  const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
+  const session = await resolveMonitorSessionFromToken(token);
+  if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
+  if (!ensureMonitorFirestore()) return proxyLeaveToRemote(req, res, '/api/monitor-notifications');
+  try {
+    const db = getMonitorDb();
+    const u = await findV2UserByUsername(db, session.username);
+    if (!u) return res.status(404).json({ ok: false, reason: 'no_user' });
+    const uid = u._docId || u.id;
+    const role = String(u.role || '').trim();
+    const position = String(u.position || '').trim();
+    const map = new Map();
+    const add = (doc) => {
+      if (!doc || !doc.id) return;
+      map.set(doc.id, doc);
+    };
+    const qMine = await db.collection('notifications').where('userId', '==', uid).limit(200).get();
+    qMine.forEach((d) => add({ id: d.id, ...d.data() }));
+    const qBc = await db.collection('notifications').where('targetType', '==', 'broadcast').limit(100).get();
+    qBc.forEach((d) => add({ id: d.id, ...d.data() }));
+    if (role) {
+      const qr = await db.collection('notifications').where('targetType', '==', 'role').where('targetValue', '==', role).limit(100).get();
+      qr.forEach((d) => add({ id: d.id, ...d.data() }));
+    }
+    if (position) {
+      const qp = await db.collection('notifications').where('targetType', '==', 'position').where('targetValue', '==', position).limit(100).get();
+      qp.forEach((d) => add({ id: d.id, ...d.data() }));
+    }
+    const items = Array.from(map.values()).map((n) => ({
+      id: n.id,
+      source: String(n.source || 'system'),
+      category: String(n.category || 'info'),
+      title: String(n.title || ''),
+      body: String(n.body || ''),
+      severity: String(n.severity || 'info'),
+      icon: String(n.icon || ''),
+      relatedType: String(n.relatedType || ''),
+      relatedId: String(n.relatedId || ''),
+      url: String(n.url || ''),
+      read: !!n.read,
+      createdAtMs: n.createdAt && n.createdAt.toMillis ? n.createdAt.toMillis() : (n.createdAt && n.createdAt._seconds ? n.createdAt._seconds * 1000 : 0)
+    })).sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0)).slice(0, 50);
+    const unread = items.filter((x) => !x.read).length;
+    return res.json({ ok: true, items, unread });
+  } catch (e) {
+    return res.status(500).json({ ok: false, reason: 'error', message: (e && e.message) || String(e) });
+  }
+});
+
+app.post('/api/monitor-notification-read', async (req, res) => {
+  const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
+  const session = await resolveMonitorSessionFromToken(token);
+  if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
+  if (!ensureMonitorFirestore()) return proxyLeaveToRemote(req, res, '/api/monitor-notification-read');
+  const ids = Array.isArray(req.body && req.body.ids) ? req.body.ids.map(String) : [];
+  const all = !!(req.body && req.body.all);
+  try {
+    const db = getMonitorDb();
+    const adminSdk = require('firebase-admin');
+    const FieldValue = adminSdk.firestore.FieldValue;
+    let targets = ids;
+    if (all) {
+      const u = await findV2UserByUsername(db, session.username);
+      if (!u) return res.status(404).json({ ok: false, reason: 'no_user' });
+      const uid = u._docId || u.id;
+      const snap = await db.collection('notifications').where('userId', '==', uid).where('read', '==', false).get();
+      targets = snap.docs.map((d) => d.id);
+    }
+    let ok = 0;
+    for (const id of targets) {
+      if (!id) continue;
+      try {
+        await db.collection('notifications').doc(id).update({ read: true, readAt: FieldValue.serverTimestamp() });
+        ok++;
+      } catch (_) {}
+    }
+    return res.json({ ok: true, updated: ok });
+  } catch (e) {
+    return res.status(500).json({ ok: false, reason: 'error', message: (e && e.message) || String(e) });
+  }
+});
+
+app.post('/api/monitor-notification-create', async (req, res) => {
+  const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
+  const session = await resolveMonitorSessionFromToken(token);
+  if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
+  if (!ensureMonitorFirestore()) return proxyLeaveToRemote(req, res, '/api/monitor-notification-create');
+  try {
+    const db = getMonitorDb();
+    const u = await findV2UserByUsername(db, session.username);
+    if (!u) return res.status(404).json({ ok: false, reason: 'no_user' });
+    const role = String(u.role || '').trim();
+    if (role !== 'ผู้ดูแลระบบ' && role !== 'แอดมิน') {
+      return res.status(403).json({ ok: false, reason: 'forbidden' });
+    }
+    const b = req.body || {};
+    const targetType = String(b.targetType || 'user').toLowerCase();
+    if (!['user', 'role', 'position', 'broadcast'].includes(targetType)) {
+      return res.status(400).json({ ok: false, reason: 'bad_target_type' });
+    }
+    if (!b.title || !b.body) return res.status(400).json({ ok: false, reason: 'need_title_body' });
+    const uid = u._docId || u.id;
+    const out = await _notifCreate({
+      source: 'admin',
+      category: String(b.category || 'admin.announce'),
+      title: String(b.title).trim(),
+      body: String(b.body).trim(),
+      severity: String(b.severity || 'info'),
+      icon: String(b.icon || ''),
+      targetType,
+      userId: targetType === 'user' ? String(b.targetValue || '').trim() : '',
+      targetValue: (targetType === 'role' || targetType === 'position') ? String(b.targetValue || '').trim() : '',
+      createdBy: uid
+    });
+    return res.json(out);
   } catch (e) {
     return res.status(500).json({ ok: false, reason: 'error', message: (e && e.message) || String(e) });
   }

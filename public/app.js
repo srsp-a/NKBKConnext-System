@@ -1252,4 +1252,241 @@ if (typeof window.electronAPI !== 'undefined') {
   if (btnClose) btnClose.addEventListener('click', () => window.electronAPI.close());
 }
 
+// ============================================================
+// Notification system — bell badge, toast, panel
+// ============================================================
+const NOTIF_SEEN_KEY = 'nkbk_notif_seen_ids';
+const NOTIF_POLL_MS = 30000;
+let _notifAllItems = [];
+let _notifSeenSet = (() => {
+  try { return new Set(JSON.parse(localStorage.getItem(NOTIF_SEEN_KEY) || '[]')); } catch (_) { return new Set(); }
+})();
+function _persistNotifSeen() {
+  try {
+    const arr = Array.from(_notifSeenSet).slice(-200);
+    localStorage.setItem(NOTIF_SEEN_KEY, JSON.stringify(arr));
+  } catch (_) {}
+}
+const _FA_TO_EMOJI = {
+  'fa-bell': '🔔', 'fa-info-circle': 'ℹ️', 'fa-check-circle': '✅', 'fa-check': '✅',
+  'fa-times-circle': '❌', 'fa-exclamation-triangle': '⚠️', 'fa-exclamation-circle': '❗',
+  'fa-bolt': '⚡', 'fa-bullhorn': '📢', 'fa-envelope': '✉️', 'fa-comment': '💬', 'fa-comments': '💬',
+  'fa-calendar-check': '📅', 'fa-calendar-day': '📅', 'fa-clock': '🕐',
+  'fa-user': '👤', 'fa-user-check': '✅', 'fa-user-shield': '🛡️', 'fa-users': '👥',
+  'fa-heart': '❤️', 'fa-star': '⭐', 'fa-flag': '🚩', 'fa-fire': '🔥',
+  'fa-gift': '🎁', 'fa-trophy': '🏆', 'fa-tools': '🛠️', 'fa-wrench': '🔧',
+  'fa-cog': '⚙️', 'fa-server': '🖥️', 'fa-database': '💾',
+  'fa-lock': '🔒', 'fa-unlock': '🔓', 'fa-shield-alt': '🛡️', 'fa-key': '🔑',
+  'fa-desktop': '🖥️', 'fa-laptop': '💻', 'fa-mobile-alt': '📱',
+  'fa-globe': '🌐', 'fa-wifi': '📶',
+  'fa-download': '⬇️', 'fa-upload': '⬆️', 'fa-sync': '🔄', 'fa-power-off': '🔌',
+  'fa-thumbs-up': '👍', 'fa-thumbs-down': '👎',
+  'fa-coins': '🪙', 'fa-hand-holding-usd': '💵',
+  'fa-file-alt': '📄', 'fa-book': '📖',
+  'fa-cake-candles': '🎂', 'fa-umbrella-beach': '🏖️'
+};
+function _notifSeverityIcon(item) {
+  const sev = item.severity || 'info';
+  if (item.icon) {
+    const m = String(item.icon).match(/fa-[a-zA-Z0-9\-]+/);
+    if (m && _FA_TO_EMOJI[m[0]]) return _FA_TO_EMOJI[m[0]];
+  }
+  if (sev === 'success') return '✅';
+  if (sev === 'warning') return '⚠️';
+  if (sev === 'danger') return '❌';
+  return 'ℹ️';
+}
+function _timeAgoTh(ms) {
+  if (!ms) return '';
+  const diff = Date.now() - ms;
+  const s = Math.max(0, Math.floor(diff / 1000));
+  if (s < 60) return 'เมื่อสักครู่';
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + ' นาทีที่แล้ว';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + ' ชั่วโมงที่แล้ว';
+  const d = Math.floor(h / 24);
+  if (d < 7) return d + ' วันที่แล้ว';
+  return _thaiDateShort(new Date(ms).toISOString());
+}
+function _escHtml(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+function showNotifToast(item, opts) {
+  // 1) พยายามแสดงเป็น OS native notification (มุมเดสก์ท็อป/Action Center) ก่อนเสมอ
+  try {
+    if (typeof window.electronAPI !== 'undefined' && typeof window.electronAPI.showNativeNotification === 'function') {
+      window.electronAPI.showNativeNotification({
+        title: item.title || 'NKBKConnext',
+        body: item.body || '',
+        severity: item.severity || 'info',
+        payload: { id: item.id, relatedType: item.relatedType || '', relatedId: item.relatedId || '' }
+      });
+      return;
+    }
+    // 2) ถ้าเบราว์เซอร์รองรับ Web Notifications — ใช้ native ของเบราว์เซอร์
+    if (typeof window.Notification !== 'undefined' && window.Notification.permission === 'granted') {
+      const n = new window.Notification(item.title || 'NKBKConnext', { body: item.body || '' });
+      n.onclick = () => { try { window.focus(); } catch (_) {} };
+      return;
+    }
+  } catch (_) {}
+  // 3) Fallback: in-app toast (กรณีที่ Electron Notification หรือ permission ใช้ไม่ได้)
+  const stack = document.getElementById('notifToastStack');
+  if (!stack) return;
+  const duration = (opts && opts.duration) || 8000;
+  const toast = document.createElement('div');
+  toast.className = 'notif-toast severity-' + (item.severity || 'info');
+  toast.innerHTML =
+    '<div class="notif-toast-icon">' + _notifSeverityIcon(item) + '</div>' +
+    '<div class="notif-toast-body">' +
+      '<div class="notif-toast-title">' + _escHtml(item.title || '') + '</div>' +
+      (item.body ? '<div class="notif-toast-msg">' + _escHtml(item.body) + '</div>' : '') +
+    '</div>' +
+    '<button type="button" class="notif-toast-close" aria-label="ปิด">✕</button>';
+  stack.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('show'));
+  const close = () => {
+    toast.classList.add('hiding');
+    toast.classList.remove('show');
+    setTimeout(() => { try { toast.remove(); } catch (_) {} }, 400);
+  };
+  toast.querySelector('.notif-toast-close').addEventListener('click', close);
+  setTimeout(close, duration);
+}
+
+function renderNotifBadge(unread) {
+  const badge = document.getElementById('notifBadge');
+  const bell = document.getElementById('btnNotifBell');
+  if (!badge || !bell) return;
+  if (unread > 0) {
+    badge.hidden = false;
+    badge.textContent = unread > 99 ? '99+' : String(unread);
+    bell.classList.add('has-unread');
+  } else {
+    badge.hidden = true;
+    badge.textContent = '0';
+    bell.classList.remove('has-unread');
+  }
+}
+
+function renderNotifPanel(items) {
+  const body = document.getElementById('notifPanelBody');
+  const count = document.getElementById('notifPanelCount');
+  if (!body) return;
+  const unread = items.filter((n) => !n.read).length;
+  if (count) count.textContent = String(unread);
+  if (!items.length) { body.innerHTML = '<p class="notif-empty">ไม่มีการแจ้งเตือน</p>'; return; }
+  body.innerHTML = items.map((n) => (
+    '<div class="notif-item severity-' + (n.severity || 'info') + (n.read ? '' : ' unread') + '" data-id="' + _escHtml(n.id) + '">' +
+      '<div class="notif-item-icon">' + _notifSeverityIcon(n) + '</div>' +
+      '<div class="notif-item-body">' +
+        '<div class="notif-item-title">' + _escHtml(n.title || '') + '</div>' +
+        (n.body ? '<div class="notif-item-msg">' + _escHtml(n.body) + '</div>' : '') +
+        '<div class="notif-item-time">' + _escHtml(_timeAgoTh(n.createdAtMs)) + '</div>' +
+      '</div>' +
+    '</div>'
+  )).join('');
+  body.querySelectorAll('.notif-item').forEach((row) => {
+    row.addEventListener('click', async () => {
+      const id = row.getAttribute('data-id');
+      const notif = _notifAllItems.find((x) => x.id === id);
+      if (!notif || notif.read) return;
+      try {
+        await window.__nkbkAuthFetch('/api/monitor-notification-read', {
+          method: 'POST', body: JSON.stringify({ ids: [id] })
+        });
+        notif.read = true;
+        row.classList.remove('unread');
+      } catch (_) {}
+      refreshNotifBadge();
+    });
+  });
+}
+
+function refreshNotifBadge() {
+  const unread = _notifAllItems.filter((n) => !n.read).length;
+  renderNotifBadge(unread);
+}
+
+async function pollNotifications() {
+  if (!window.__nkbkAuthFetch) return;
+  try {
+    const res = await window.__nkbkAuthFetch('/api/monitor-notifications');
+    const data = await res.json().catch(() => ({ ok: false }));
+    if (!data || !data.ok) return;
+    const items = data.items || [];
+    _notifAllItems = items;
+    // โชว์ toast ตัวใหม่ที่ยังไม่เคยเห็น (เรียงเก่า→ใหม่ แสดงทีละตัวพร้อม delay)
+    const fresh = items.filter((n) => !n.read && !_notifSeenSet.has(n.id));
+    fresh.reverse();
+    fresh.forEach((n, idx) => {
+      setTimeout(() => showNotifToast(n), idx * 350);
+      _notifSeenSet.add(n.id);
+    });
+    if (fresh.length > 0) _persistNotifSeen();
+    renderNotifBadge(data.unread || items.filter((n) => !n.read).length);
+    // ถ้า panel เปิดอยู่ re-render
+    const panel = document.getElementById('notifPanel');
+    if (panel && !panel.hidden) renderNotifPanel(items);
+  } catch (_) {}
+}
+
+function openNotifPanel() {
+  const panel = document.getElementById('notifPanel');
+  if (!panel) return;
+  renderNotifPanel(_notifAllItems);
+  panel.hidden = false;
+}
+function closeNotifPanel() {
+  const panel = document.getElementById('notifPanel');
+  if (panel) panel.hidden = true;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const bell = document.getElementById('btnNotifBell');
+  const close = document.getElementById('btnNotifClose');
+  const readAll = document.getElementById('btnNotifReadAll');
+  const panel = document.getElementById('notifPanel');
+  if (bell) bell.addEventListener('click', () => {
+    if (panel && panel.hidden) openNotifPanel(); else closeNotifPanel();
+    // โหลดซ้ำเพื่อได้ข้อมูลล่าสุด
+    pollNotifications();
+  });
+  if (close) close.addEventListener('click', closeNotifPanel);
+  if (panel) {
+    const bd = panel.querySelector('.notif-panel-backdrop');
+    if (bd) bd.addEventListener('click', closeNotifPanel);
+  }
+  if (readAll) readAll.addEventListener('click', async () => {
+    try {
+      await window.__nkbkAuthFetch('/api/monitor-notification-read', {
+        method: 'POST', body: JSON.stringify({ all: true })
+      });
+      _notifAllItems.forEach((n) => { n.read = true; });
+      renderNotifPanel(_notifAllItems);
+      refreshNotifBadge();
+    } catch (_) {}
+  });
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape') closeNotifPanel();
+  });
+  // เริ่ม polling
+  setTimeout(() => pollNotifications(), 3500);
+  setInterval(() => pollNotifications(), NOTIF_POLL_MS);
+
+  // ผู้ใช้คลิกที่ native notification → เปิด panel + สลับแท็บตาม relatedType
+  if (typeof window.electronAPI !== 'undefined' && typeof window.electronAPI.onNativeNotificationClick === 'function') {
+    window.electronAPI.onNativeNotificationClick((payload) => {
+      try {
+        if (payload && payload.relatedType === 'leave') {
+          const btn = document.querySelector('.tab-nav-btn[data-tab="leave"]');
+          if (btn) btn.click();
+        } else {
+          openNotifPanel();
+        }
+      } catch (_) {}
+    });
+  }
+});
+
 fetchSystem();

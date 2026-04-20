@@ -1156,6 +1156,43 @@ function quitApp() {
 ipcMain.handle('app-get-version', () => app.getVersion());
 ipcMain.handle('app-is-portable-build', () => isPortableBuild());
 ipcMain.handle('app-is-packaged', () => app.isPackaged);
+
+/** แสดง Native OS Notification (Windows Toast / macOS) */
+ipcMain.handle('show-native-notification', async (_e, opts) => {
+  try {
+    const { Notification: ElectronNotification } = require('electron');
+    if (!ElectronNotification || !ElectronNotification.isSupported()) {
+      return { ok: false, reason: 'not_supported' };
+    }
+    const o = opts || {};
+    const iconPath = path.join(APP_DIR, 'assets', 'icon.png');
+    const n = new ElectronNotification({
+      title: String(o.title || 'NKBKConnext System'),
+      body: String(o.body || ''),
+      icon: (function(){ try { return require('fs').existsSync(iconPath) ? iconPath : undefined; } catch(_) { return undefined; } })(),
+      silent: false,
+      urgency: o.severity === 'danger' ? 'critical' : (o.severity === 'warning' ? 'normal' : 'low'),
+      timeoutType: 'default'
+    });
+    n.on('click', () => {
+      try {
+        if (mainWindow) {
+          if (mainWindow.isMinimized()) mainWindow.restore();
+          if (!mainWindow.isVisible()) mainWindow.show();
+          mainWindow.focus();
+        }
+      } catch (_) {}
+      try {
+        const wc = mainWindow && mainWindow.webContents;
+        if (wc && !wc.isDestroyed()) wc.send('native-notification-click', o.payload || null);
+      } catch (_) {}
+    });
+    n.show();
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, reason: 'error', message: (e && e.message) || String(e) };
+  }
+});
 ipcMain.handle('app-check-updates-now', async () => {
   if (!autoUpdater) return { ok: false, error: 'no-updater' };
   try {
