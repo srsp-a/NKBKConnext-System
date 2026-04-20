@@ -3102,6 +3102,35 @@ app.get('/api/monitor-me', async (req, res) => {
 // Leave system — sync กับ Firestore (V2 schema)
 // =====================================================
 
+/** Proxy request ไป remote monitor-api เมื่อเครื่องไม่มี firebase-service-account.json */
+async function proxyLeaveToRemote(req, res, apiPath) {
+  const remoteBase = getMonitorApiUrl();
+  if (!remoteBase) return res.status(503).json({ ok: false, reason: 'no_remote', message: 'ไม่ได้ตั้ง monitorApiUrl' });
+  const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
+  const bases = [remoteBase];
+  const fb = getMonitorApiUrlFallback();
+  if (fb && fb !== remoteBase) bases.push(fb);
+  let queryStr = '';
+  try { const u = new URL(req.originalUrl, 'http://x'); queryStr = u.search || ''; } catch (_) {}
+  for (const base of bases) {
+    try {
+      const url = base.replace(/\/$/, '') + apiPath + queryStr;
+      const headers = { 'X-Monitor-Token': token };
+      let body;
+      if (req.method === 'POST') {
+        headers['Content-Type'] = 'application/json';
+        body = JSON.stringify(req.body || {});
+      }
+      const r = await fetch(url, { method: req.method, headers, body });
+      const j = await r.json().catch(() => ({ ok: false, reason: 'bad_json' }));
+      return res.status(r.status).json(j);
+    } catch (e) {
+      if (bases.indexOf(base) < bases.length - 1) continue;
+      return res.status(502).json({ ok: false, reason: 'proxy_fail', message: (e && e.message) || String(e) });
+    }
+  }
+}
+
 /**
  * รองรับ session จาก 2 ที่:
  *  1) local MONITOR_SESSIONS (PIN / LINE login ที่ออกจากเครื่องนี้)
@@ -3173,7 +3202,7 @@ app.get('/api/monitor-my-leaves', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
   const session = await resolveMonitorSessionFromToken(token);
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
-  if (!ensureMonitorFirestore()) return res.status(503).json({ ok: false, reason: 'no_firestore' });
+  if (!ensureMonitorFirestore()) return proxyLeaveToRemote(req, res, '/api/monitor-my-leaves');
   try {
     const db = getMonitorDb();
     const u = await findV2UserByUsername(db, session.username);
@@ -3216,7 +3245,7 @@ app.get('/api/monitor-my-leave-balance', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
   const session = await resolveMonitorSessionFromToken(token);
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
-  if (!ensureMonitorFirestore()) return res.status(503).json({ ok: false, reason: 'no_firestore' });
+  if (!ensureMonitorFirestore()) return proxyLeaveToRemote(req, res, '/api/monitor-my-leave-balance');
   try {
     const db = getMonitorDb();
     const u = await findV2UserByUsername(db, session.username);
@@ -3253,7 +3282,7 @@ app.get('/api/monitor-leave-pending-approvals', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
   const session = await resolveMonitorSessionFromToken(token);
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
-  if (!ensureMonitorFirestore()) return res.status(503).json({ ok: false, reason: 'no_firestore' });
+  if (!ensureMonitorFirestore()) return proxyLeaveToRemote(req, res, '/api/monitor-leave-pending-approvals');
   try {
     const db = getMonitorDb();
     const u = await findV2UserByUsername(db, session.username);
@@ -3307,7 +3336,7 @@ app.post('/api/monitor-leave-approve', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
   const session = await resolveMonitorSessionFromToken(token);
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
-  if (!ensureMonitorFirestore()) return res.status(503).json({ ok: false, reason: 'no_firestore' });
+  if (!ensureMonitorFirestore()) return proxyLeaveToRemote(req, res, '/api/monitor-leave-approve');
   const leaveId = req.body && req.body.leaveId ? String(req.body.leaveId) : '';
   if (!leaveId) return res.status(400).json({ ok: false, reason: 'no_id' });
   try {
@@ -3374,7 +3403,7 @@ app.get('/api/monitor-leave-form-data', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
   const session = await resolveMonitorSessionFromToken(token);
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
-  if (!ensureMonitorFirestore()) return res.status(503).json({ ok: false, reason: 'no_firestore' });
+  if (!ensureMonitorFirestore()) return proxyLeaveToRemote(req, res, '/api/monitor-leave-form-data');
   const leaveId = String(req.query.leaveId || '').trim();
   if (!leaveId) return res.status(400).json({ ok: false, reason: 'no_id' });
   try {
@@ -3487,7 +3516,7 @@ app.post('/api/monitor-leave-reject', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
   const session = await resolveMonitorSessionFromToken(token);
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
-  if (!ensureMonitorFirestore()) return res.status(503).json({ ok: false, reason: 'no_firestore' });
+  if (!ensureMonitorFirestore()) return proxyLeaveToRemote(req, res, '/api/monitor-leave-reject');
   const leaveId = req.body && req.body.leaveId ? String(req.body.leaveId) : '';
   const reason = req.body && req.body.reason != null ? String(req.body.reason).trim() : '';
   if (!leaveId) return res.status(400).json({ ok: false, reason: 'no_id' });

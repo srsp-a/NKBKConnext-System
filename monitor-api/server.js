@@ -1699,6 +1699,333 @@ app.post('/api/programs-push-admin-web', routePostProgramsPushAdminWeb);
 app.post('/api/monitor-programs-push-admin-web', routePostProgramsPushAdminWeb);
 
 // =====================================================
+// Leave system — (my-leaves / balance / pending-approvals / approve / reject / form-data)
+// สอดคล้องกับ schema V2 LIFF (leaves, leave_types, leave_balances)
+// =====================================================
+function _leaveFiscalYearKey(date) {
+  const d = date instanceof Date ? date : new Date();
+  return d.getFullYear();
+}
+function _leaveClassify(user) {
+  const pos = String((user && user.position) || '').trim();
+  const canFlag = user && (user.canApproveLeave === true || user.canApproveLeave === 'true');
+  const isLevel1 = canFlag && /ผู้จัดการ/.test(pos) && !/รอง/.test(pos);
+  const isLevel2 = canFlag && (/รองผู้จัดการ/.test(pos) || /หัวหน้า/.test(pos));
+  return { canApprove: !!(canFlag && (isLevel1 || isLevel2)), isLevel1, isLevel2 };
+}
+async function _leaveLoadTypes() {
+  try {
+    const list = await firebaseGetCollection('leave_types', { pageSize: 200 });
+    const out = {};
+    (list || []).forEach((t) => { if (t && t.id) out[t.id] = t; });
+    return out;
+  } catch (_) { return {}; }
+}
+async function _leaveWriteDoc(collection, docId, patch) {
+  const adb = getMonitorAdminFirestore();
+  if (adb) {
+    await adb.collection(collection).doc(String(docId)).set(patch, { merge: true });
+    return 'admin';
+  }
+  await firebaseSet(collection, docId, patch);
+  return 'rest';
+}
+function _leaveTsToIso(v) {
+  if (!v) return '';
+  if (typeof v === 'string') return v;
+  if (v.toDate) { try { return v.toDate().toISOString(); } catch (_) {} }
+  if (v._seconds != null) { try { return new Date(v._seconds * 1000).toISOString(); } catch (_) {} }
+  return String(v);
+}
+function _leaveCreatedMs(v) {
+  if (!v) return 0;
+  if (v.toDate) { try { return v.toDate().getTime(); } catch (_) {} }
+  if (v._seconds != null) return v._seconds * 1000;
+  if (typeof v === 'string') { const t = Date.parse(v); return isNaN(t) ? 0 : t; }
+  return 0;
+}
+
+app.get('/api/monitor-my-leaves', async (req, res) => {
+  const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
+  const session = token ? MONITOR_SESSIONS.get(token) : null;
+  if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
+  try {
+    const u = await findUserForMonitor(session.username);
+    if (!u) return res.status(404).json({ ok: false, reason: 'no_user' });
+    const types = await _leaveLoadTypes();
+    const all = await firebaseQueryAll('leaves', 'userId', u.id, 500);
+    const items = (all || []).map((d) => ({
+      id: d.id,
+      type: String(d.type || ''),
+      typeName: (types[d.type] && (types[d.type].nameTH || types[d.type].name)) || String(d.type || ''),
+      partial: String(d.partial || 'full'),
+      startDate: String(d.startDate || ''),
+      endDate: String(d.endDate || ''),
+      durationDays: Number(d.durationDays) || 0,
+      status: String(d.status || 'pending'),
+      reason: String(d.reason || ''),
+      approverName1: String(d.approverName1 || ''),
+      approverName2: String(d.approverName2 || ''),
+      createdAtMs: _leaveCreatedMs(d.createdAt)
+    }));
+    items.sort((a, b) => {
+      const sa = String(a.startDate || ''), sb = String(b.startDate || '');
+      if (sa && sb && sa !== sb) return sb.localeCompare(sa);
+      return (b.createdAtMs || 0) - (a.createdAtMs || 0);
+    });
+    return res.json({ ok: true, items, userId: u.id });
+  } catch (e) {
+    return res.status(500).json({ ok: false, reason: 'error', message: (e && e.message) || String(e) });
+  }
+});
+
+app.get('/api/monitor-my-leave-balance', async (req, res) => {
+  const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
+  const session = token ? MONITOR_SESSIONS.get(token) : null;
+  if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
+  try {
+    const u = await findUserForMonitor(session.username);
+    if (!u) return res.status(404).json({ ok: false, reason: 'no_user' });
+    const year = _leaveFiscalYearKey(new Date());
+    const types = await _leaveLoadTypes();
+    const balDoc = await firebaseGet('leave_balances', u.id + '_' + year);
+    const itemsMap = balDoc && balDoc.items && typeof balDoc.items === 'object' ? balDoc.items : {};
+    const out = [];
+    for (const [tid, t] of Object.entries(types)) {
+      const row = itemsMap[tid] || {};
+      const quota = Number(row.quota != null ? row.quota : (t.yearlyQuota || t.quota || 0)) || 0;
+      const used = Number(row.used != null ? row.used : 0) || 0;
+      const remaining = Number(row.remaining != null ? row.remaining : (quota - used)) || 0;
+      out.push({
+        typeId: tid,
+        name: String(t.nameTH || t.name || tid),
+        order: Number(t.order) || 999,
+        quota, used, remaining
+      });
+    }
+    out.sort((a, b) => (a.order || 999) - (b.order || 999));
+    return res.json({ ok: true, year, items: out });
+  } catch (e) {
+    return res.status(500).json({ ok: false, reason: 'error', message: (e && e.message) || String(e) });
+  }
+});
+
+app.get('/api/monitor-leave-pending-approvals', async (req, res) => {
+  const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
+  const session = token ? MONITOR_SESSIONS.get(token) : null;
+  if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
+  try {
+    const u = await findUserForMonitor(session.username);
+    if (!u) return res.status(404).json({ ok: false, reason: 'no_user' });
+    const cls = _leaveClassify(u);
+    if (!cls.canApprove) return res.json({ ok: true, canApprove: false, items: [] });
+    const types = await _leaveLoadTypes();
+    const statuses = cls.isLevel1 ? ['pending', 'approved_lv1'] : ['pending'];
+    const all = [];
+    for (const st of statuses) {
+      const list = await firebaseQueryAll('leaves', 'status', st, 200);
+      (list || []).forEach((d) => {
+        if (d.userId === u.id) return;
+        all.push({
+          id: d.id,
+          userId: String(d.userId || ''),
+          userName: String(d.userName || ''),
+          userDept: String(d.userDept || ''),
+          type: String(d.type || ''),
+          typeName: (types[d.type] && (types[d.type].nameTH || types[d.type].name)) || String(d.type || ''),
+          partial: String(d.partial || 'full'),
+          startDate: String(d.startDate || ''),
+          endDate: String(d.endDate || ''),
+          durationDays: Number(d.durationDays) || 0,
+          status: String(d.status || 'pending'),
+          reason: String(d.reason || ''),
+          approverName2: String(d.approverName2 || ''),
+          createdAtMs: _leaveCreatedMs(d.createdAt)
+        });
+      });
+    }
+    all.sort((a, b) => (a.createdAtMs || 0) - (b.createdAtMs || 0));
+    return res.json({ ok: true, canApprove: true, level: cls.isLevel1 ? 1 : 2, items: all });
+  } catch (e) {
+    return res.status(500).json({ ok: false, reason: 'error', message: (e && e.message) || String(e) });
+  }
+});
+
+app.post('/api/monitor-leave-approve', async (req, res) => {
+  const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
+  const session = token ? MONITOR_SESSIONS.get(token) : null;
+  if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
+  const leaveId = req.body && req.body.leaveId ? String(req.body.leaveId) : '';
+  if (!leaveId) return res.status(400).json({ ok: false, reason: 'no_id' });
+  try {
+    const u = await findUserForMonitor(session.username);
+    if (!u) return res.status(404).json({ ok: false, reason: 'no_user' });
+    const cls = _leaveClassify(u);
+    if (!cls.canApprove) return res.status(403).json({ ok: false, reason: 'not_approver' });
+    const d = await firebaseGet('leaves', leaveId);
+    if (!d) return res.status(404).json({ ok: false, reason: 'no_leave' });
+    if (d.userId === u.id) return res.status(400).json({ ok: false, reason: 'self' });
+    const curStatus = String(d.status || 'pending');
+    const now = new Date();
+    const approverName = String(u.fullname || session.fullname || session.username);
+    const patch = {};
+    if (cls.isLevel1) {
+      if (curStatus === 'approved' || curStatus === 'rejected' || curStatus === 'cancelled') {
+        return res.status(400).json({ ok: false, reason: 'bad_state', currentStatus: curStatus });
+      }
+      patch.status = 'approved';
+      patch.approvedByLevel1 = u.id;
+      patch.approvedAtLevel1 = now;
+      patch.approverName1 = approverName;
+      try {
+        const year = _leaveFiscalYearKey(new Date());
+        const balId = (d.userId || '') + '_' + year;
+        const bal = await firebaseGet('leave_balances', balId);
+        const items = bal && bal.items && typeof bal.items === 'object' ? { ...bal.items } : {};
+        const tid = d.type;
+        const days = Number(d.durationDays) || 0;
+        const row = items[tid] || {};
+        const used = (Number(row.used) || 0) + days;
+        const quota = Number(row.quota != null ? row.quota : 0) || 0;
+        items[tid] = { ...row, used, remaining: quota - used };
+        await _leaveWriteDoc('leave_balances', balId, { items });
+      } catch (e) { console.warn('[leave-approve] balance update:', e.message); }
+    } else {
+      if (curStatus !== 'pending') {
+        return res.status(400).json({ ok: false, reason: 'bad_state', currentStatus: curStatus });
+      }
+      patch.status = 'approved_lv1';
+      patch.approvedByLevel2 = u.id;
+      patch.approvedAtLevel2 = now;
+      patch.approverName2 = approverName;
+    }
+    await _leaveWriteDoc('leaves', leaveId, patch);
+    return res.json({ ok: true, status: patch.status });
+  } catch (e) {
+    return res.status(500).json({ ok: false, reason: 'error', message: (e && e.message) || String(e) });
+  }
+});
+
+app.post('/api/monitor-leave-reject', async (req, res) => {
+  const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
+  const session = token ? MONITOR_SESSIONS.get(token) : null;
+  if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
+  const leaveId = req.body && req.body.leaveId ? String(req.body.leaveId) : '';
+  const reason = req.body && req.body.reason != null ? String(req.body.reason).trim() : '';
+  if (!leaveId) return res.status(400).json({ ok: false, reason: 'no_id' });
+  try {
+    const u = await findUserForMonitor(session.username);
+    if (!u) return res.status(404).json({ ok: false, reason: 'no_user' });
+    const cls = _leaveClassify(u);
+    if (!cls.canApprove) return res.status(403).json({ ok: false, reason: 'not_approver' });
+    const d = await firebaseGet('leaves', leaveId);
+    if (!d) return res.status(404).json({ ok: false, reason: 'no_leave' });
+    if (d.userId === u.id) return res.status(400).json({ ok: false, reason: 'self' });
+    const curStatus = String(d.status || 'pending');
+    if (curStatus === 'approved' || curStatus === 'rejected' || curStatus === 'cancelled') {
+      return res.status(400).json({ ok: false, reason: 'bad_state', currentStatus: curStatus });
+    }
+    const rejectorName = String(u.fullname || session.fullname || session.username);
+    const now = new Date();
+    await _leaveWriteDoc('leaves', leaveId, {
+      status: 'rejected',
+      rejectedAt: now,
+      statusAt: now,
+      approverId: u.id,
+      rejectedBy: u.id,
+      rejectedByName: rejectorName,
+      rejectorName: rejectorName,
+      rejectReason: reason
+    });
+    return res.json({ ok: true, status: 'rejected' });
+  } catch (e) {
+    return res.status(500).json({ ok: false, reason: 'error', message: (e && e.message) || String(e) });
+  }
+});
+
+app.get('/api/monitor-leave-form-data', async (req, res) => {
+  const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
+  const session = token ? MONITOR_SESSIONS.get(token) : null;
+  if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
+  const leaveId = String(req.query.leaveId || '').trim();
+  if (!leaveId) return res.status(400).json({ ok: false, reason: 'no_id' });
+  try {
+    const l = await firebaseGet('leaves', leaveId);
+    if (!l) return res.status(404).json({ ok: false, reason: 'no_leave' });
+    const me = await findUserForMonitor(session.username);
+    const myUid = me ? me.id : '';
+    const meRole = me ? String(me.role || '').trim() : '';
+    const cls = _leaveClassify(me);
+    if (l.userId !== myUid && meRole !== 'ผู้ดูแลระบบ' && meRole !== 'แอดมิน' && !cls.canApprove) {
+      return res.status(403).json({ ok: false, reason: 'forbidden' });
+    }
+    const user = l.userId ? await firebaseGet('users', l.userId) : null;
+    async function resolveApprover(idOrEmail, fallback) {
+      const s = String(idOrEmail || '').trim();
+      if (!s) return String(fallback || '');
+      try {
+        if (s.includes('@')) {
+          const q = await firebaseQuery('users', 'email', s);
+          if (q) return String(q.fullname || q.nameTH || q.displayName || fallback || '');
+        } else {
+          const doc = await firebaseGet('users', s);
+          if (doc) return String(doc.fullname || doc.nameTH || doc.displayName || fallback || '');
+        }
+      } catch (_) {}
+      return String(fallback || s);
+    }
+    const approverLv1Name = await resolveApprover(l.approvedByLevel1 || l.approverId1 || l.approverId, l.approverName1 || l.approverName);
+    const approverLv2Name = await resolveApprover(l.approvedByLevel2 || l.acknowledgedByLevel2 || l.approverId2, l.approverName2 || l.acknowledgerName2);
+    const types = await _leaveLoadTypes();
+    const typeName = (l.type && types[l.type] && (types[l.type].nameTH || types[l.type].name)) || String(l.type || '');
+    const year = _leaveFiscalYearKey(new Date());
+    const bal = await firebaseGet('leave_balances', (l.userId || '') + '_' + year);
+    const balItems = bal && bal.items ? bal.items : {};
+    const balance = [];
+    for (const [tid, t] of Object.entries(types)) {
+      const row = balItems[tid] || {};
+      const quota = Number(t.yearlyQuota || row.quota || 0) || 0;
+      const used = Number(row.used || 0) || 0;
+      balance.push({
+        typeId: tid,
+        name: String(t.nameTH || t.name || tid),
+        quota, used, remaining: Math.max(0, quota - used),
+        order: Number(t.order) || 999
+      });
+    }
+    balance.sort((a, b) => (a.order || 999) - (b.order || 999));
+    return res.json({
+      ok: true,
+      leaveId,
+      leave: {
+        type: l.type || '',
+        typeName,
+        partial: l.partial || 'full',
+        startDate: l.startDate || '',
+        endDate: l.endDate || l.startDate || '',
+        durationDays: Number(l.durationDays) || 0,
+        reason: l.reason || l.note || '',
+        status: l.status || 'pending',
+        createdAtIso: _leaveTsToIso(l.createdAt),
+        approvedAtLevel1Iso: _leaveTsToIso(l.approvedAtLevel1 || l.approvedAt1 || l.approvedAt),
+        approvedAtLevel2Iso: _leaveTsToIso(l.approvedAtLevel2 || l.approvedAt2 || l.acknowledgedAtLevel2),
+        acknowledged: !!l.acknowledgedByLevel2
+      },
+      user: {
+        fullname: (user && (user.fullname || user.nameTH || user.displayName)) || l.userName || '',
+        position: (user && (user.position || user.jobPosition)) || '',
+        job: (user && (user.job || user.workType)) || '',
+        department: (user && (user.department || user.dept)) || l.userDept || ''
+      },
+      approver: { level1Name: approverLv1Name || '', level2Name: approverLv2Name || '' },
+      balance
+    });
+  } catch (e) {
+    return res.status(500).json({ ok: false, reason: 'error', message: (e && e.message) || String(e) });
+  }
+});
+
+// =====================================================
 // GET /api/monitor-me
 // =====================================================
 app.get('/api/monitor-me', async (req, res) => {
