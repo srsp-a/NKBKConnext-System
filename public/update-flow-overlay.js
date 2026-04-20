@@ -101,11 +101,10 @@
     '</div>' +
     '<div class="nkbk-upd-panel" data-panel="ready" style="display:none">' +
     '<div class="nkbk-upd-ready-icon" aria-hidden="true">✓</div>' +
-    '<h2 id="nkbkUpdTitleReady">พร้อมติดตั้งอัปเดต</h2>' +
+    '<h2 id="nkbkUpdTitleReady">กำลังติดตั้งและเปิดโปรแกรมใหม่</h2>' +
     '<p class="nkbk-upd-sub" id="nkbkUpdSubReady"></p>' +
     '<div class="nkbk-upd-actions">' +
-    '<button type="button" class="nkbk-upd-btn nkbk-upd-btn-primary" id="nkbkUpdBtnRestart">รีสตาร์ทและติดตั้ง</button>' +
-    '<button type="button" class="nkbk-upd-btn nkbk-upd-btn-secondary" id="nkbkUpdBtnQuit">ปิดโปรแกรม (เปิดใหม่เองภายหลัง)</button>' +
+    '<button type="button" class="nkbk-upd-btn nkbk-upd-btn-primary" id="nkbkUpdBtnRestart" style="display:none">รีสตาร์ทและติดตั้ง</button>' +
     '</div></div>' +
     '<div class="nkbk-upd-panel" data-panel="err" style="display:none">' +
     '<div class="nkbk-upd-err-icon" aria-hidden="true">!</div>' +
@@ -121,8 +120,8 @@
   var subReady = document.getElementById('nkbkUpdSubReady');
   var errMsg = document.getElementById('nkbkUpdErrMsg');
   var btnRestart = document.getElementById('nkbkUpdBtnRestart');
-  var btnQuit = document.getElementById('nkbkUpdBtnQuit');
   var btnDismiss = document.getElementById('nkbkUpdBtnDismiss');
+  var autoInstalledOnce = false;
 
   function panel(name) {
     var nodes = root.querySelectorAll('.nkbk-upd-panel');
@@ -175,7 +174,16 @@
         subReady.innerHTML =
           'ดาวน์โหลดครบแล้ว' +
           (rv ? ' <strong style="color:#00d4aa">v' + esc(rv.replace(/^v/i, '')) + '</strong>' : '') +
-          '<br>กดรีสตาร์ทเพื่อติดตั้งทันที หรือปิดโปรแกรมแล้วเปิดใหม่เมื่อสะดวก';
+          '<br>ระบบจะปิดโปรแกรม ติดตั้ง และเปิดใหม่อัตโนมัติ…';
+      }
+      // ติดตั้งอัตโนมัติหลังโหลดเสร็จ (เปิดแอปใหม่หลังติดตั้งสำเร็จ)
+      if (!autoInstalledOnce) {
+        autoInstalledOnce = true;
+        setTimeout(function () {
+          try {
+            if (api.quitAndInstallAppUpdate) api.quitAndInstallAppUpdate();
+          } catch (_) {}
+        }, 1200);
       }
       return;
     }
@@ -190,11 +198,6 @@
   if (btnRestart) {
     btnRestart.addEventListener('click', function () {
       if (api.quitAndInstallAppUpdate) api.quitAndInstallAppUpdate();
-    });
-  }
-  if (btnQuit) {
-    btnQuit.addEventListener('click', function () {
-      if (api.quitAppCompletely) api.quitAppCompletely();
     });
   }
   if (btnDismiss) {
