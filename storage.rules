@@ -1,0 +1,11 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // รูปจากเว็บองค์กร (ย้ายจาก WordPress)
+    match /cms/{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+    // อัปโหลดผ่าน Admin SDK / Cloud Functions เท่านั้น (migration script ใช้ SA)
+  }
+}

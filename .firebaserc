@@ -1,0 +1,54 @@
+{
+  "projects": {
+    "default": "admin-panel-nkbkcoop-cbf10"
+  },
+  "targets": {
+    "admin-panel-nkbkcoop-cbf10": {
+      "hosting": {
+        "main": [
+          "admin-panel-nkbkcoop-cbf10"
+        ],
+        "monitor": [
+          "monitor-api-nkbkcoop"
+        ],
+        "line": [
+          "api-line-nkbkcoop"
+        ],
+        "admin": [
+          "admin-nkbkcoop"
+        ],
+        "portal": [
+          "portal-nkbkcoop"
+        ],
+        "link": [
+          "link-nkbkcoop"
+        ],
+        "leave": [
+          "leave-nkbkcoop"
+        ],
+        "register": [
+          "register-nkbkcoop"
+        ],
+        "random": [
+          "random-nkbkcoop"
+        ],
+        "queue": [
+          "queue-nkbkcoop"
+        ],
+        "q": [
+          "q-nkbkcoop"
+        ],
+        "qauto": [
+          "qauto-nkbkcoop"
+        ],
+        "payment": [
+          "payment-nkbkcoop"
+        ],
+        "web": [
+          "nkbkcoop-web"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

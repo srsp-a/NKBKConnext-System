@@ -11,6 +11,12 @@ monitor-sessions.json
 !build-includes/monitor-config.json
 .env
 .env.*
+scripts/cloudflare-email.env
+.firebase/
+hosting-dist/
+firebase-debug.log
+firebase-debug.*.log
+functions/node_modules/
 .DS_Store
 Thumbs.db
 *.asar.unpacked

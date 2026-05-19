@@ -1,0 +1,266 @@
+// Rules Version 2
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ผู้ใช้ที่ถือ UID นี้ถือว่าเป็นแอดมินเต็มรูปแบบ
+    function isSuperAdmin() {
+      return request.auth != null && request.auth.uid == 'yPyuxPnu9tQmK89OH4NrUBjJ3jb2';
+    }
+    function isRoleAdmin() {
+      return request.auth != null &&
+        (
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ผู้ดูแลระบบ'
+          || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'แอดมิน'
+          || request.auth.token.admin == true
+        );
+    }
+    // ผู้ดูแลระบบเท่านั้น (ไม่รวมแอดมิน) — ใช้กับ config ที่สำคัญ เช่น menu_permissions
+    function isSuperOnlyAdmin() {
+      return isSuperAdmin() ||
+        (
+          request.auth != null &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ผู้ดูแลระบบ'
+        );
+    }
+    function isAdmin() {
+      return isSuperAdmin() || isRoleAdmin();
+    }
+    
+    // ========================================
+    // Users
+    // ========================================
+    match /users/{userId} {
+      allow read: if true;
+      allow create, delete: if isAdmin();
+      allow update: if true;
+    }
+    
+    // programs, systems: อ่านได้ทั่วไป (line-webhook ใช้ใส่ context ให้ AI ตอบคำถามโปรแกรม/ระบบได้), เขียนเฉพาะแอดมิน
+    match /programs/{programId} { allow read: if true; allow write: if isAdmin(); }
+    match /systems/{systemId}  { allow read: if true; allow write: if isAdmin(); }
+    match /settings/{docId}    { allow read, write: if isAdmin(); }
+    match /logs/{logId}        { allow read, write: if isAdmin(); }
+
+    // การแจ้งเตือน — user อ่านได้ทั่วไป (กรองที่ server/client), เขียน/ลบ/สร้างต้องล็อกอินหรือ admin
+    match /notifications/{notifId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null; // mark as read
+      allow delete: if isAdmin();
+    }
+    
+    match /config/{docId} {
+      allow read: if docId == 'line_settings' || docId == 'leave_settings' || docId == 'org' || docId == 'line_attendance_notify' || docId == 'attendance_auto_fetch' || docId == 'ai_chat' || docId == 'menu_permissions' || isAdmin();
+      // menu_permissions เขียนได้เฉพาะ 'ผู้ดูแลระบบ' เท่านั้น (ไม่ให้แอดมินยกสิทธิ์ตัวเอง)
+      allow write: if (docId == 'menu_permissions' ? isSuperOnlyAdmin() : isAdmin());
+    }
+    match /ai_memory/{docId} {
+      allow read, write: if true;
+    }
+    match /ai_chat_state/{docId} {
+      allow read, write: if true;
+    }
+    
+    // ========================================
+    // Leave Domain
+    // ========================================
+    match /leave_types/{typeId} { 
+      allow read: if true; 
+      allow write: if isAdmin(); 
+    }
+    match /holidays/{holidayId} { 
+      allow read: if true;
+      allow write: if isAdmin(); 
+    }
+    match /approvers/{apvId} { 
+      allow read, write: if isAdmin(); 
+    }
+    // leaves: line-webhook อ่านได้เพื่อใส่ [รายการลาล่าสุด] ใน AI context, เขียน/อัปเดตต้อง login
+    match /leaves/{leaveId} { 
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if isAdmin();
+    }
+    // leave_balances: อ่านได้ทั่วไป (line-webhook ใช้ใส่ context ให้ AI ตอบวันลาคงเหลือได้ถูกต้อง), เขียนต้อง login
+    match /leave_balances/{docId} { 
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /attendance/{docId} { 
+      allow read, write: if isAdmin(); 
+    }
+    // attendance_log: หน้า #attendance หรือ line-webhook (ดึงอัตโนมัติ) บันทึก — leave อ่านได้
+    match /attendance_log/{docId} {
+      allow read, write: if true;
+    }
+    // คิวแจ้ง LINE เมื่อสแกนเข้า/ออก (Admin หรือ line-webhook สร้าง, line-webhook อ่าน+ลบ)
+    match /attendance_scan_notify_queue/{docId} {
+      allow read, delete, create: if true;
+      allow update: if isAdmin();
+    }
+    // บันทึกว่าแจ้ง LINE สแกนเข้า/ออกแล้ว (line-webhook เขียน, Admin อ่านเพื่อแสดงสัญลักษณ์)
+    match /attendance_line_sent/{docId} {
+      allow read, create: if true;
+      allow update, delete: if isAdmin();
+    }
+    
+    // ========================================
+    // Queue System
+    // ========================================
+    match /queue/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /queue/waiting/tickets/{ticketId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // ========================================
+    // Lucky Draw
+    // ========================================
+    match /luckyDraw_participants/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    match /luckyDraw_prizes/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    match /luckyDraw_categories/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    match /luckyDraw_winners/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    match /luckyDraw_prizeResults/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    match /luckyDraw_settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    // ========================================
+    // LINE Integration
+    // ========================================
+    match /line_followers/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    match /line_users/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    match /line_autoreply/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /lineAutoReplies/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /line_templates/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /line_link_pins/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // กลุ่มไลน์ — webhook ต้องเขียนได้โดยไม่มี auth
+    match /line_bot_groups/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    match /line_bot_rooms/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    match /line_events/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    match /line_stats/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    match /line_broadcasts/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    match /line_liff/{docId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+    match /liffLinks/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /line_flex_templates/{docId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+    match /flex_templates/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /line_rich_messages/{docId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+    match /line_rich_menus/{docId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+    match /line_config/{docId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ========================================
+    // อีเมล (เทมเพลตใน Firestore, ส่งผ่าน API)
+    // ========================================
+    match /email_templates/{docId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+    match /email_logs/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // ========================================
+    // CMS เว็บองค์กร (ย้ายจาก WordPress)
+    // ========================================
+    match /cms_posts/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /cms_pages/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /cms_categories/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /cms_site/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    // ========================================
+    // Catch-all — เฉพาะแอดมิน
+    // ========================================
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

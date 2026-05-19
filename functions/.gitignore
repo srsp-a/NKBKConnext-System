@@ -1,0 +1,6 @@
+node_modules/
+monitor-api/node_modules/
+monitor-api/.env
+line-webhook/node_modules/
+line-webhook/.env
+line-webhook/attendance_notify_sent.json

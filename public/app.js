@@ -1070,16 +1070,86 @@ async function loadLeaveApprovals() {
   }
 }
 
-function _leaveConfirm(opts) {
-  if (typeof window.confirmDialog === 'function') return window.confirmDialog(opts);
-  return Promise.resolve(window.confirm((opts && opts.message) || 'ยืนยัน?'));
+/* ============================================================
+ * nkbkModal — unified confirm/alert/prompt (แทน window.confirm / window.alert / window.prompt)
+ * สวยกว่า native dialog ของ Electron เพราะ native จะใช้ Windows dialog เก่าที่มีชื่อ app/system-status-monitor
+ * ============================================================ */
+function nkbkModalShow(opts) {
+  opts = opts || {};
+  const mode = opts.mode || 'confirm'; // 'confirm' | 'alert' | 'prompt'
+  const title = opts.title != null ? String(opts.title) : '';
+  const message = opts.message != null ? String(opts.message) : '';
+  const okText = opts.okText || (mode === 'alert' ? 'ตกลง' : 'ยืนยัน');
+  const cancelText = opts.cancelText || 'ยกเลิก';
+  const variant = opts.variant === 'primary' ? 'success' : (opts.variant || 'info'); // danger / warning / info / success
+  const iconMap = {
+    danger: '✕',
+    warning: '⚠',
+    info: 'ℹ',
+    success: '✓'
+  };
+  const iconChar = opts.icon || iconMap[variant] || 'ℹ';
+  const _esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return new Promise((resolve) => {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'nkbk-modal-backdrop';
+    backdrop.innerHTML =
+      '<div class="nkbk-modal variant-' + variant + '" role="dialog" aria-modal="true">' +
+        '<div class="nkbk-modal-body">' +
+          '<div class="nkbk-modal-icon">' + _esc(iconChar) + '</div>' +
+          '<div class="nkbk-modal-content">' +
+            (title ? '<div class="nkbk-modal-title">' + _esc(title) + '</div>' : '') +
+            (message ? '<div class="nkbk-modal-msg">' + _esc(message) + '</div>' : '') +
+            (mode === 'prompt' ? '<div class="nkbk-modal-input-wrap"><input type="text" class="nkbk-modal-input" id="nkbkModalInput" placeholder="' + _esc(opts.placeholder || '') + '" value="' + _esc(opts.defaultValue || '') + '"/></div>' : '') +
+          '</div>' +
+        '</div>' +
+        '<div class="nkbk-modal-actions">' +
+          (mode === 'alert' ? '' : '<button type="button" class="nkbk-modal-btn nkbk-modal-btn-cancel" data-act="cancel">' + _esc(cancelText) + '</button>') +
+          '<button type="button" class="nkbk-modal-btn nkbk-modal-btn-ok" data-act="ok">' + _esc(okText) + '</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(backdrop);
+    requestAnimationFrame(() => backdrop.classList.add('show'));
+    const inputEl = backdrop.querySelector('.nkbk-modal-input');
+    if (inputEl) { setTimeout(() => { try { inputEl.focus(); inputEl.select(); } catch (_) {} }, 30); }
+    function cleanup(val) {
+      backdrop.classList.remove('show');
+      setTimeout(() => { try { backdrop.remove(); } catch (_) {} }, 200);
+      document.removeEventListener('keydown', onKey);
+      resolve(val);
+    }
+    function onKey(ev) {
+      if (ev.key === 'Escape') cleanup(mode === 'prompt' ? null : false);
+      else if (ev.key === 'Enter') {
+        if (mode === 'prompt') cleanup(inputEl ? inputEl.value : '');
+        else if (mode === 'alert') cleanup(true);
+        else cleanup(true);
+      }
+    }
+    backdrop.addEventListener('click', (ev) => {
+      if (ev.target === backdrop) cleanup(mode === 'prompt' ? null : false);
+      const btn = ev.target.closest('[data-act]');
+      if (!btn) return;
+      const act = btn.getAttribute('data-act');
+      if (act === 'ok') {
+        if (mode === 'prompt') cleanup(inputEl ? inputEl.value : '');
+        else cleanup(true);
+      } else if (act === 'cancel') {
+        cleanup(mode === 'prompt' ? null : false);
+      }
+    });
+    document.addEventListener('keydown', onKey);
+  });
 }
+window.nkbkConfirm = (opts) => nkbkModalShow({ ...(opts || {}), mode: 'confirm' });
+window.nkbkAlert = (opts) => nkbkModalShow({ ...(typeof opts === 'string' ? { message: opts } : (opts || {})), mode: 'alert' });
+window.nkbkPrompt = (opts) => nkbkModalShow({ ...(opts || {}), mode: 'prompt' });
 
 async function handleLeaveApprove(id) {
-  const ok = await _leaveConfirm({
+  const ok = await window.nkbkConfirm({
     title: 'อนุมัติคำขอลา?',
     message: 'เมื่ออนุมัติแล้วระบบจะอัปเดตสถานะและหักยอดลา (ถ้าคุณเป็นผู้อนุมัติขั้นสุดท้าย)',
-    okText: 'อนุมัติ', cancelText: 'ยกเลิก', variant: 'primary'
+    okText: 'อนุมัติ', cancelText: 'ยกเลิก', variant: 'success', icon: '✓'
   });
   if (!ok) return;
   try {
@@ -1088,19 +1158,27 @@ async function handleLeaveApprove(id) {
     });
     const data = await res.json().catch(() => ({ ok: false }));
     if (!data.ok) {
-      alert('ไม่สำเร็จ: ' + (data.reason || 'error') + (data.message ? ' — ' + data.message : ''));
+      await window.nkbkAlert({ title: 'ไม่สำเร็จ', message: (data.reason || 'error') + (data.message ? ' — ' + data.message : ''), variant: 'danger' });
       return;
     }
     refreshLeaveTab();
-  } catch (e) { alert('ผิดพลาด: ' + e.message); }
+  } catch (e) {
+    await window.nkbkAlert({ title: 'เกิดข้อผิดพลาด', message: e.message || String(e), variant: 'danger' });
+  }
 }
 
 async function handleLeaveReject(id) {
-  const reason = window.prompt('เหตุผลที่ไม่อนุมัติ (ไม่บังคับ)', '') || '';
-  const ok = await _leaveConfirm({
+  const reason = await window.nkbkPrompt({
+    title: 'เหตุผลที่ไม่อนุมัติ',
+    message: 'ระบุเหตุผลเพื่อแจ้งผู้ลา (ไม่บังคับ)',
+    placeholder: 'เช่น เอกสารไม่ครบ / ติดวันประชุม',
+    okText: 'ถัดไป', cancelText: 'ยกเลิก', variant: 'warning', icon: '⚠'
+  });
+  if (reason === null) return; // ยกเลิก
+  const ok = await window.nkbkConfirm({
     title: 'ไม่อนุมัติคำขอลา?',
     message: 'สถานะคำขอจะถูกเปลี่ยนเป็น "ไม่อนุมัติ" และไม่สามารถย้อนกลับได้' + (reason ? '\n\nเหตุผล: ' + reason : ''),
-    okText: 'ไม่อนุมัติ', cancelText: 'ยกเลิก', variant: 'danger'
+    okText: 'ไม่อนุมัติ', cancelText: 'กลับ', variant: 'danger', icon: '✕'
   });
   if (!ok) return;
   try {
@@ -1109,11 +1187,13 @@ async function handleLeaveReject(id) {
     });
     const data = await res.json().catch(() => ({ ok: false }));
     if (!data.ok) {
-      alert('ไม่สำเร็จ: ' + (data.reason || 'error') + (data.message ? ' — ' + data.message : ''));
+      await window.nkbkAlert({ title: 'ไม่สำเร็จ', message: (data.reason || 'error') + (data.message ? ' — ' + data.message : ''), variant: 'danger' });
       return;
     }
     refreshLeaveTab();
-  } catch (e) { alert('ผิดพลาด: ' + e.message); }
+  } catch (e) {
+    await window.nkbkAlert({ title: 'เกิดข้อผิดพลาด', message: e.message || String(e), variant: 'danger' });
+  }
 }
 
 // bind filter + refresh button
@@ -1127,19 +1207,19 @@ document.addEventListener('DOMContentLoaded', () => {
 // ----- ใบลา (PDF/Print) -----
 async function openLeaveFormWindow(leaveId) {
   try {
-    if (!window.__nkbkAuthFetch) { alert('กรุณาล็อกอินใหม่'); return; }
+    if (!window.__nkbkAuthFetch) { await window.nkbkAlert({ title: 'กรุณาล็อกอินใหม่', variant: 'warning' }); return; }
     const res = await window.__nkbkAuthFetch('/api/monitor-leave-form-data?leaveId=' + encodeURIComponent(leaveId));
     const data = await res.json().catch(() => ({ ok: false }));
     if (!data || !data.ok) {
-      alert('ไม่สามารถดึงข้อมูลใบลา: ' + ((data && (data.reason || data.message)) || 'unknown'));
+      await window.nkbkAlert({ title: 'ไม่สามารถดึงข้อมูลใบลา', message: String((data && (data.reason || data.message)) || 'unknown'), variant: 'danger' });
       return;
     }
     const html = buildLeaveFormHtml(data);
     const w = window.open('', '_blank', 'width=900,height=1000,noopener=no');
-    if (!w) { alert('เบราว์เซอร์บล็อก popup — กรุณาอนุญาต'); return; }
-    try { w.document.open(); w.document.write(html); w.document.close(); } catch (e) { alert('เปิดใบลาไม่สำเร็จ: ' + e.message); }
+    if (!w) { await window.nkbkAlert({ title: 'เบราว์เซอร์บล็อก popup', message: 'กรุณาอนุญาต popup ใน Electron', variant: 'warning' }); return; }
+    try { w.document.open(); w.document.write(html); w.document.close(); } catch (e) { await window.nkbkAlert({ title: 'เปิดใบลาไม่สำเร็จ', message: e.message, variant: 'danger' }); }
   } catch (e) {
-    alert('เกิดข้อผิดพลาด: ' + e.message);
+    await window.nkbkAlert({ title: 'เกิดข้อผิดพลาด', message: e.message, variant: 'danger' });
   }
 }
 

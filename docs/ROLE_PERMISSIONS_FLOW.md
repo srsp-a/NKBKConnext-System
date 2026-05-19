@@ -89,18 +89,18 @@
 }
 ```
 
-### กฎการอนุญาต (Resolution)
+### กฎการอนุญาต (Resolution — ตาม priority)
 
-สำหรับผู้ใช้ `u` ที่มี `role` + `position` เมื่อขอเข้าเมนู `m`:
+สำหรับผู้ใช้ `u` ที่มี `role` + `position` + `menuPermissions` เมื่อขอเข้าเมนู `m`:
 
-1. ถ้า `role === "ผู้ดูแลระบบ"` → อนุญาตทุกเมนู (bypass)
-2. ถ้า `role === "แอดมิน"` → อนุญาตทุกเมนู (bypass)
-3. ไม่งั้น เช็ค **ทั้ง role และ position** ต้องอนุญาต
-   - `rolePermissions[role][m] === true` **AND** `positionPermissions[position][m] === true`
-4. ถ้าไม่เจอ role/position/menu ใน matrix → ใช้ `defaultAllow` (ดีฟอลต์ `false`)
+1. **Super admin bypass** — ถ้า `role === "ผู้ดูแลระบบ"` → อนุญาตทุกเมนู (safety net; ไม่สามารถถูกจำกัดได้)
+2. **Per-user override** — ถ้า `u.menuPermissions[m] === true` → อนุญาต (force allow)
+3. **Per-user override** — ถ้า `u.menuPermissions[m] === false` → ไม่อนุญาต (force deny)
+4. **Role + Position AND** — ทั้ง `rolePermissions[role][m]` **และ** `positionPermissions[position][m]` ต้อง `true`
+   - ถ้าใน matrix ไม่มีค่า — ใช้ `defaultAllow` (ค่าเริ่มต้น `false`)
+5. **Unmanaged menus** — เมนูที่ยังไม่ถูกเพิ่มใน `config/menu_permissions.menus` → อนุญาตโดยปริยาย (เพื่อให้แท็บใหม่ไม่หายตอนยังไม่ได้ตั้งค่า)
 
-> หมายเหตุ: **AND** — ให้ทั้งสองฝั่งยินยอมถึงผ่าน (ป้องกันกรณี admin ตั้ง role ให้ได้สิทธิ์แต่ตำแหน่งยังไม่ได้รับ)
-> ถ้าต้องการ **OR** (ฝั่งใดฝั่งหนึ่งก็พอ) เปลี่ยนได้ในฟังก์ชัน resolve เท่านั้น
+> หมายเหตุ: **แอดมิน (role=แอดมิน)** ปัจจุบัน **ไม่ bypass** — ตัดสิทธิ์ตาม matrix ปกติ (ยกเว้นจะเพิ่ม override ให้ตัวเอง)
 
 ## 4. โฟลว์การทำงาน (End-to-end)
 

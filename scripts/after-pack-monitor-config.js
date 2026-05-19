@@ -19,7 +19,11 @@ module.exports = async function afterPackMonitorConfig(context) {
     body = fs.readFileSync(src, "utf8");
   } else {
     body =
-      JSON.stringify({ monitorApiUrl: "https://api.nkbkcoop.com" }, null, 2) + "\n";
+      JSON.stringify(
+        { monitorApiUrl: "https://monitor-api.nkbkcoop.com" },
+        null,
+        2
+      ) + "\n";
     console.warn(
       "[afterPack] build-includes/monitor-config.json ไม่พบ — ใช้ค่าเริ่มต้น"
     );

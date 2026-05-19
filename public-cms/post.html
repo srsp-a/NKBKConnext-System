@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ข่าว — สหกรณ์หนองคาย</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand"><a href="/">สหกรณ์ออมทรัพย์สาธารณสุขหนองคาย จำกัด</a></div>
+    <nav><a href="/news">← ข่าวทั้งหมด</a></nav>
+  </header>
+  <main class="container">
+    <p class="back"><a href="/news">← กลับรายการข่าว</a></p>
+    <div id="postHero" class="post-hero"></div>
+    <article class="post-article">
+      <p id="postMeta" class="muted"></p>
+      <h1 id="postTitle">กำลังโหลด...</h1>
+      <div id="postBody"></div>
+    </article>
+  </main>
+  <footer class="site-footer"><p>© สหกรณ์ออมทรัพย์สาธารณสุขหนองคาย จำกัด</p></footer>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
+  <script src="/firebase-config.js"></script>
+  <script src="/app.js"></script>
+  <script>initPost();</script>
+</body>
+</html>

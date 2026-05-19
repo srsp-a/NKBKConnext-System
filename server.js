@@ -3782,25 +3782,36 @@ app.get('/api/me-permissions', async (req, res) => {
       const KNOWN_MENUS = ['overview','webapp','leave','system','storage','network','software'];
       const managedIds = (cfg.menus || []).map((m) => m && m.id).filter(Boolean);
       const managedSet = new Set(managedIds);
-      if (role === 'ผู้ดูแลระบบ' || role === 'แอดมิน') {
+      // bypass เฉพาะ "ผู้ดูแลระบบ" (super admin) — แอดมินปกติต้องผ่าน matrix เพื่อเทสและจำกัดสิทธิ์ได้
+      if (role === 'ผู้ดูแลระบบ') {
         const all = Array.from(new Set([...managedIds, ...KNOWN_MENUS]));
         return res.json({ ok: true, role, position, fullname, allowedMenus: all, managedMenus: managedIds, bypass: true });
       }
       const defaultAllow = !!cfg.defaultAllow;
       const rolePerm = (cfg.rolePermissions && cfg.rolePermissions[role]) || {};
       const posPerm = (cfg.positionPermissions && cfg.positionPermissions[position]) || {};
+      const userOverride = (u && u.menuPermissions && typeof u.menuPermissions === 'object') ? u.menuPermissions : {};
       const allowed = [];
       for (const m of cfg.menus) {
         if (!m || !m.id) continue;
+        // ลำดับความสำคัญ: user override > role AND position > defaultAllow
+        if (userOverride[m.id] === true) { allowed.push(m.id); continue; }
+        if (userOverride[m.id] === false) continue;
         const rA = rolePerm[m.id] === true || (rolePerm[m.id] == null && defaultAllow);
         const pA = posPerm[m.id] === true || (posPerm[m.id] == null && defaultAllow);
         if (rA && pA) allowed.push(m.id);
       }
       // ใส่เมนูที่รู้จักแต่ยังไม่อยู่ใน matrix → ถือว่าอนุญาตโดยปริยาย
       for (const mid of KNOWN_MENUS) {
+        if (userOverride[mid] === false) continue; // user override deny
         if (!managedSet.has(mid) && !allowed.includes(mid)) allowed.push(mid);
       }
-      return res.json({ ok: true, role, position, fullname, allowedMenus: allowed, managedMenus: managedIds, bypass: false });
+      return res.json({
+        ok: true, role, position, fullname,
+        allowedMenus: allowed, managedMenus: managedIds,
+        hasUserOverride: Object.keys(userOverride).length > 0,
+        bypass: false
+      });
     }
     return res.json({
       ok: true, role, position: '', fullname,

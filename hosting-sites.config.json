@@ -1,0 +1,83 @@
+{
+  "v2Root": "../Github/V2",
+  "sites": [
+    {
+      "target": "admin",
+      "siteId": "admin-nkbkcoop",
+      "domain": "admin.nkbkcoop.com",
+      "src": "admin",
+      "shared": true
+    },
+    {
+      "target": "portal",
+      "siteId": "portal-nkbkcoop",
+      "domain": "portal.nkbkcoop.com",
+      "portalFromAdmin": true,
+      "shared": true
+    },
+    {
+      "target": "link",
+      "siteId": "link-nkbkcoop",
+      "domain": "link.nkbkcoop.com",
+      "src": "link",
+      "shared": false
+    },
+    {
+      "target": "leave",
+      "siteId": "leave-nkbkcoop",
+      "domain": "leave.nkbkcoop.com",
+      "src": "leave",
+      "shared": true
+    },
+    {
+      "target": "register",
+      "siteId": "register-nkbkcoop",
+      "domain": "register.nkbkcoop.com",
+      "src": "register",
+      "shared": false
+    },
+    {
+      "target": "random",
+      "siteId": "random-nkbkcoop",
+      "domain": "random.nkbkcoop.com",
+      "src": "random",
+      "shared": false
+    },
+    {
+      "target": "queue",
+      "siteId": "queue-nkbkcoop",
+      "domain": "queue.nkbkcoop.com",
+      "src": "queue",
+      "shared": true
+    },
+    {
+      "target": "q",
+      "siteId": "q-nkbkcoop",
+      "domain": "q.nkbkcoop.com",
+      "src": "q",
+      "shared": true
+    },
+    {
+      "target": "qauto",
+      "siteId": "qauto-nkbkcoop",
+      "domain": "qauto.nkbkcoop.com",
+      "src": "qauto",
+      "shared": false
+    },
+    {
+      "target": "payment",
+      "siteId": "payment-nkbkcoop",
+      "domain": "payment.nkbkcoop.com",
+      "src": "payment",
+      "shared": false
+    },
+    {
+      "target": "web",
+      "siteId": "nkbkcoop-web",
+      "domain": "nkbkcoop.com",
+      "src": ".",
+      "srcOnly": ["index.html"],
+      "shared": false
+    }
+  ]
+}

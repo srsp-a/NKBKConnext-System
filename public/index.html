@@ -399,19 +399,19 @@
         <!-- ซอฟต์แวร์ -->
         <section id="panel-software" class="tab-panel" role="tabpanel">
           <div class="grid">
-            <section class="card">
+            <section class="card" data-menu-id="software.office">
               <div class="card-header"><span class="card-icon">📄</span><h2>Microsoft Office</h2></div>
               <div class="card-body" id="officeList"><p class="muted">—</p></div>
             </section>
-            <section class="card">
+            <section class="card" data-menu-id="software.line">
               <div class="card-header"><span class="card-icon">💬</span><h2>LINE</h2></div>
               <div class="card-body" id="lineBody"><p class="muted">—</p></div>
             </section>
-            <section class="card">
+            <section class="card" data-menu-id="software.windowsupdate">
               <div class="card-header"><span class="card-icon">🔄</span><h2>อัปเดต Windows</h2></div>
               <div class="card-body" id="windowsUpdateBody"><p class="muted">—</p></div>
             </section>
-            <section class="card">
+            <section class="card" data-menu-id="software.cleartemp">
               <div class="card-header"><span class="card-icon">🗑️</span><h2>ล้างไฟล์ชั่วคราว (Temp)</h2></div>
               <div class="card-body">
                 <p class="muted" style="margin-bottom: 0.75rem;">ล้างโฟลเดอร์ Temp ของผู้ใช้ปัจจุบัน เพื่อปล่อยพื้นที่ดิสก์</p>
@@ -422,7 +422,7 @@
                 <div class="clear-temp-result" id="clearTempResult" aria-live="polite"></div>
               </div>
             </section>
-            <section class="card" id="batteryCard">
+            <section class="card" id="batteryCard" data-menu-id="software.battery">
               <div class="card-header"><span class="card-icon">🔋</span><h2>แบตเตอรี่</h2></div>
               <div class="card-body" id="batteryBody"><p class="muted">—</p></div>
             </section>
@@ -660,9 +660,12 @@
       function applyMenuPermissionsFromApi(data) {
         if (!data || !data.ok) return;
         var allowed = Array.isArray(data.allowedMenus) ? data.allowedMenus.slice() : null;
+        var managed = Array.isArray(data.managedMenus) ? data.managedMenus.slice() : null;
         if (!allowed) return;
         var allowSet = {};
         for (var i = 0; i < allowed.length; i++) allowSet[allowed[i]] = true;
+        var managedSet = {};
+        if (managed) { for (var mi = 0; mi < managed.length; mi++) managedSet[managed[mi]] = true; }
         var anyVisible = false;
         var firstVisibleBtn = null;
         document.querySelectorAll('.tab-nav-btn').forEach(function(btn) {
@@ -682,6 +685,16 @@
           } else {
             panel.hidden = false;
           }
+        });
+        // Sub-menu: ซ่อน element ที่มี data-menu-id (เฉพาะที่ admin ได้จัดการแล้วและไม่อนุญาต)
+        // เมนูที่ยังไม่อยู่ใน managedMenus = อนุญาตโดยปริยาย → ไม่ซ่อน
+        document.querySelectorAll('[data-menu-id]').forEach(function(el) {
+          var mid = el.getAttribute('data-menu-id');
+          if (!mid) return;
+          var isManaged = managed ? !!managedSet[mid] : true;
+          var show = allowSet[mid] === true || !isManaged;
+          el.hidden = !show;
+          el.style.display = show ? '' : 'none';
         });
         var activeBtn = document.querySelector('.tab-nav-btn.active:not([hidden])');
         if (!activeBtn && firstVisibleBtn) {

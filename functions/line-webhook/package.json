@@ -1,0 +1,15 @@
+{
+  "name": "nkbk-line-webhook",
+  "version": "1.0.0",
+  "description": "LINE Webhook Server for Synology NAS",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "optionalDependencies": {
+    "puppeteer": "^23.0.0"
+  }
+}

@@ -295,10 +295,16 @@ function primeMonitorApiUrlFromPackagedConfig() {
     if (String(process.env.MONITOR_API_URL || '').trim()) return;
     const execDir = process.execPath && path.dirname(process.execPath);
     const candidates = [];
+    candidates.push(path.join(__dirname, 'monitor-config.json'));
     if (execDir) candidates.push(path.join(execDir, 'monitor-config.json'));
     try {
       if (app.isPackaged && process.resourcesPath) {
         candidates.push(path.join(process.resourcesPath, 'monitor-config.json'));
+      }
+    } catch (_) {}
+    try {
+      if (app.getPath) {
+        candidates.push(path.join(app.getPath('userData'), 'monitor-config.json'));
       }
     } catch (_) {}
     for (const p of candidates) {
