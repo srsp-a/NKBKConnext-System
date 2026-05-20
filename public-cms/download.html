@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ดาวน์โหลด — NKBKCOOP</title>
+  <link rel="icon" href="https://res.cloudinary.com/dzs7zbikj/image/upload/w_32,h_32,c_fit,f_png,q_auto/v1770613894/site-config/vd64o0efi0hdpetkzyrf.png" type="image/png" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="cms-header"></div>
+  <div id="cms-page-title"></div>
+  <main id="cms-page-content"></main>
+  <div id="cms-footer"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
+  <script src="/firebase-config.js"></script>
+  <script src="/site-config.js"></script>
+  <script src="/i18n.js"></script>
+  <script src="/icons.js"></script>
+  <script src="/layout.js"></script>
+  <script src="/download-page.js?v=2"></script>
+  <script src="/app.js?v=2"></script>
+  <script>
+    initStaticPage().catch(function (e) {
+      var main = document.getElementById('cms-page-content');
+      if (main) main.innerHTML = '<p class="error text-center">' + (e.message || e) + '</p>';
+    });
+  </script>
+</body>
+</html>

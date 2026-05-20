@@ -21,3 +21,5 @@ functions/node_modules/
 Thumbs.db
 *.asar.unpacked
 create-shortcut.vbs
+# ไฟล์ใหญ่เกิน limit GitHub (100MB) — deploy ผ่าน Firebase Hosting โดยตรง
+public-cms/assets/docs/report-agm-2568.pdf

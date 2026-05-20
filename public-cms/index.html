@@ -3,47 +3,24 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>สหกรณ์ออมทรัพย์สาธารณสุขหนองคาย จำกัด</title>
+  <title>NKBKCOOP</title>
+  <link rel="icon" href="https://res.cloudinary.com/dzs7zbikj/image/upload/w_32,h_32,c_fit,f_png,q_auto/v1770613894/site-config/vd64o0efi0hdpetkzyrf.png" type="image/png" />
   <link rel="stylesheet" href="/styles.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600;700&display=swap" rel="stylesheet" />
 </head>
 <body>
-  <header class="site-header">
-    <div class="brand">
-      <a href="/">สหกรณ์ออมทรัพย์สาธารณสุขหนองคาย จำกัด</a>
-    </div>
-    <nav>
-      <a href="/">หน้าหลัก</a>
-      <a href="/news">ข่าวสาร</a>
-      <a href="https://admin.nkbkcoop.com" target="_blank" rel="noopener">ระบบสมาชิก</a>
-    </nav>
-  </header>
-
-  <main class="container">
-    <section class="hero">
-      <p class="badge">เว็บใหม่บน Firebase (ทดสอบ)</p>
-      <h1 id="siteName">สหกรณ์ออมทรัพย์สาธารณสุขหนองคาย จำกัด</h1>
-      <p class="lead">ข้อมูลข่าวและประกาศดึงจาก WordPress → Firestore · รูปอยู่ Firebase Storage</p>
-      <p class="preview-url">พรีวิว: <strong>admin-panel-nkbkcoop-cbf10.web.app</strong></p>
-    </section>
-
-    <section>
-      <h2>ข่าวล่าสุด</h2>
-      <div id="newsList" class="news-grid">
-        <p class="muted">กำลังโหลด...</p>
-      </div>
-      <p class="center"><a class="btn" href="/news">ดูข่าวทั้งหมด</a></p>
-    </section>
-  </main>
-
-  <footer class="site-footer">
-    <p>© สหกรณ์ออมทรัพย์สาธารณสุขหนองคาย จำกัด · 919 หมู่ 5 ต.โพธิ์ชัย อ.เมืองหนองคาย จ.หนองคาย 43000 · โทร 042-420750</p>
-  </footer>
+  <div id="cms-header"></div>
+  <main id="cms-page-content"></main>
+  <div id="cms-footer"></div>
 
   <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
   <script src="/firebase-config.js"></script>
+  <script src="/site-config.js"></script>
+  <script src="/i18n.js"></script>
+  <script src="/icons.js"></script>
+  <script src="/layout.js"></script>
   <script src="/app.js"></script>
+  <script src="/home-page.js"></script>
   <script>initHome();</script>
 </body>
 </html>

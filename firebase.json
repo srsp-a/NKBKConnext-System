@@ -49,9 +49,22 @@
         {
           "source": "/n/**",
           "destination": "/post.html"
+        },
+        {
+          "source": "/download",
+          "destination": "/download.html"
+        },
+        {
+          "source": "/page/**",
+          "destination": "/page.html"
         }
       ],
       "redirects": [
+        {
+          "source": "/page/7934",
+          "destination": "/download",
+          "type": 301
+        },
         {
           "source": "/news.html",
           "destination": "/news",

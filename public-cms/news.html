@@ -3,28 +3,28 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ข่าวสาร — สหกรณ์หนองคาย</title>
+  <title>NKBKCOOP</title>
+  <link rel="icon" href="https://res.cloudinary.com/dzs7zbikj/image/upload/w_32,h_32,c_fit,f_png,q_auto/v1770613894/site-config/vd64o0efi0hdpetkzyrf.png" type="image/png" />
   <link rel="stylesheet" href="/styles.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600;700&display=swap" rel="stylesheet" />
 </head>
 <body>
-  <header class="site-header">
-    <div class="brand"><a href="/">สหกรณ์ออมทรัพย์สาธารณสุขหนองคาย จำกัด</a></div>
-    <nav>
-      <a href="/">หน้าหลัก</a>
-      <a href="/news">ข่าวสาร</a>
-    </nav>
-  </header>
-  <main class="container">
-    <h1>ข่าวสารและประกาศ</h1>
-    <div id="newsList" class="news-grid"><p class="muted">กำลังโหลด...</p></div>
-  </main>
-  <footer class="site-footer">
-    <p>© สหกรณ์ออมทรัพย์สาธารณสุขหนองคาย จำกัด</p>
-  </footer>
+  <div id="cms-header"></div>
+  <div id="cms-page-title"></div>
+  <div class="kb-page-body">
+    <div class="kb-container kb-layout">
+      <div id="newsList"></div>
+      <div id="newsSidebar"></div>
+    </div>
+  </div>
+  <div id="cms-footer"></div>
+
   <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
   <script src="/firebase-config.js"></script>
+  <script src="/site-config.js"></script>
+  <script src="/i18n.js"></script>
+  <script src="/icons.js"></script>
+  <script src="/layout.js"></script>
   <script src="/app.js"></script>
   <script>initNewsList();</script>
 </body>

@@ -39,6 +39,10 @@ const db = admin.firestore();
 const bucket = admin.storage().bucket();
 const mediaCache = new Map();
 
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 function fetchJson(url) {
   return new Promise((resolve, reject) => {
     const lib = url.startsWith('https') ? https : http;
@@ -53,6 +57,9 @@ function fetchJson(url) {
         if (res.statusCode !== 200) {
           return reject(new Error(`HTTP ${res.statusCode} ${url}: ${body.slice(0, 200)}`));
         }
+        if (body.trimStart().startsWith('<')) {
+          return reject(new Error(`Non-JSON (HTML) from ${url}`));
+        }
         try {
           resolve(JSON.parse(body));
         } catch (e) {
@@ -61,6 +68,19 @@ function fetchJson(url) {
       });
     }).on('error', reject);
   });
+}
+
+async function fetchJsonRetry(url, tries = 4) {
+  let last;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await fetchJson(url);
+    } catch (e) {
+      last = e;
+      if (i < tries - 1) await sleep(1500 * (i + 1));
+    }
+  }
+  throw last;
 }
 
 function downloadBuffer(url) {
@@ -176,6 +196,36 @@ function stripHtml(html) {
 }
 
 async function fetchAllWp(type) {
+  if (type === 'pages') {
+    const ids = [];
+    let page = 1;
+    const perPage = 10;
+    while (true) {
+      const url = `${WP_BASE}/wp-json/wp/v2/pages?per_page=${perPage}&page=${page}&status=publish&_fields=id`;
+      const batch = await fetchJsonRetry(url);
+      if (!Array.isArray(batch) || batch.length === 0) break;
+      ids.push(...batch.map((p) => p.id));
+      console.log(`[WP pages] list ${page} (+${batch.length})`);
+      if (batch.length < perPage) break;
+      page += 1;
+      await sleep(400);
+    }
+    console.log(`[WP pages] fetching ${ids.length} pages by id...`);
+    const items = [];
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      try {
+        const item = await fetchJsonRetry(`${WP_BASE}/wp-json/wp/v2/pages/${id}`);
+        items.push(item);
+      } catch (e) {
+        console.warn(`[WP pages] skip id ${id}:`, e.message);
+      }
+      if ((i + 1) % 5 === 0) console.log(`[WP pages] detail ${i + 1}/${ids.length}`);
+      await sleep(350);
+    }
+    return Number.isFinite(LIMIT) ? items.slice(0, LIMIT) : items;
+  }
+
   const items = [];
   let page = 1;
   const perPage = 100;
@@ -184,7 +234,7 @@ async function fetchAllWp(type) {
   while (true) {
     if (Number.isFinite(LIMIT) && items.length >= LIMIT) break;
     const url = `${WP_BASE}/wp-json/wp/v2/${type}?per_page=${perPage}&page=${page}&status=publish`;
-    const batch = await fetchJson(url);
+    const batch = await fetchJsonRetry(url);
     if (!Array.isArray(batch) || batch.length === 0) break;
     items.push(...batch);
     if (totalPages == null && page === 1) {
@@ -227,6 +277,8 @@ async function saveItem(collection, item, kind) {
     }
   }
 
+  const categoryIds = Array.isArray(item.categories) ? item.categories.map(Number) : [];
+
   const doc = {
     wpId: item.id,
     kind,
@@ -237,6 +289,7 @@ async function saveItem(collection, item, kind) {
     featuredImageUrl,
     link: item.link || '',
     status: item.status || 'publish',
+    categoryIds,
     publishedAt: item.date_gmt ? admin.firestore.Timestamp.fromDate(new Date(item.date_gmt + 'Z')) : null,
     modifiedAt: item.modified_gmt ? admin.firestore.Timestamp.fromDate(new Date(item.modified_gmt + 'Z')) : null,
     migratedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -281,11 +334,13 @@ async function main() {
 
   if (!postsOnly) {
     console.log('\n--- Pages ---');
-    try {
-      const pages = await fetchAllWp('pages');
-      for (const p of pages) await saveItem('cms_pages', p, 'page');
-    } catch (e) {
-      console.warn('[pages skip]', e.message);
+    const pages = await fetchAllWp('pages');
+    for (const p of pages) {
+      try {
+        await saveItem('cms_pages', p, 'page');
+      } catch (e) {
+        console.warn('[page save skip]', p.id, e.message);
+      }
     }
   }
 
