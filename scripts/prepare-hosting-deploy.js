@@ -42,6 +42,11 @@ function copyShared(destDir) {
 }
 
 for (const site of config.sites) {
+  if (site.itSrc) {
+    console.log('[prepare-hosting-deploy]', site.target, 'skip (IT repo:', site.itSrc + ')');
+    continue;
+  }
+
   const dest = path.join(outRoot, site.target);
   fs.rmSync(dest, { recursive: true, force: true });
 

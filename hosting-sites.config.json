@@ -83,7 +83,7 @@
       "target": "ai",
       "siteId": "ai-nkbkcoop",
       "domain": "ai.nkbkcoop.com",
-      "src": "ai-web",
+      "itSrc": "ai-web",
       "shared": false
     }
   ]

@@ -13,7 +13,7 @@ const kept = firebase.hosting.filter((h) => apiTargets.has(h.target));
 
 const staticHosting = config.sites.map((site) => ({
   target: site.target,
-  public: `hosting-dist/${site.target}`,
+  public: site.itSrc || `hosting-dist/${site.target}`,
   ...block
 }));
 
