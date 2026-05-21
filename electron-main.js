@@ -9,7 +9,7 @@ const { Readable } = require('stream');
 let serverListenPort = 3333;
 let autoUpdater = null;
 let pendingManualUpdateCheck = false;
-/** แจ้งหน้า login เมื่อมีอัปเดต (จาก GitHub Releases) */
+/** แจ้งหน้า login เมื่อมีอัปเดต (ชุดไฟล์บน Firebase Hosting / URL generic — desktop-update-manifest.json) */
 let pendingUpdateInfo = null;
 const APP_DIR = __dirname;
 let mainWindow = null;
@@ -26,7 +26,8 @@ let updateAvailableDebounceTimer = null;
 let tray = null;
 let serverProcess = null;
 
-const RELEASES_URL = 'https://github.com/srsp-a/NKBKConnext-System/releases';
+/** เมื่อโหลด /api/config ไม่ได้ — โฟลเดอร์ค่าเริ่มต้นบน Firebase Hosting (โปรเจกต์หลัก) */
+const FALLBACK_DESKTOP_UPDATE_FEED_URL = 'https://admin-panel-nkbkcoop-cbf10.web.app/desktop-app-updates/';
 
 if (process.platform === 'win32') {
   try {
@@ -52,17 +53,6 @@ function getWindowsShortcutIconLocation() {
   return null;
 }
 
-function getGithubRepoSlug() {
-  try {
-    const pkg = require(path.join(APP_DIR, 'package.json'));
-    const u = (pkg.repository && pkg.repository.url) || '';
-    const m = String(u).match(/github\.com[:/]([^/]+\/[^/.\s]+)/i);
-    return m ? m[1].replace(/\.git$/i, '') : 'srsp-a/NKBKConnext-System';
-  } catch (_) {
-    return 'srsp-a/NKBKConnext-System';
-  }
-}
-
 function semverNorm(v) {
   return String(v || '0').replace(/^v/i, '').trim();
 }
@@ -80,51 +70,79 @@ function semverCompare(latest, current) {
   return 0;
 }
 
-async function fetchGithubLatestReleaseMeta() {
-  const slug = getGithubRepoSlug();
-  const url = `https://api.github.com/repos/${slug}/releases/latest`;
+async function resolveDesktopUpdateFeedUrlFromLocalServer() {
+  try {
+    const r = await fetch(`http://127.0.0.1:${serverListenPort}/api/config`, {
+      headers: { Accept: 'application/json', 'Cache-Control': 'no-store' }
+    });
+    const j = await r.json().catch(() => ({}));
+    const u = j && j.desktopUpdateFeedUrl ? String(j.desktopUpdateFeedUrl).trim() : '';
+    if (u) {
+      return u.endsWith('/') ? u : `${u}/`;
+    }
+  } catch (_) {}
+  const fb = FALLBACK_DESKTOP_UPDATE_FEED_URL.trim();
+  return fb.endsWith('/') ? fb : `${fb}/`;
+}
+
+async function fetchDesktopPortableManifestMeta() {
+  const feedUrl = await resolveDesktopUpdateFeedUrlFromLocalServer();
+  const url = `${feedUrl}desktop-update-manifest.json`;
   const r = await fetch(url, {
     headers: {
-      Accept: 'application/vnd.github+json',
+      Accept: 'application/json',
+      'Cache-Control': 'no-store',
       'User-Agent': 'NKBKConnext-System-Portable-UpdateCheck'
-    }
+    },
+    redirect: 'follow'
   });
   if (r.status === 404) {
-    return { error: 'ยังไม่มี Release บน GitHub' };
+    return {
+      error:
+        'ยังไม่มีไฟล์ desktop-update-manifest.json — อัปโหลดขึ้น Firebase Hosting (โฟลเดอร์เดียวกับ latest.yml)',
+      feedUrl
+    };
   }
   if (!r.ok) {
     const t = await r.text().catch(() => '');
-    return { error: 'GitHub: ' + r.status + (t ? ' ' + t.slice(0, 100) : '') };
+    return { error: `เซิร์ฟเวอร์อัปเดต: HTTP ${r.status}${t ? ` ${t.slice(0, 100)}` : ''}`, feedUrl };
   }
-  const rel = await r.json();
-  const tag = semverNorm(rel.tag_name || rel.name || '0');
-  const assets = Array.isArray(rel.assets) ? rel.assets : [];
-  let asset = assets.find((a) => /\.exe$/i.test(a.name || '') && /portable/i.test(String(a.name || '')));
-  if (!asset) asset = assets.find((a) => /\.exe$/i.test(a.name || ''));
+  let rel;
+  try {
+    rel = await r.json();
+  } catch (_) {
+    return { error: 'ไฟล์ manifest ไม่ใช่ JSON ที่ถูกต้อง', feedUrl };
+  }
+  const latestVersion = semverNorm(rel.latestVersion || rel.version || '0');
+  const downloadUrl = String(rel.portableUrl || rel.downloadUrl || '').trim();
+  const fileName =
+    String(rel.portableFileName || rel.fileName || '').trim() ||
+    `NKBKConnext System ${latestVersion} Portable.exe`;
   return {
-    tag,
-    downloadUrl: (asset && asset.browser_download_url) || '',
-    fileName: (asset && asset.name) || ''
+    feedUrl,
+    latestVersion,
+    downloadUrl,
+    fileName
   };
 }
 
-async function checkGithubReleaseImpl() {
+async function checkDesktopPortableReleaseImpl() {
   const currentVersion = app.getVersion();
   try {
-    const data = await fetchGithubLatestReleaseMeta();
+    const data = await fetchDesktopPortableManifestMeta();
     if (data.error) {
-      return { hasUpdate: false, currentVersion, error: data.error };
+      return { hasUpdate: false, currentVersion, error: data.error, feedUrl: data.feedUrl };
     }
-    const latestVersion = data.tag;
+    const latestVersion = data.latestVersion;
     const cmp = semverCompare(latestVersion, currentVersion);
     const hasUpdate = cmp > 0;
-    const defaultName = `NKBKConnext System ${latestVersion} Portable.exe`;
     return {
       hasUpdate,
       currentVersion,
       latestVersion,
       downloadUrl: data.downloadUrl,
-      fileName: data.fileName || defaultName
+      fileName: data.fileName,
+      feedUrl: data.feedUrl
     };
   } catch (e) {
     return {
@@ -135,8 +153,13 @@ async function checkGithubReleaseImpl() {
   }
 }
 
-async function downloadGithubReleaseImpl(downloadUrl, fileName) {
-  if (!downloadUrl) return { ok: false, error: 'ไม่มีลิงก์ดาวน์โหลด (แนบไฟล์ *Portable*.exe ใน Release)' };
+async function downloadPortableReleaseImpl(downloadUrl, fileName) {
+  if (!downloadUrl) {
+    return {
+      ok: false,
+      error: 'ไม่มีลิงก์ Portable ใน desktop-update-manifest.json (ฟิลด์ portableUrl)'
+    };
+  }
   const safeName = String(fileName || 'update.exe').replace(/[\\/:*?"<>|]/g, '_');
   const dest = path.join(app.getPath('downloads'), safeName);
   const res = await fetch(downloadUrl, {
@@ -418,9 +441,21 @@ function createWindow() {
     title: 'NKBKConnext System - ระบบตรวจสอบและจัดการข้อมูลสหกรณ์'
   });
 
-  ipcMain.on('window-minimize', () => { if (mainWindow) mainWindow.minimize(); });
-  ipcMain.on('window-close', () => {
-    if (mainWindow) mainWindow.hide();
+  ipcMain.on('window-minimize', (e) => {
+    const w = BrowserWindow.fromWebContents(e.sender);
+    if (w) w.minimize();
+  });
+  ipcMain.on('window-maximize', (e) => {
+    const w = BrowserWindow.fromWebContents(e.sender);
+    if (!w) return;
+    if (w.isMaximized()) w.unmaximize();
+    else w.maximize();
+  });
+  ipcMain.on('window-close', (e) => {
+    const w = BrowserWindow.fromWebContents(e.sender);
+    if (!w) return;
+    if (w === mainWindow) w.hide();
+    else w.close();
   });
 
   // อนุญาตให้ window.open() จาก renderer สร้างหน้าต่างใหม่ (เช่น "ใบลา" print popup)
@@ -542,6 +577,29 @@ function createWindow() {
       win.webContents.executeJavaScript(injectScript).catch(function(){});
     });
     win.on('closed', () => {});
+  });
+
+  ipcMain.handle('open-nkbk-ai-chat', async (_event, token) => {
+    const tok = typeof token === 'string' ? token.trim() : '';
+    const q = tok ? '?t=' + encodeURIComponent(tok) : '';
+    const win = new BrowserWindow({
+      width: 980,
+      height: 760,
+      minWidth: 720,
+      minHeight: 520,
+      resizable: true,
+      maximizable: true,
+      frame: false,
+      icon: path.join(APP_DIR, 'assets', 'icon.png'),
+      title: 'ChatGPT โมเน่ — NKBKConnext System',
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: path.join(APP_DIR, 'preload.js')
+      }
+    });
+    win.loadURL(`http://127.0.0.1:${serverListenPort}/nkbk-ai.html${q}`);
+    return { ok: true };
   });
 
   mainWindow.loadURL(`http://127.0.0.1:${serverListenPort}/`);
@@ -699,7 +757,7 @@ function runQuitAndInstall() {
   }
 }
 
-/** ป๊อปอัปแบบกำหนดเอง — พบเวอร์ชันใหม่จาก GitHub (electron-updater) */
+/** ป๊อปอัปแบบกำหนดเอง — พบเวอร์ชันใหม่จาก electron-updater (feed generic / Firebase Hosting) */
 function showNsisUpdateAvailableWindow(newVersion) {
   if (!autoUpdater) return;
   if (appUpdateFlowState.phase === 'downloading' || appUpdateFlowState.phase === 'ready') return;
@@ -919,17 +977,20 @@ function createTray() {
 function checkForUpdatesManual() {
   if (isPortableBuild()) {
     (async () => {
-      const u = await checkGithubReleaseImpl();
+      const u = await checkDesktopPortableReleaseImpl();
+      const feedPage = u.feedUrl || (await resolveDesktopUpdateFeedUrlFromLocalServer());
       if (u.error) {
-        dialog.showMessageBox({
-          type: 'warning',
-          title: 'NKBKConnext System',
-          message: u.error,
-          buttons: ['เปิดหน้า Releases', 'ตกลง'],
-          defaultId: 1
-        }).then(({ response }) => {
-          if (response === 0) shell.openExternal(RELEASES_URL);
-        });
+        dialog
+          .showMessageBox({
+            type: 'warning',
+            title: 'NKBKConnext System',
+            message: u.error,
+            buttons: ['เปิดหน้ารายการอัปเดต', 'ตกลง'],
+            defaultId: 1
+          })
+          .then(({ response }) => {
+            if (response === 0 && feedPage) shell.openExternal(feedPage);
+          });
         return;
       }
       if (!u.hasUpdate) {
@@ -950,12 +1011,12 @@ function checkForUpdatesManual() {
           ' (ปัจจุบัน ' +
           u.currentVersion +
           ')\n\nดาวน์โหลดไฟล์ Portable ไปที่โฟลเดอร์ดาวน์โหลด แล้วปิดแอปและรันไฟล์ใหม่แทนที่เดิม',
-        buttons: ['ดาวน์โหลด', 'เปิด GitHub', 'ปิด'],
+        buttons: ['ดาวน์โหลด', 'เปิดหน้ารายการอัปเดต', 'ปิด'],
         defaultId: 0,
         cancelId: 2
       });
       if (response === 0 && u.downloadUrl) {
-        const r = await downloadGithubReleaseImpl(u.downloadUrl, u.fileName);
+        const r = await downloadPortableReleaseImpl(u.downloadUrl, u.fileName);
         if (r.ok) {
           dialog.showMessageBox({
             title: 'NKBKConnext System',
@@ -968,8 +1029,8 @@ function checkForUpdatesManual() {
             message: r.error || 'ดาวน์โหลดไม่สำเร็จ'
           });
         }
-      } else if (response === 1) {
-        shell.openExternal(RELEASES_URL);
+      } else if (response === 1 && feedPage) {
+        shell.openExternal(feedPage);
       }
     })();
     return;
@@ -1062,7 +1123,7 @@ function focusMainWindowForUpdate() {
   } catch (_) {}
 }
 
-function setupAutoUpdater() {
+async function setupAutoUpdater() {
   if (!app.isPackaged) return;
   if (isPortableBuild()) {
     return;
@@ -1070,6 +1131,14 @@ function setupAutoUpdater() {
   try {
     autoUpdater = require('electron-updater').autoUpdater;
     autoUpdater.autoDownload = false;
+    try {
+      const feedUrl = await resolveDesktopUpdateFeedUrlFromLocalServer();
+      if (feedUrl) {
+        autoUpdater.setFeedURL({ provider: 'generic', url: feedUrl });
+      }
+    } catch (e) {
+      console.warn('[autoUpdater] setFeedURL', e.message);
+    }
     autoUpdater.on('update-available', (info) => {
       const ver = (info && info.version) || '';
       pendingManualUpdateCheck = false;
@@ -1339,17 +1408,16 @@ ipcMain.handle('open-line-oauth-window', async (_e, url) => {
   }
 });
 
-ipcMain.handle('github-check-update', async () => checkGithubReleaseImpl());
-ipcMain.handle('github-download-update', async (_e, opts) => {
+ipcMain.handle('desktop-check-update', async () => checkDesktopPortableReleaseImpl());
+ipcMain.handle('desktop-download-update', async (_e, opts) => {
   const url = opts && opts.url;
   const fileName = opts && opts.fileName;
   try {
-    return await downloadGithubReleaseImpl(url, fileName);
+    return await downloadPortableReleaseImpl(url, fileName);
   } catch (e) {
     return { ok: false, error: (e && e.message) || String(e) };
   }
 });
-
 ipcMain.handle('app-get-pending-update', () => pendingUpdateInfo);
 ipcMain.handle('app-download-update', async () => {
   if (!autoUpdater) return { ok: false, error: 'no-updater' };
@@ -1441,7 +1509,7 @@ if (!gotTheLock) {
       }
     }
   } catch (_) {}
-  setupAutoUpdater();
+  await setupAutoUpdater();
   createWindow();
 });
 

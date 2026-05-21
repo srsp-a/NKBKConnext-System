@@ -29,6 +29,17 @@ function parseFileUpdatedAt(title, description) {
   return '';
 }
 
+function stripUpdateFromTitle(title) {
+  return String(title || '')
+    .replace(/\s*\((?:อัพเดต|อัปเดต|แนบไฟล์|อัปโหลด)[^)]*\)/gi, '')
+    .replace(
+      /\s*(?:อัพเดต|อัปเดต|แนบไฟล์)\s+\d{1,2}\s+[^\s]+\s+\d{4}\s*/gi,
+      ''
+    )
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function isUsableDownloadUrl(url) {
   return !!(url && url !== '#' && !/^javascript:/i.test(url));
 }
@@ -50,20 +61,20 @@ function parseDownloadSections(html) {
       .map((m) => {
         const block = m[1];
         const titleM = block.match(/<h3>([\s\S]*?)<\/h3>/i);
-        const title = stripDownloadHtml(titleM ? titleM[1] : '');
+        const rawTitle = stripDownloadHtml(titleM ? titleM[1] : '');
         const descM = block.match(/<p>([\s\S]*?)<\/p>/i);
         const description = stripDownloadHtml(descM ? descM[1] : '');
         const pdfM =
           block.match(/iframe src="([^"]+\.pdf[^"]*)"/i) ||
           block.match(/href="([^"]+\.pdf[^"]*)"/i);
         const fileUrl = pdfM ? pdfM[1].trim() : '';
-        const id = slugDownloadId(title);
+        const updatedAt = parseFileUpdatedAt(rawTitle, description);
         return {
-          id,
-          title,
+          id: slugDownloadId(rawTitle),
+          title: stripUpdateFromTitle(rawTitle),
           description,
           fileUrl,
-          updatedAt: parseFileUpdatedAt(title, description)
+          updatedAt
         };
       })
       .filter((it) => it.title);
@@ -114,34 +125,47 @@ function renderDownloadBtn(item) {
   return `<a href="${href}" class="kb-download-btn" data-download-id="${escapeDownloadHtml(item.id)}" target="_blank" rel="noopener noreferrer" download>${inner}</a>`;
 }
 
-function renderDownloadTable(sections) {
+function renderDownloadCountInline(count) {
+  const icon = window.KbIcon ? KbIcon.wrap('download', '', 11) : '';
+  return `<span class="kb-download-count-inline">${icon} <span data-count-num>${formatDownloadCount(count)}</span></span>`;
+}
+
+function renderDownloadActionCell(item, count) {
+  const dlCount = count != null ? count : 0;
+  const datePart = item.updatedAt
+    ? `<span class="kb-download-meta-date">${escapeDownloadHtml(item.updatedAt)}</span> `
+    : '';
+  const meta = `<div class="kb-download-meta" data-count-cell>${datePart}${renderDownloadCountInline(dlCount)}</div>`;
+  return `<div class="kb-download-action">${renderDownloadBtn(item)}${meta}</div>`;
+}
+
+function formatDownloadCount(n) {
+  const num = Number(n) || 0;
+  const lang = window.CmsI18n?.getLang() || 'th';
+  return num.toLocaleString(lang === 'en' ? 'en-US' : 'th-TH');
+}
+
+function renderDownloadTable(sections, countMap) {
+  const counts = countMap || {};
   const colDoc = window.CmsI18n ? CmsI18n.t('download.colDoc') : 'เอกสาร';
-  const colUpdated = window.CmsI18n ? CmsI18n.t('download.colUpdated') : 'อัปเดตไฟล์';
   const colAction = window.CmsI18n ? CmsI18n.t('download.colAction') : 'ดาวน์โหลด';
-  const colCount = window.CmsI18n ? CmsI18n.t('download.colCount') : 'จำนวนดาวน์โหลด';
-  const noFile = window.CmsI18n ? CmsI18n.t('download.noFile') : 'ยังไม่มีไฟล์';
-  const noDate = window.CmsI18n ? CmsI18n.t('download.noDate') : '—';
 
   const blocks = (sections || [])
     .map((sec) => {
       const rows = sec.items
         .map((it) => {
-          const updated = it.updatedAt
-            ? escapeDownloadHtml(it.updatedAt)
-            : `<span class="kb-download-muted">${noDate}</span>`;
           const note =
             !isUsableDownloadUrl(it.fileUrl) && it.description
               ? `<div class="kb-download-desc">${escapeDownloadHtml(it.description)}</div>`
               : '';
+          const dlCount = counts[it.id] != null ? counts[it.id] : 0;
           return `
 <tr data-download-id="${escapeDownloadHtml(it.id)}">
   <td class="kb-download-col-doc">
     <div class="kb-download-title">${escapeDownloadHtml(it.title)}</div>
     ${note}
   </td>
-  <td class="kb-download-col-date">${updated}</td>
-  <td class="kb-download-col-btn">${renderDownloadBtn(it)}</td>
-  <td class="kb-download-col-count"><span class="kb-download-count" data-count-for="${escapeDownloadHtml(it.id)}">0</span></td>
+  <td class="kb-download-col-btn">${renderDownloadActionCell(it, dlCount)}</td>
 </tr>`;
         })
         .join('');
@@ -154,9 +178,7 @@ function renderDownloadTable(sections) {
       <thead>
         <tr>
           <th scope="col">${colDoc}</th>
-          <th scope="col">${colUpdated}</th>
           <th scope="col">${colAction}</th>
-          <th scope="col">${colCount}</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -175,48 +197,11 @@ function renderDownloadTable(sections) {
 </div>`;
 }
 
-async function loadDownloadCounts(root) {
-  const ids = [
-    ...new Set(
-      [...(root?.querySelectorAll('[data-download-id]') || [])].map((el) =>
-        el.getAttribute('data-download-id')
-      )
-    )
-  ].filter(Boolean);
-  if (!ids.length || !window.db) return;
-
-  const counts = {};
-  await Promise.all(
-    ids.map(async (id) => {
-      try {
-        const snap = await db.collection('cms_download_counts').doc(id).get();
-        counts[id] = snap.exists ? snap.data().count || 0 : 0;
-      } catch {
-        counts[id] = 0;
-      }
-    })
-  );
-
-  root.querySelectorAll('.kb-download-count').forEach((el) => {
-    const id = el.getAttribute('data-count-for');
-    if (id && counts[id] != null) {
-      el.textContent = Number(counts[id]).toLocaleString('th-TH');
-    }
-  });
-}
-
 async function trackDownload(id) {
-  if (!id || !window.db) return null;
-  const ref = db.collection('cms_download_counts').doc(id);
+  if (!id || !window.CmsCounters) return null;
   try {
-    await ref.set(
-      { count: firebase.firestore.FieldValue.increment(1) },
-      { merge: true }
-    );
-    const snap = await ref.get();
-    return snap.exists ? snap.data().count || 0 : 1;
+    return await CmsCounters.bump('cms_download_counts', id);
   } catch (e) {
-    console.warn('download count', id, e.message);
     return null;
   }
 }
@@ -229,12 +214,11 @@ function bindDownloadButtons(root) {
       if (!id || btn.classList.contains('is-loading')) return;
       btn.classList.add('is-loading');
       btn.setAttribute('aria-busy', 'true');
-      const newCount = await trackDownload(id);
-      const countEl = root.querySelector(
-        `.kb-download-count[data-count-for="${CSS.escape(id)}"]`
-      );
-      if (countEl && newCount != null) {
-        countEl.textContent = Number(newCount).toLocaleString('th-TH');
+      const next = await trackDownload(id);
+      if (next != null) {
+        const row = btn.closest('tr');
+        const numEl = row && row.querySelector('[data-count-num]');
+        if (numEl) numEl.textContent = formatDownloadCount(next);
       }
       window.setTimeout(() => {
         btn.classList.remove('is-loading');
@@ -248,6 +232,5 @@ window.CmsDownloadPage = {
   PAGE_ID: CMS_DOWNLOAD_PAGE_ID,
   parseDownloadSections,
   renderDownloadTable,
-  loadDownloadCounts,
   bindDownloadButtons
 };

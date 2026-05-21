@@ -50,14 +50,23 @@ service cloud.firestore {
     }
     
     match /config/{docId} {
-      allow read: if docId == 'line_settings' || docId == 'leave_settings' || docId == 'org' || docId == 'line_attendance_notify' || docId == 'attendance_auto_fetch' || docId == 'ai_chat' || docId == 'menu_permissions' || isAdmin();
+      allow read: if docId == 'line_settings' || docId == 'leave_settings' || docId == 'org' || docId == 'line_attendance_notify' || docId == 'attendance_auto_fetch' || docId == 'ai_chat' || docId == 'desktop_ai' || docId == 'menu_permissions' || isAdmin();
       // menu_permissions เขียนได้เฉพาะ 'ผู้ดูแลระบบ' เท่านั้น (ไม่ให้แอดมินยกสิทธิ์ตัวเอง)
       allow write: if (docId == 'menu_permissions' ? isSuperOnlyAdmin() : isAdmin());
     }
     match /ai_memory/{docId} {
       allow read, write: if true;
     }
+    match /ai_desktop_memory/{docId} {
+      allow read, write: if isAdmin();
+    }
     match /ai_chat_state/{docId} {
+      allow read, write: if true;
+    }
+    match /ai_chat_context/{docId} {
+      allow read, write: if true;
+    }
+    match /ai_chat_pending_image/{docId} {
       allow read, write: if true;
     }
     
@@ -258,9 +267,69 @@ service cloud.firestore {
     match /cms_download_counts/{itemId} {
       allow read: if true;
       allow create: if request.resource.data.keys().hasOnly(['count'])
+        && request.resource.data.count is int
         && request.resource.data.count == 1;
       allow update: if request.resource.data.keys().hasOnly(['count'])
-        && request.resource.data.count == resource.data.count + 1;
+        && request.resource.data.count is int
+        && request.resource.data.count == resource.data.get('count', 0) + 1;
+    }
+    // จำนวนเข้าชมข่าว (หน้า CMS นับเมื่อเปิดอ่าน — อ่านได้ทั่วไป, เพิ่ม count เท่านั้น)
+    match /cms_post_views/{postId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasOnly(['count'])
+        && request.resource.data.count is int
+        && request.resource.data.count == 1;
+      allow update: if request.resource.data.keys().hasOnly(['count'])
+        && request.resource.data.count is int
+        && request.resource.data.count == resource.data.get('count', 0) + 1;
+    }
+    // แบบฟอร์มติดต่อหน้า CMS (สาธารณะส่งได้, อ่านเฉพาะแอดมิน)
+    match /cms_contact_inquiries/{docId} {
+      allow read: if isAdmin();
+      allow create: if request.resource.data.keys().hasAll(['name', 'email', 'topic', 'message', 'createdAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 120
+        && request.resource.data.email is string
+        && request.resource.data.email.matches('.*@.*[.].*')
+        && request.resource.data.email.size() <= 120
+        && request.resource.data.topic is string
+        && request.resource.data.topic.size() > 0
+        && request.resource.data.topic.size() <= 32
+        && request.resource.data.message is string
+        && request.resource.data.message.size() > 0
+        && request.resource.data.message.size() <= 5000
+        && (!('phone' in request.resource.data)
+          || (request.resource.data.phone is string && request.resource.data.phone.size() <= 30))
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if isAdmin();
+    }
+    // แจ้งโอนเงินจากหน้า CMS
+    match /cms_payment_notifications/{docId} {
+      allow read: if isAdmin();
+      allow create: if request.resource.data.keys().hasAll([
+          'name', 'phone', 'amount', 'transferType', 'bankAccount',
+          'transferDate', 'transferTime', 'createdAt'
+        ])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 120
+        && request.resource.data.phone is string
+        && request.resource.data.phone.size() > 0
+        && request.resource.data.phone.size() <= 30
+        && request.resource.data.amount is number
+        && request.resource.data.amount > 0
+        && request.resource.data.transferType is string
+        && request.resource.data.transferType.size() > 0
+        && request.resource.data.bankAccount is string
+        && request.resource.data.transferDate is string
+        && request.resource.data.transferTime is string
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if isAdmin();
+    }
+    match /departments/{deptId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
     
     // ========================================

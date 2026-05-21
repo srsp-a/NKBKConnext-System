@@ -1,11 +1,14 @@
-# ตัวติดตั้ง + อัปเดต (GitHub)
+# ตัวติดตั้ง + อัปเดต (Firebase Hosting — generic feed)
+
+คู่มือปล่อยเวอร์ชันและโครงสร้างไฟล์: **`docs/FIREBASE_DESKTOP_UPDATES.md`**
 
 ## แนวทางที่แนะนำ
 
-1. **แจกแค่ไฟล์ติดตั้ง** ใน `dist/` ชื่อแบบ `NKBKConnext System Setup x.x.x.exe`  
+1. **แจกไฟล์ติดตั้ง** ใน `dist/` ชื่อแบบ `NKBKConnext System Setup x.x.x.exe`  
 2. ผู้ใช้ **ติดตั้งครั้งเดียว** ลง Program Files (หรือโฟลเดอร์ที่เลือก)  
-3. **อัปเดต** ผ่าน **GitHub Releases** — โปรแกรมใช้ `electron-updater` ตรวจจาก repo ใน `package.json`  
-4. **monitor-config / API login** ตั้งที่เซิร์ฟเวอร์ (line-webhook) แล้ว — ไม่ต้องพึ่งไฟล์ config ฝั่งเครื่องลูกข่ายมากนักเมื่อใช้ remote login
+3. **อัปเดต** ผ่าน **HTTPS generic URL** — `electron-updater` อ่าน `latest.yml` จากโฟลเดอร์ที่โฮสต์บน Firebase (ค่าเริ่มต้นใน `package.json` → `build.publish.url`)  
+4. **Portable** ใช้ **`desktop-update-manifest.json`** ในโฟลเดอร์เดียวกัน  
+5. **monitor-config / API login** ตั้งที่เซิร์ฟเวอร์แล้ว — ไม่ต้องพึ่งไฟล์ config ฝั่งเครื่องลูกข่ายมากนักเมื่อใช้ remote login
 
 ## Build
 
@@ -16,12 +19,14 @@
 
 ## อัปเดตฝั่งผู้ใช้
 
-- หลังเปิดแอป ~5 วินาที จะเช็ก GitHub อัตโนมัติ  
-- **หน้า login**: ถ้ามีเวอร์ชันใหม่ จะมีแถบแจ้ง — กดดาวน์โหลดหรือข้ามไปก่อน  
-- **เมนูถาด**: ตรวจสอบอัปเดต (เหมือนเดิม)
+- หลังเปิดแอป ~5 วินาที จะเช็ก feed generic อัตโนมัติ  
+- **หน้า login**: ถ้ามีเวอร์ชันใหม่ (Portable จาก manifest / NSIS จาก updater) จะมีแถบแจ้ง  
+- **เมนูถาด**: ตรวจสอบอัปเดต — Portable โหลดจาก manifest / NSIS ผ่าน electron-updater  
 
 ## ปล่อยเวอร์ชันใหม่
 
 1. เพิ่ม `version` ใน `package.json`  
-2. สร้าง tag บน GitHub แล้วอัปโหลดไฟล์ Setup ไปที่ Release  
-3. หรือใช้ `npm run release` (publish always) ถ้าตั้ง token แล้ว
+2. `npm run build:installer`  
+3. คัดลอกไฟล์จาก `dist/` ขึ้น **`public-cms/desktop-app-updates/`** — แก้ **`desktop-update-manifest.json`** — `firebase deploy --only hosting:main`  
+
+ไม่ต้องใช้ **`GH_TOKEN`** สำหรับ flow หลัก

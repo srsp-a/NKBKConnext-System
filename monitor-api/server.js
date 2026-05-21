@@ -2808,6 +2808,194 @@ app.get('/workstations.html', (req, res) => {
 });
 
 // =====================================================
+// NKBK AI (Desktop + Web ai.nkbkcoop.com)
+// =====================================================
+function loadNkbkAiModule(name) {
+  const candidates = [
+    path.join(__dirname, '..', 'lib', name),
+    path.join(__dirname, 'lib', name),
+    path.join(__dirname, '..', '..', 'lib', name)
+  ];
+  for (const p of candidates) {
+    try {
+      if (fsSync.existsSync(p)) return require(p);
+    } catch (_) {}
+  }
+  throw new Error('ไม่พบ lib/' + name);
+}
+
+async function resolveMonitorSessionFromToken(token) {
+  if (!token) return null;
+  const session = MONITOR_SESSIONS.get(token);
+  if (!session) return null;
+  return {
+    username: session.username || '',
+    fullname: session.fullname || '',
+    email: session.email || '',
+    group: session.group || '',
+    role: session.role || ''
+  };
+}
+
+function createMonitorSessionFromUser(v2User) {
+  const sessionName = String(v2User.username || v2User.id || '').trim() || 'user';
+  const token = crypto.randomBytes(24).toString('hex');
+  monitorSessionsSet(token, {
+    username: sessionName,
+    createdAt: Date.now(),
+    fullname: v2User.fullname != null ? String(v2User.fullname).trim() : '',
+    email: v2User.email != null ? String(v2User.email).trim() : '',
+    group: v2User.group != null ? String(v2User.group).trim() : '',
+    role: v2User.role != null ? String(v2User.role).trim() : ''
+  });
+  return { token, username: sessionName };
+}
+
+function resolveAiLiffIdForHost(req, site) {
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '')
+    .split(',')[0]
+    .trim()
+    .split(':')[0]
+    .toLowerCase();
+  const defaults = {
+    'ai.nkbkcoop.com': '2008951184-JVo663Kx',
+    'ai-nkbkcoop.web.app': '2008951184-fiX8mFgN'
+  };
+  if (host === 'ai.nkbkcoop.com' || host.endsWith('.ai.nkbkcoop.com')) {
+    return (
+      (site && site.aiLiffId && String(site.aiLiffId).trim()) ||
+      defaults['ai.nkbkcoop.com'] ||
+      ''
+    );
+  }
+  if (host.includes('web.app') || host.includes('firebaseapp.com')) {
+    return (
+      (site && site.aiLiffIdWebApp && String(site.aiLiffIdWebApp).trim()) ||
+      (site && site.aiLiffId && String(site.aiLiffId).trim()) ||
+      defaults['ai-nkbkcoop.web.app'] ||
+      ''
+    );
+  }
+  return (
+    (process.env.AI_LIFF_ID || '').trim() ||
+    (site && site.aiLiffId && String(site.aiLiffId).trim()) ||
+    defaults['ai.nkbkcoop.com'] ||
+    defaults['ai-nkbkcoop.web.app'] ||
+    ''
+  );
+}
+
+function resolveLinkAccountUrl(site) {
+  const fromSite = site && site.linkLiffId && String(site.linkLiffId).trim();
+  const liffId = fromSite || '2008951184-870KgFSE';
+  return 'https://liff.line.me/' + liffId;
+}
+
+app.get('/api/ai-web-config', async (req, res) => {
+  let site = null;
+  try {
+    site = await firebaseGet('config', 'site');
+  } catch (_) {}
+  const liffId = resolveAiLiffIdForHost(req, site);
+  res.json({
+    ok: true,
+    liffId,
+    siteName: 'ChatGPT โมเน่',
+    orgName: 'สหกรณ์ออมทรัพย์สาธารณสุขหนองคาย จำกัด',
+    linkAccountUrl: resolveLinkAccountUrl(site)
+  });
+});
+
+app.post('/api/ai-liff-login', async (req, res) => {
+  try {
+    const idToken = String((req.body && req.body.idToken) || '').trim();
+    if (!idToken) return res.status(400).json({ ok: false, message: 'ไม่พบ LINE idToken' });
+    const channelId = (process.env.LINE_LOGIN_CHANNEL_ID || '').trim();
+    if (!channelId) {
+      return res.status(503).json({ ok: false, message: 'เซิร์ฟเวอร์ยังไม่ตั้งค่า LINE Login' });
+    }
+    const vb = new URLSearchParams({ id_token: idToken, client_id: channelId }).toString();
+    const vr = await httpsPostForm('https://api.line.me/oauth2/v2.1/verify', vb);
+    let vj = {};
+    try {
+      vj = JSON.parse(vr.raw || '{}');
+    } catch (_) {}
+    if (vr.status < 200 || vr.status >= 300 || !vj.sub) {
+      let detail = '';
+      try {
+        detail = vj.error_description || vj.error || '';
+      } catch (_) {}
+      console.warn('[ai-liff-login] LINE verify failed:', vr.status, detail || vr.raw?.slice?.(0, 200));
+      const expired = /expired|expire|invalid/i.test(String(detail));
+      return res.status(401).json({
+        ok: false,
+        message: expired
+          ? 'เซสชัน LINE หมดอายุ — กดเข้าสู่ระบบอีกครั้ง'
+          : 'LINE token ไม่ถูกต้องหรือหมดอายุ — กดเข้าสู่ระบบอีกครั้ง',
+        code: expired ? 'token_expired' : 'token_invalid'
+      });
+    }
+    const lineSub = String(vj.sub).trim();
+    let v2User = null;
+    try {
+      v2User = await firebaseQuery('users', 'lineUserId', lineSub);
+    } catch (e) {
+      console.error('[ai-liff-login] Firestore:', e.message);
+    }
+    if (!v2User) {
+      let site = null;
+      try {
+        site = await firebaseGet('config', 'site');
+      } catch (_) {}
+      return res.status(403).json({
+        ok: false,
+        message: 'บัญชี LINE นี้ยังไม่ได้ผูกกับระบบ — กรุณาผูกบัญชีก่อนเข้าใช้งาน',
+        needsLinkAccount: true,
+        linkAccountUrl: resolveLinkAccountUrl(site)
+      });
+    }
+    if (!v2UserMayAccessMonitorLine(v2User)) {
+      return res.status(403).json({ ok: false, message: 'บัญชีนี้ไม่มีสิทธิ์เข้าใช้งานแอป NKBKConnext' });
+    }
+    const db = getMonitorAdminFirestore();
+    if (db) {
+      try {
+        const nkbkAi = loadNkbkAiModule('nkbk-ai.js');
+        const config = await nkbkAi.getEffectiveAiConfig(db);
+        const sessionName = String(v2User.username || v2User.id || '').trim();
+        if (!nkbkAi.isUserAllowed(config, sessionName)) {
+          return res.status(403).json({ ok: false, message: nkbkAi.denyMessage(config) });
+        }
+      } catch (e) {
+        console.warn('[ai-liff-login] AI permission check:', e.message);
+      }
+    }
+    const sess = createMonitorSessionFromUser(v2User);
+    return res.json({
+      ok: true,
+      token: sess.token,
+      username: sess.username,
+      displayName: v2User.fullname != null ? String(v2User.fullname).trim() : '',
+      pictureUrl: v2User.pictureUrl || v2User.linePictureUrl || ''
+    });
+  } catch (e) {
+    console.error('[ai-liff-login]', e.message);
+    return res.status(500).json({ ok: false, message: e.message || 'เข้าสู่ระบบไม่สำเร็จ' });
+  }
+});
+
+try {
+  const { registerNkbkAiRoutes } = loadNkbkAiModule('nkbk-ai-routes.js');
+  registerNkbkAiRoutes(app, {
+    getDb: getMonitorAdminFirestore,
+    resolveSession: resolveMonitorSessionFromToken
+  });
+  console.log('[Monitor API] NKBK AI routes registered');
+} catch (e) {
+  console.warn('[Monitor API] NKBK AI routes skipped:', e.message);
+}
+
+// =====================================================
 // Static (ไฟล์อื่นใน public)
 // =====================================================
 app.use(express.static(path.join(__dirname, 'public')));
@@ -2897,7 +3085,6 @@ if (usePassengerSocket) {
     logRoutesHint(_basePathHint);
   });
 } else if (shouldStartHttpServer()) {
-  // ถูก require โดย Plesk (require.main ไม่ใช่ไฟล์นี้)
   const port = Number(process.env.PORT) || PORT;
   app.listen(port, '0.0.0.0', () => {
     console.log(`[Monitor API] listen(${port}) — โหลดเป็นโมดูล (ให้ Passenger hook ถ้ามี)`);

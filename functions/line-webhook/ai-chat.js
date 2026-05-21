@@ -3,6 +3,121 @@
  * ใช้ OpenAI API, ความจำจาก Firestore, บุคลิกและคำเรียกจาก config
  */
 const https = require('https');
+const aiImageGen = require('./ai-image-gen.js');
+
+const pendingImageJobs = new Set();
+
+function trackImageJob(promise) {
+  pendingImageJobs.add(promise);
+  promise.finally(() => pendingImageJobs.delete(promise));
+  return promise;
+}
+
+async function drainPendingImageJobs() {
+  if (!pendingImageJobs.size) return;
+  await Promise.allSettled([...pendingImageJobs]);
+}
+
+function withTimeout(promise, ms, message) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message || 'timeout')), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+async function runLineImageGeneration(deps, pushTo, scopeId, groupId, text, lastContext, cfg, apiKey) {
+  const { pushMessage, firebaseSet } = deps;
+  const imgCfg = aiImageGen.configFromLineCfg(cfg);
+  const directText = String(text || '').trim();
+  const ctxText =
+    (lastContext && lastContext.lastAssistantText) ||
+    (lastContext && lastContext.lastUserText) ||
+    '';
+
+  console.log('[ai-image] start', scopeId.substring(0, 8), 'len=', directText.length);
+
+  try {
+    let prompt = aiImageGen.buildImagePromptFromMessage(text, lastContext);
+    if (directText.length <= 180 && ctxText && ctxText.length > 120) {
+      try {
+        prompt = await withTimeout(
+          aiImageGen.enhancePromptFromContext(apiKey, imgCfg, text, ctxText),
+          20000,
+          'prompt timeout'
+        );
+      } catch (_) {}
+    }
+
+    const images = await withTimeout(
+      aiImageGen.generateImages(apiKey, imgCfg, prompt, { fastOnly: true }),
+      150000,
+      'ใช้เวลานานเกินไป — ลองใหม่หรือย่อเนื้อหา'
+    );
+    const imageUrl = await withTimeout(
+      aiImageGen.uploadPngAndGetUrl(images[0].b64),
+      90000,
+      'อัปโหลดรูปไม่สำเร็จ'
+    );
+
+    const imageMessages = [
+      { type: 'text', text: 'สร้างรูปให้แล้วค่ะ ✨' },
+      {
+        type: 'image',
+        originalContentUrl: imageUrl,
+        previewImageUrl: imageUrl
+      }
+    ];
+
+    try {
+      await pushMessage(pushTo, imageMessages);
+    } catch (pushErr) {
+      const pushMsg = String((pushErr && pushErr.message) || pushErr || '');
+      console.warn('[ai-image] push failed:', pushMsg);
+      await firebaseSet('ai_chat_pending_image', scopeId, {
+        scopeId,
+        imageUrl,
+        pushError: pushMsg.slice(0, 200),
+        createdAt: new Date().toISOString()
+      });
+      console.log('[ai-image] saved pending image for next reply', scopeId.substring(0, 8));
+      return;
+    }
+
+    try {
+      await firebaseSet('ai_chat_pending_image', scopeId, {
+        scopeId,
+        imageUrl: '',
+        clearedAt: new Date().toISOString()
+      });
+    } catch (_) {}
+    try {
+      await firebaseSet('ai_chat_context', scopeId, {
+        lastUserText: text,
+        lastAssistantText: '[สร้างรูปแล้ว]',
+        updatedAt: new Date().toISOString()
+      });
+    } catch (_) {}
+    if (groupId) {
+      try {
+        await firebaseSet('ai_chat_state', groupId, { groupId, lastMessageAt: new Date().toISOString() });
+      } catch (_) {}
+    }
+    console.log('✅ AI image sent to', groupId ? 'group' : 'user', scopeId.substring(0, 8) + '...');
+  } catch (e) {
+    console.warn('AI image generation error:', e.message);
+    try {
+      await pushMessage(pushTo, [
+        {
+          type: 'text',
+          text: '⚠️ สร้างรูปไม่สำเร็จ — ' + String(e.message || 'ลองใหม่').slice(0, 400)
+        }
+      ]);
+    } catch (e2) {
+      console.warn('AI image error push failed:', e2.message);
+    }
+  }
+}
 
 const SYSTEM_PROMPT_TEMPLATE = `คุณคือ {{name}} — {{gender_instruction}}
 
@@ -526,19 +641,29 @@ async function getAiMemory(firebaseGetCollection, userId, groupId, maxPerScope) 
   return filtered.slice(0, limit).map(m => (m.content || '').trim()).filter(Boolean);
 }
 
+function buildChatCompletionBody(model, messages, maxTokens) {
+  const m = model || 'gpt-4o-mini';
+  const limit = Math.min(4000, Math.max(256, parseInt(maxTokens, 10) || 1000));
+  const body = { model: m, messages };
+  // gpt-5 / o-series ใช้ max_completion_tokens แทน max_tokens
+  if (/^gpt-5|^o[0-9]/i.test(m)) {
+    body.max_completion_tokens = limit;
+  } else {
+    body.max_tokens = limit;
+    body.temperature = 0.7;
+  }
+  return body;
+}
+
 async function callOpenAI(apiKey, model, systemContent, userContent) {
   if (!apiKey || !apiKey.trim()) {
     throw new Error('OpenAI API Key not configured');
   }
-  const body = JSON.stringify({
-    model: model || 'gpt-4o-mini',
-    messages: [
-      { role: 'system', content: systemContent },
-      { role: 'user', content: userContent }
-    ],
-    max_tokens: 1000,
-    temperature: 0.7
-  });
+  const payload = buildChatCompletionBody(model, [
+    { role: 'system', content: systemContent },
+    { role: 'user', content: userContent }
+  ], 1000);
+  const body = JSON.stringify(payload);
   return new Promise((resolve, reject) => {
     const options = {
       hostname: 'api.openai.com',
@@ -584,8 +709,17 @@ async function callOpenAI(apiKey, model, systemContent, userContent) {
  * @param {object} source - { userId, groupId? }
  * @param {object} userProfile - { displayName? }
  */
+function readPendingImageUrl(pending) {
+  if (!pending || typeof pending !== 'object') return '';
+  const url = String(pending.imageUrl || '').trim();
+  if (!url) return '';
+  const created = pending.createdAt ? new Date(pending.createdAt).getTime() : 0;
+  if (created && Date.now() - created > 48 * 60 * 60 * 1000) return '';
+  return url;
+}
+
 async function tryAiChat(deps, replyToken, text, userId, source, userProfile) {
-  const { replyMessage, firebaseGet, firebaseSet, firebaseGetCollection, firebaseQuery } = deps;
+  const { replyMessage, pushMessage, firebaseGet, firebaseSet, firebaseGetCollection, firebaseQuery } = deps;
   let cfg;
   try {
     cfg = await firebaseGet('config', 'ai_chat');
@@ -635,6 +769,8 @@ async function tryAiChat(deps, replyToken, text, userId, source, userProfile) {
   const userContent = groupId
     ? `[ผู้ส่ง: ${displayName}]\n\n${text}`
     : text;
+  const scopeId = groupId || userId;
+  const pushTo = groupId || userId;
 
   const sendFallback = async (msg) => {
     const fallback = msg || 'ขออภัยค่ะ ตอนนี้ตอบไม่ได้ กรุณาลองใหม่หรือติดต่อเจ้าหน้าที่';
@@ -646,6 +782,44 @@ async function tryAiChat(deps, replyToken, text, userId, source, userProfile) {
   };
 
   try {
+    const apiKey = (cfg.openaiApiKey || '').trim();
+    const model = (cfg.model || 'gpt-4o-mini').trim();
+
+    let lastContext = null;
+    let pendingImageUrl = '';
+    try {
+      lastContext = await firebaseGet('ai_chat_context', scopeId);
+    } catch (_) {}
+    try {
+      const pending = await firebaseGet('ai_chat_pending_image', scopeId);
+      pendingImageUrl = readPendingImageUrl(pending);
+    } catch (_) {}
+
+    if (aiImageGen.wantsLineImageGeneration(text) && typeof pushMessage === 'function') {
+      try {
+        await replyMessage(replyToken, [{
+          type: 'text',
+          text: '🎨 กำลังสร้างรูปให้... รอ 1–2 นาทีนะคะ ✨\n(ถ้าไม่เห็นรูป ลองพิมพ์ข้อความอีกครั้ง โมเน่จะส่งให้ในข้อความถัดไป)'
+        }]);
+      } catch (e) {
+        console.warn('AI image ack reply failed:', e.message);
+      }
+
+      trackImageJob(
+        runLineImageGeneration(
+          { pushMessage, firebaseSet },
+          pushTo,
+          scopeId,
+          groupId,
+          text,
+          lastContext,
+          cfg,
+          apiKey
+        )
+      );
+      return;
+    }
+
     // โหลด context พร้อมกันเพื่อให้เร็ว ลดโอกาส reply token หมดอายุ
     const [memoryLines, todayContext, dataContextResult] = await Promise.all([
       getAiMemory(firebaseGetCollection, userId, groupId, cfg.memoryMaxPerScope).catch(() => []),
@@ -658,9 +832,6 @@ async function tryAiChat(deps, replyToken, text, userId, source, userProfile) {
     const userCallNameOverride = dataContextResult && typeof dataContextResult === 'object' ? dataContextResult.userCallName : null;
     const bangkokDateStr = formatBangkokDateThai();
     const systemContent = buildSystemPrompt(cfg, memoryLines, todayContext, bangkokDateStr, dataContextStr, userCallNameOverride);
-
-    const apiKey = (cfg.openaiApiKey || '').trim();
-    const model = (cfg.model || 'gpt-4o-mini').trim();
 
     let replyText;
     try {
@@ -678,13 +849,39 @@ async function tryAiChat(deps, replyToken, text, userId, source, userProfile) {
       replyText = replyText.substring(0, 4997) + '...';
     }
 
+    const replyMessages = [];
+    if (pendingImageUrl) {
+      replyMessages.push({ type: 'text', text: 'สร้างรูปให้แล้วค่ะ ✨' });
+      replyMessages.push({
+        type: 'image',
+        originalContentUrl: pendingImageUrl,
+        previewImageUrl: pendingImageUrl
+      });
+      try {
+        await firebaseSet('ai_chat_pending_image', scopeId, {
+          scopeId,
+          imageUrl: '',
+          deliveredAt: new Date().toISOString()
+        });
+      } catch (_) {}
+    }
+    replyMessages.push({ type: 'text', text: replyText });
+
     try {
-      await replyMessage(replyToken, [{ type: 'text', text: replyText }]);
+      await replyMessage(replyToken, replyMessages);
     } catch (e) {
       console.warn('AI chat reply error:', e.message);
       await sendFallback('ขออภัยค่ะ ส่งคำตอบไม่สำเร็จ (อาจหมดเวลา) ลองถามใหม่ได้ค่ะ');
       return;
     }
+
+    try {
+      await firebaseSet('ai_chat_context', scopeId, {
+        lastUserText: text,
+        lastAssistantText: replyText.slice(0, 4000),
+        updatedAt: new Date().toISOString()
+      });
+    } catch (_) {}
 
     if (groupId) {
       try {
@@ -698,4 +895,4 @@ async function tryAiChat(deps, replyToken, text, userId, source, userProfile) {
   }
 }
 
-module.exports = { tryAiChat, buildSystemPrompt, getAiMemory, getTodayAttendanceContext, callOpenAI, hasTriggerWord };
+module.exports = { tryAiChat, buildSystemPrompt, getAiMemory, getTodayAttendanceContext, callOpenAI, hasTriggerWord, drainPendingImageJobs };

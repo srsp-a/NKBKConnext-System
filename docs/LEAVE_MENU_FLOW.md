@@ -6,6 +6,7 @@
 
 ### A. สำหรับผู้ใช้ทุกคน (ที่ล็อกอินแล้ว)
 - **ยอดลาคงเหลือปีนี้** — แสดงแยกตามประเภทการลา (พร้อมเปอร์เซ็นต์ใช้ไปแล้ว)
+- **+ ลางาน** — ส่งคำขอลาใหม่จากในโปรแกรม (ประเภท / รูปแบบ / วันที่ / เหตุผล) — บันทึกลง Firestore `leaves` เหมือน [leave.nkbkcoop.com](https://leave.nkbkcoop.com/)
 - **รายการลาของฉัน** — การลาทั้งหมดของตัวเอง (ย้อนหลัง + ปัจจุบัน) สามารถกรองตามสถานะ
   - `pending` / `approved_lv1` / `approved` / `rejected` / `cancelled`
 
@@ -35,6 +36,8 @@
 |---|---|---|
 | `GET` | `/api/monitor-my-leaves` | รายการลาของ user ปัจจุบัน |
 | `GET` | `/api/monitor-my-leave-balance` | ยอดลาคงเหลือรายประเภท (ปีปัจจุบัน) |
+| `GET` | `/api/monitor-leave-submit-meta` | ประเภทการลา + รูปแบบที่รองรับ + วันย้อนหลังที่ขอได้ |
+| `POST` | `/api/monitor-leave-submit` | ส่งคำขอลา (body: `{type, partial, startDate, endDate, reason?}`) |
 | `GET` | `/api/monitor-leave-pending-approvals` | คำขอที่ user คนนี้ต้องอนุมัติ (`canApprove=false` ถ้าไม่ใช่ approver) |
 | `POST` | `/api/monitor-leave-approve` | อนุมัติ (body: `{leaveId}`) — Level 1 → `approved` + หักยอด; Level 2 → `approved_lv1` |
 | `POST` | `/api/monitor-leave-reject` | ไม่อนุมัติ (body: `{leaveId, reason?}`) — เขียนฟิลด์ reject ครบ |

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChatGPT โมเน่</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="nkbk-ai.css">
+</head>
+<body>
+  <div class="title-bar" id="titleBar">
+    <div class="title-bar-drag">
+      <span class="title-bar-title">ChatGPT โมเน่</span>
+    </div>
+    <div class="title-bar-controls">
+      <button type="button" class="title-bar-btn" id="btnMinimize" title="ย่อ">−</button>
+      <button type="button" class="title-bar-btn" id="btnMaximize" title="ขยาย">□</button>
+      <button type="button" class="title-bar-btn title-bar-btn-close" id="btnClose" title="ปิด">×</button>
+    </div>
+  </div>
+
+  <div class="nkbk-ai-shell">
+    <aside class="nkbk-ai-sidebar" id="nkbkAiSidebar">
+      <button type="button" id="btnNkbkAiNewThread" class="nkbk-ai-sidebar-new">+ แชทใหม่</button>
+      <div class="nkbk-ai-sidebar-label">บทสนทนา</div>
+      <nav class="nkbk-ai-thread-list" id="nkbkAiThreadList" aria-label="รายการบทสนทนา"></nav>
+    </aside>
+
+    <div class="nkbk-ai-app">
+      <header class="nkbk-ai-header">
+        <div class="nkbk-ai-header-main">
+          <div class="nkbk-ai-avatar" aria-hidden="true">
+            <img src="chatgpt-icon.svg" alt="" width="24" height="24">
+          </div>
+          <div class="nkbk-ai-header-text">
+            <div class="nkbk-ai-title-row">
+              <h1 id="nkbkAiTitle">ChatGPT โมเน่</h1>
+              <span id="nkbkAiCallBadge" class="nkbk-ai-call-badge hidden"></span>
+            </div>
+            <p id="nkbkAiSubtitle" class="nkbk-ai-sub">แชท · วิเคราะห์รูป · สร้างภาพ</p>
+          </div>
+        </div>
+        <div class="nkbk-ai-header-actions">
+          <button type="button" id="btnNkbkAiMemory" class="nkbk-ai-btn-ghost nkbk-ai-btn-icon-sm" title="ความจำ">🧠</button>
+        </div>
+      </header>
+
+      <div id="nkbkAiBanner" class="nkbk-ai-banner hidden" role="alert"></div>
+
+      <main class="nkbk-ai-messages" id="nkbkAiMessages" aria-live="polite">
+        <div class="nkbk-ai-welcome" id="nkbkAiWelcome">
+          <p class="nkbk-ai-welcome-title" id="nkbkAiWelcomeTitle">สวัสดีค่ะ โมเน่พร้อมช่วยแล้ว</p>
+          <p class="nkbk-ai-welcome-hints">พิมพ์ข้อความ · แนบรูป · หรือกด 🎨 สร้างภาพ</p>
+          <div class="nkbk-ai-welcome-chips">
+            <button type="button" class="nkbk-ai-chip" data-prompt="สรุปข่าวสารสหกรณ์ให้ฟังหน่อย">💬 สรุปข่าว</button>
+            <button type="button" class="nkbk-ai-chip" data-prompt="สร้างรูปโลโก้สหกรณ์สไตล์มินิมอล">🎨 สร้างรูป</button>
+          </div>
+        </div>
+      </main>
+
+      <footer class="nkbk-ai-composer-wrap">
+        <div id="nkbkAiAttachPreview" class="nkbk-ai-attach-preview hidden"></div>
+        <div class="nkbk-ai-composer">
+          <input type="file" id="nkbkAiFileInput" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
+          <button type="button" id="btnNkbkAiAttach" class="nkbk-ai-btn-icon" title="แนบรูป">📎</button>
+          <button type="button" id="btnNkbkAiGenerate" class="nkbk-ai-btn-icon nkbk-ai-btn-icon--accent" title="สร้างรูป">🎨</button>
+          <textarea id="nkbkAiInput" rows="1" placeholder="ถามอะไรก็ได้..." aria-label="ข้อความ"></textarea>
+          <button type="button" id="btnNkbkAiSend" class="nkbk-ai-btn-send" disabled aria-label="ส่ง">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+          </button>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <div class="nkbk-ai-modal" id="nkbkAiMemoryModal" aria-hidden="true">
+    <div class="nkbk-ai-modal-backdrop" id="nkbkAiMemoryBackdrop"></div>
+    <div class="nkbk-ai-modal-box">
+      <div class="nkbk-ai-modal-head">
+        <h2>คำสั่งที่โมเน่จำ</h2>
+        <button type="button" class="nkbk-ai-modal-close" id="nkbkAiMemoryClose" aria-label="ปิด">×</button>
+      </div>
+      <div class="nkbk-ai-modal-body">
+        <label class="nkbk-ai-field-label" for="nkbkAiCallNameInput">ชื่อที่ AI เรียกคุณ <span class="muted">(sync LINE)</span></label>
+        <div class="nkbk-field-stack nkbk-field-stack--callname">
+          <input type="text" id="nkbkAiCallNameInput" class="nkbk-callname-input" placeholder="เช่น คุณผู้ชาย" maxlength="40">
+        </div>
+        <label class="nkbk-ai-field-label" for="nkbkAiStandingInstructions">คำสั่งที่ต้องการให้ AI จำ</label>
+        <div class="nkbk-field-stack">
+          <textarea id="nkbkAiStandingInstructions" rows="6" placeholder="เช่น ตอบสั้นๆ"></textarea>
+        </div>
+      </div>
+      <div class="nkbk-ai-modal-foot">
+        <button type="button" class="nkbk-ai-btn-ghost" id="nkbkAiMemoryCancel">ยกเลิก</button>
+        <button type="button" class="nkbk-ai-btn-primary" id="nkbkAiMemorySave">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="nkbk-ai-lightbox" id="nkbkAiLightbox" aria-hidden="true">
+    <div class="nkbk-ai-lightbox-backdrop" id="nkbkAiLightboxBackdrop"></div>
+    <div class="nkbk-ai-lightbox-inner">
+      <img id="nkbkAiLightboxImg" alt="">
+      <div class="nkbk-ai-lightbox-actions">
+        <button type="button" id="nkbkAiLightboxDownload" class="nkbk-ai-btn-primary">⬇ ดาวน์โหลด</button>
+        <button type="button" id="nkbkAiLightboxClose" class="nkbk-ai-btn-ghost">ปิด</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="nkbk-ai.js"></script>
+</body>
+</html>

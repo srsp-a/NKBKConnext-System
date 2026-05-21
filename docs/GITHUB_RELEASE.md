@@ -2,6 +2,15 @@
 
 **หมายเหตุ:** คำสั่ง `cd path\to\it` หรือ `cd path/to/it` ในเอกสารนี้หมายถึง **โฟลเดอร์รากของโปรเจกต์ที่มีไฟล์ `package.json`** — ไม่ใช่พิมพ์ตามตัวอักษร ให้แทนด้วย path จริงบนเครื่องคุณ เช่น `cd C:\Users\PC\Downloads\NKBK\it`
 
+## v1.0.7 — หมายเหตุปล่อย
+
+- **แก้ `no_session` / ภาพรวมว่างหลังล็อกอิน:** เมื่อล็อกอินผ่านโปร็กซี่ไป Monitor API แล้วได้โทเคน ระบบจะเก็บ session ใน RAM ของ `server.js` บนเครื่องด้วย — `/api/monitor-me` และเมนูที่ใช้โทเคน (เช่น **ลางาน**) ไม่พึ่งแค่การเรียก `/api/monitor-me` จาก Node ไปเซิร์ฟเวอร์ภายนอกอย่างเดียว
+- **เข้มงวดหลังโหลดโปรไฟล์:** ถ้าทุกความพยายาม `/api/monitor-me` ไม่ได้ `ok` จะล้างโทเคนและส่งกลับหน้า login แทนการเปิดแอปในสภาพข้อมูลผู้ใช้ว่าง
+
+ตั้งค่า tag release เป็น **`v1.0.7`** ให้ตรงกับ `version` ใน `package.json` *(ถ้ายังใช้ GitHub tag — การอัปเดตแอปหลักใช้ Firebase ตาม `docs/FIREBASE_DESKTOP_UPDATES.md`)*
+
+**การอัปเดตแอปเดสก์ท็อป:** ใช้ **Firebase Hosting** — ไม่บังคับ GitHub Release — ดู **`docs/FIREBASE_DESKTOP_UPDATES.md`**
+
 ## ถ้า push ไม่ได้: Permission denied (SSH เป็น user อื่น)
 
 เครื่องที่ SSH ผูกกับบัญชีอื่น (เช่น gloszilla-ai) จะ push ไป srsp-a ไม่ได้
@@ -30,30 +39,37 @@ git push -u origin main
 
 (ในโปรเจกต์นี้ commit แรกทำไว้แล้ว — เหลือแค่ `git push`)
 
-## ปล่อยเวอร์ชันใหม่ + อัปโหลดไฟล์ติดตั้งขึ้น GitHub Release
+## ปล่อยเวอร์ชันแอปเดสก์ท็อป (หลัก — Firebase Hosting)
 
-1. แก้เลขเวอร์ชันใน `package.json` (ฟิลด์ `version` เช่น `1.0.1`)
-2. สร้าง Personal Access Token ที่ GitHub: **Settings → Developer settings → Tokens** — สิทธิ์ `repo`
-3. ใน PowerShell/CMD (Windows):
+คู่มือเต็ม: **`docs/FIREBASE_DESKTOP_UPDATES.md`**
 
 ```bat
 cd path\to\it
-set GH_TOKEN=ghp_xxxxxxxxxxxx
-npm run release
-```
-
-คำสั่งนี้จะ build แล้วอัปโหลดไฟล์ใน `dist/` ขึ้น **Release** บน GitHub (สร้าง tag `v1.0.1` ตาม version)
-
-หรือ build เองแล้วอัปโหลดมือ:
-
-```bat
+npm pkg set version=1.0.8
 npm run build:installer
 ```
 
-จากนั้นไปที่ GitHub → **Releases** → สร้าง Release → Tag `v1.0.1` (ตรงกับ `version` ใน package.json) → **แนบไฟล์ `*Portable*.exe`** จากโฟลเดอร์ `dist` (ชื่อมีคำว่า Portable จะถูกเลือกก่อน)
+จากนั้นคัดลอกจาก **`dist/`** ไปที่ **`public-cms/desktop-app-updates/`** ใน repo — แก้ **`desktop-update-manifest.json`** (Portable) — แล้ว:
+
+```bat
+firebase deploy --only hosting:main
+```
+
+คำสั่ง **`npm run release`** build เท่านั้น (`publish never`) — **ไม่ใช้ `GH_TOKEN`**
+
+## (ทางเลือก) อัปโหลดขึ้น GitHub Release
+
+หากยังต้องการแจกผ่าน GitHub:
+
+1. แก้เลขเวอร์ชันใน `package.json`
+2. สร้าง Personal Access Token — สิทธิ์ `repo`
+3. เปลี่ยน `build.publish` ใน `package.json` กลับเป็น `provider: github` แล้วใช้ `electron-builder --win --publish always` พร้อม `GH_TOKEN`
+
+หรือ build ด้วย `npm run build:installer` แล้วแนบไฟล์ใน `dist/` ขึ้น Release ด้วยมือ
 
 ## แอปแบบ Portable บนเครื่องลูก
 
-- หน้า **ล็อกอิน** จะโชว์แบนเนอร์ถ้ามีเวอร์ชันใหม่บน GitHub → กด **ดาวน์โหลดอัปเดต** ได้เลย (ไฟล์ไปที่โฟลเดอร์ดาวน์โหลด แล้วปิดแอปรัน `.exe` ใหม่แทนที่เดิม)
-- เมนูถาด → **ตรวจสอบอัปเดต** — ถ้ามีเวอร์ชันใหม่จะถามดาวน์โหลดหรือเปิด GitHub
-- เลขเวอร์ชันบน GitHub ต้อง **มากกว่า** เวอร์ชันในแอปที่รันอยู่ (เทียบจาก tag เช่น `v1.0.2`)
+- หน้า **ล็อกอิน** อ่าน **`desktop-update-manifest.json`** จาก URL feed เดียวกับตัวติดตั้ง — มีเวอร์ชันใหม่จะแจ้งให้ดาวน์โหลด
+- เมนูถาด → **ตรวจสอบอัปเดต** — ดาวน์โหลด Portable หรือเปิดหน้าโฟลเดอร์บน Hosting
+
+แอปแบบติดตั้ง (NSIS) ใช้ **electron-updater** กับ **`latest.yml`** ในโฟลเดอร์เดียวกัน — เวอร์ชันใน `latest.yml` ต้องสูงกว่าแอปที่รันอยู่

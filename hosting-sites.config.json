@@ -78,6 +78,13 @@
       "src": ".",
       "srcOnly": ["index.html"],
       "shared": false
+    },
+    {
+      "target": "ai",
+      "siteId": "ai-nkbkcoop",
+      "domain": "ai.nkbkcoop.com",
+      "src": "ai-web",
+      "shared": false
     }
   ]
 }

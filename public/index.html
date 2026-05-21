@@ -168,87 +168,199 @@
 
         <!-- เว็บแอป -->
         <section id="panel-webapp" class="tab-panel" role="tabpanel">
-          <div class="grid">
-            <section class="card card-wide nas-connect-card">
-              <div class="card-header"><span class="card-icon">📁</span><h2>เชื่อมต่อ NAS / Network Drive</h2></div>
-              <div class="card-body">
-                <div class="nas-form">
-                  <div class="nas-field">
-                    <label for="nasUncPath">UNC Path <span class="nas-unc-lock" title="ค่านี้ล็อคเป็นค่าเริ่มต้นของทุกเครื่อง">🔒</span></label>
-                    <input type="text" id="nasUncPath" autocomplete="off" readonly value="\\NKBKCOOP-DRIVE\home">
-                  </div>
-                  <div class="nas-field">
-                    <label for="nasUsername">ชื่อผู้ใช้</label>
-                    <input type="text" id="nasUsername" placeholder="username หรือ domain\\user" autocomplete="username">
-                  </div>
-                  <div class="nas-field">
-                    <label for="nasPassword">รหัสผ่าน</label>
-                    <input type="password" id="nasPassword" placeholder="รหัสผ่าน" autocomplete="current-password">
-                  </div>
-                  <label class="nas-remember toggle">
-                    <input type="checkbox" id="nasRemember" checked aria-label="บันทึกการตั้งค่า">
-                    <span class="toggle-slider"></span>
-                    <span class="nas-remember-label">บันทึกการตั้งค่า</span>
-                  </label>
-                  <div class="nas-actions">
-                    <button type="button" class="btn-test" id="btnNasConnect">
-                      <span class="btn-test-icon">📁</span>
-                      เชื่อมต่อ
-                    </button>
-                    <button type="button" class="btn-test btn-secondary" id="btnNasDisconnect">
-                      <span class="btn-test-icon">✕</span>
-                      ยกเลิกการเชื่อมต่อ
-                    </button>
-                    <button type="button" class="btn-test btn-open-drive nas-open-hidden" id="btnNasOpenDrive" title="เปิดโฟลเดอร์ใน Explorer">
-                      <span class="btn-test-icon">📂</span>
-                      เปิดโฟลเดอร์
-                    </button>
-                  </div>
+          <div class="webapp-hub">
+            <header class="webapp-hub-header">
+              <h2 class="webapp-hub-title">เว็บแอป &amp; บริการ</h2>
+              <p class="webapp-hub-sub muted">ตั้งค่าแต่ละรายการก่อน จากนั้นกดเปิดใช้งานบนการ์ด</p>
+            </header>
+            <div class="webapp-card-grid">
+              <article class="webapp-service-card" id="webappCardNas" data-configured="false">
+                <div class="webapp-card-glow webapp-card-glow--nas" aria-hidden="true"></div>
+                <div class="webapp-card-icon webapp-card-icon--nas" aria-hidden="true">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                 </div>
-                <div class="nas-result" id="nasResult" aria-live="polite"></div>
+                <div class="webapp-card-main">
+                  <h3 class="webapp-card-title">NAS / Network Drive</h3>
+                  <p class="webapp-card-meta" id="webappNasMeta">\\NKBKCOOP-DRIVE\home</p>
+                  <span class="webapp-card-badge webapp-card-badge--pending" id="webappNasBadge">ต้องตั้งค่าก่อน</span>
+                </div>
+                <div class="webapp-card-foot">
+                  <button type="button" class="webapp-card-btn webapp-card-btn--primary" id="btnWebappNasUse" disabled>เปิดใช้งาน</button>
+                  <button type="button" class="webapp-card-btn webapp-card-btn--ghost" id="btnWebappNasSettings" data-webapp-settings="nas" aria-label="ตั้งค่า NAS">⚙ ตั้งค่า</button>
+                </div>
+              </article>
+              <article class="webapp-service-card" id="webappCardWeb" data-configured="false">
+                <div class="webapp-card-glow webapp-card-glow--web" aria-hidden="true"></div>
+                <div class="webapp-card-icon webapp-card-icon--web" aria-hidden="true">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                </div>
+                <div class="webapp-card-main">
+                  <h3 class="webapp-card-title" id="webappWebTitle">ระบบสหกรณ์</h3>
+                  <p class="webapp-card-meta" id="webappWebMeta">ยังไม่ระบุ URL</p>
+                  <span class="webapp-card-badge webapp-card-badge--pending" id="webappWebBadge">ต้องตั้งค่าก่อน</span>
+                </div>
+                <div class="webapp-card-foot">
+                  <button type="button" class="webapp-card-btn webapp-card-btn--primary" id="btnWebappWebUse" disabled>เปิดในแอป</button>
+                  <button type="button" class="webapp-card-btn webapp-card-btn--ghost" id="btnWebappWebSettings" data-webapp-settings="web" aria-label="ตั้งค่าเว็บแอป">⚙ ตั้งค่า</button>
+                </div>
+              </article>
+              <article class="webapp-service-card" id="webappCardGpt" data-configured="false">
+                <div class="webapp-card-glow webapp-card-glow--gpt" aria-hidden="true"></div>
+                <div class="webapp-card-icon webapp-card-icon--gpt" aria-hidden="true">
+                  <img src="chatgpt-icon.svg" alt="" width="28" height="28" class="webapp-card-icon-img">
+                </div>
+                <div class="webapp-card-main">
+                  <h3 class="webapp-card-title">ChatGPT</h3>
+                  <p class="webapp-card-meta" id="webappGptMeta">chatgpt.com</p>
+                  <span class="webapp-card-badge webapp-card-badge--pending" id="webappGptBadge">ต้องตั้งค่าก่อน</span>
+                </div>
+                <div class="webapp-card-foot">
+                  <button type="button" class="webapp-card-btn webapp-card-btn--primary" id="btnWebappGptUse" disabled>เปิดในแอป</button>
+                  <button type="button" class="webapp-card-btn webapp-card-btn--ghost" id="btnWebappGptSettings" data-webapp-settings="gpt" aria-label="ตั้งค่า ChatGPT">⚙ ตั้งค่า</button>
+                </div>
+              </article>
+              <article class="webapp-service-card" id="webappCardNkbkAi" data-configured="false">
+                <div class="webapp-card-glow webapp-card-glow--nkbkai" aria-hidden="true"></div>
+                <div class="webapp-card-icon webapp-card-icon--nkbkai" aria-hidden="true">
+                  <img src="chatgpt-icon.svg" alt="" width="28" height="28" class="webapp-card-icon-img">
+                  <span class="webapp-nkbk-badge">NKBK</span>
+                </div>
+                <div class="webapp-card-main">
+                  <h3 class="webapp-card-title">ChatGPT โมเน่</h3>
+                  <p class="webapp-card-meta" id="webappNkbkAiMeta">โมเน่</p>
+                  <span class="webapp-card-badge webapp-card-badge--pending" id="webappNkbkAiBadge">ต้องตั้งค่าก่อน</span>
+                </div>
+                <div class="webapp-card-foot">
+                  <button type="button" class="webapp-card-btn webapp-card-btn--primary" id="btnWebappNkbkAiUse" disabled>เปิดแชท</button>
+                  <button type="button" class="webapp-card-btn webapp-card-btn--ghost" id="btnWebappNkbkAiSettings" data-webapp-settings="nkbkai" aria-label="ตั้งค่า ChatGPT NKBK">⚙ ตั้งค่า</button>
+                </div>
+              </article>
+            </div>
+          </div>
+
+          <div class="ledck-modal" id="webappSettingsModal" aria-hidden="true">
+            <div class="ledck-modal-backdrop" id="webappSettingsBackdrop"></div>
+            <div class="ledck-modal-box ledck-modal-box-wide webapp-settings-box">
+              <div class="ledck-modal-header">
+                <h3 id="webappSettingsTitle">ตั้งค่า</h3>
+                <button type="button" class="ledck-modal-close" id="webappSettingsClose" aria-label="ปิด">×</button>
               </div>
-            </section>
-            <section class="card card-wide web-connect-card">
-              <div class="card-header"><span class="card-icon">🌐</span><h2>เชื่อมต่อกับเว็บไซต์</h2></div>
-              <div class="card-body">
-                <div class="web-form">
-                  <div class="nas-field">
-                    <label for="webUrl">URL</label>
-                    <input type="text" id="webUrl" placeholder="http://oa.nkbkcoop.com/nkh" autocomplete="off">
-                  </div>
-                  <div class="nas-field">
-                    <label for="webDatabase">ฐานข้อมูล (ไม่บังคับ)</label>
-                    <input type="text" id="webDatabase" placeholder="isconkh_SQL" autocomplete="off">
-                  </div>
-                  <div class="nas-field">
-                    <label for="webUsername">ชื่อผู้ใช้</label>
-                    <input type="text" id="webUsername" placeholder="username" autocomplete="username">
-                  </div>
-                  <div class="nas-field">
-                    <label for="webPassword">รหัสผ่าน</label>
-                    <div class="pw-field-wrap">
-                      <input type="password" id="webPassword" placeholder="รหัสผ่าน" autocomplete="current-password">
-                      <button type="button" class="pw-toggle" data-pw-toggle="webPassword" aria-label="แสดง/ซ่อนรหัสผ่าน" title="แสดง/ซ่อนรหัสผ่าน">
-                        <span class="pw-eye-on">👁</span>
-                        <span class="pw-eye-off" hidden>🙈</span>
+              <div class="ledck-modal-body">
+                <div id="webappSettingsPanelNas" class="webapp-settings-panel" hidden>
+                  <div class="nas-form">
+                    <div class="nas-field">
+                      <label for="nasUncPath">UNC Path <span class="nas-unc-lock" title="ค่านี้ล็อคเป็นค่าเริ่มต้นของทุกเครื่อง">🔒</span></label>
+                      <input type="text" id="nasUncPath" autocomplete="off" readonly value="\\NKBKCOOP-DRIVE\home">
+                    </div>
+                    <div class="nas-field">
+                      <label for="nasUsername">ชื่อผู้ใช้</label>
+                      <input type="text" id="nasUsername" placeholder="username หรือ domain\\user" autocomplete="username">
+                    </div>
+                    <div class="nas-field">
+                      <label for="nasPassword">รหัสผ่าน</label>
+                      <input type="password" id="nasPassword" placeholder="รหัสผ่าน" autocomplete="current-password">
+                    </div>
+                    <label class="nas-remember toggle">
+                      <input type="checkbox" id="nasRemember" checked aria-label="บันทึกการตั้งค่า">
+                      <span class="toggle-slider"></span>
+                      <span class="nas-remember-label">บันทึกการตั้งค่า</span>
+                    </label>
+                    <div class="nas-actions">
+                      <button type="button" class="btn-test" id="btnNasConnect">
+                        <span class="btn-test-icon">📁</span>
+                        บันทึก &amp; เชื่อมต่อ
+                      </button>
+                      <button type="button" class="btn-test btn-secondary" id="btnNasDisconnect">
+                        <span class="btn-test-icon">✕</span>
+                        ยกเลิกการเชื่อมต่อ
+                      </button>
+                      <button type="button" class="btn-test btn-open-drive nas-open-hidden" id="btnNasOpenDrive" title="เปิดโฟลเดอร์ใน Explorer">
+                        <span class="btn-test-icon">📂</span>
+                        เปิดโฟลเดอร์
                       </button>
                     </div>
                   </div>
-                  <label class="nas-remember toggle">
-                    <input type="checkbox" id="webRemember" checked aria-label="บันทึกการตั้งค่า">
-                    <span class="toggle-slider"></span>
-                    <span class="nas-remember-label">บันทึกการตั้งค่า</span>
-                  </label>
-                  <div class="nas-actions">
-                    <button type="button" class="btn-test btn-open-in-app" id="btnWebOpenInApp" title="เปิดในแอป แล้วเติม User/Pass ให้อัตโนมัติ">
-                      <span class="btn-test-icon">📱</span>
-                      เปิดในแอป
-                    </button>
-                  </div>
+                  <div class="nas-result" id="nasResult" aria-live="polite"></div>
                 </div>
-                <div class="nas-result" id="webResult" aria-live="polite"></div>
+                <div id="webappSettingsPanelWeb" class="webapp-settings-panel" hidden>
+                  <div class="web-form">
+                    <div class="nas-field">
+                      <label for="webUrl">URL</label>
+                      <input type="text" id="webUrl" placeholder="http://oa.nkbkcoop.com/nkh" autocomplete="off">
+                    </div>
+                    <div class="nas-field">
+                      <label for="webDatabase">ฐานข้อมูล (ไม่บังคับ)</label>
+                      <input type="text" id="webDatabase" placeholder="isconkh_SQL" autocomplete="off">
+                    </div>
+                    <div class="nas-field">
+                      <label for="webUsername">ชื่อผู้ใช้</label>
+                      <input type="text" id="webUsername" placeholder="username" autocomplete="username">
+                    </div>
+                    <div class="nas-field">
+                      <label for="webPassword">รหัสผ่าน</label>
+                      <div class="pw-field-wrap">
+                        <input type="password" id="webPassword" placeholder="รหัสผ่าน" autocomplete="current-password">
+                        <button type="button" class="pw-toggle" data-pw-toggle="webPassword" aria-label="แสดง/ซ่อนรหัสผ่าน" title="แสดง/ซ่อนรหัสผ่าน">
+                          <span class="pw-eye-on">👁</span>
+                          <span class="pw-eye-off" hidden>🙈</span>
+                        </button>
+                      </div>
+                    </div>
+                    <label class="nas-remember toggle">
+                      <input type="checkbox" id="webRemember" checked aria-label="บันทึกการตั้งค่า">
+                      <span class="toggle-slider"></span>
+                      <span class="nas-remember-label">บันทึกการตั้งค่า</span>
+                    </label>
+                  </div>
+                  <div class="nas-result" id="webResult" aria-live="polite"></div>
+                </div>
+                <div id="webappSettingsPanelGpt" class="webapp-settings-panel" hidden>
+                  <p class="muted webapp-gpt-hint">เปิดใช้งาน ChatGPT ในแอป — ล็อกอินด้วยบัญชี OpenAI ของคุณในหน้าต่างที่เปิดขึ้น (ครั้งแรกเท่านั้น)</p>
+                  <div class="nas-field">
+                    <label for="gptUrl">URL</label>
+                    <input type="text" id="gptUrl" readonly value="https://chatgpt.com/">
+                  </div>
+                  <label class="nas-remember toggle">
+                    <input type="checkbox" id="gptEnabled" aria-label="เปิดใช้งาน ChatGPT">
+                    <span class="toggle-slider"></span>
+                    <span class="nas-remember-label">เปิดใช้งาน ChatGPT บนเครื่องนี้</span>
+                  </label>
+                  <div class="nas-result" id="gptResult" aria-live="polite"></div>
+                </div>
+                <div id="webappSettingsPanelNkbkAi" class="webapp-settings-panel" hidden>
+                  <label class="nas-remember toggle">
+                    <input type="checkbox" id="nkbkAiEnabled" aria-label="เปิดใช้งาน ChatGPT โมเน่">
+                    <span class="toggle-slider"></span>
+                    <span class="nas-remember-label">เปิดใช้งาน ChatGPT โมเน่</span>
+                  </label>
+                  <div class="nas-field">
+                    <label for="nkbkAiStandingLocal">คำสั่งที่ต้องการให้ AI จำ</label>
+                    <div class="nkbk-field-stack">
+                      <div class="nkbk-callname-inbox" id="nkbkAiCallNameInBox">
+                        <span class="nkbk-callname-icon" aria-hidden="true">🏷️</span>
+                        <div class="nkbk-callname-copy">
+                          <span class="nkbk-callname-label">ชื่อที่ AI เรียกคุณ</span>
+                          <input type="text" id="nkbkAiCallNameLocal" class="nkbk-callname-input" placeholder="เช่น คุณผู้ชาย, พี่ก๊อต" maxlength="40">
+                        </div>
+                        <span class="nkbk-callname-note">sync LINE</span>
+                      </div>
+                      <textarea id="nkbkAiStandingLocal" rows="5" placeholder="เช่น ตอบสั้นๆ / ใช้ภาษาง่ายๆ"></textarea>
+                    </div>
+                  </div>
+                  <div class="nas-result" id="nkbkAiResult" aria-live="polite"></div>
+                </div>
               </div>
-            </section>
+              <div class="ledck-modal-footer">
+                <button type="button" class="btn-test btn-secondary" id="webappSettingsCancel">ปิด</button>
+                <button type="button" class="btn-test" id="btnGptSaveSettings" style="display:none">บันทึกการตั้งค่า</button>
+                <button type="button" class="btn-test" id="btnNkbkAiSaveSettings" style="display:none">บันทึกการตั้งค่า</button>
+                <button type="button" class="btn-test" id="btnWebSaveSettings">บันทึกการตั้งค่า</button>
+                <button type="button" class="btn-test btn-open-in-app" id="btnWebOpenInApp" title="เปิดในแอป แล้วเติม User/Pass ให้อัตโนมัติ">
+                  <span class="btn-test-icon">📱</span>
+                  เปิดในแอป
+                </button>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -259,6 +371,7 @@
               <div class="card-header"><span class="card-icon">📊</span><h2>ยอดลาคงเหลือปีนี้</h2>
                 <div class="leave-header-actions">
                   <span class="leave-year-badge" id="leaveYearBadge">—</span>
+                  <button type="button" class="btn-leave-submit" id="btnLeaveSubmit" title="ส่งคำขอลางาน">+ ลางาน</button>
                   <button type="button" class="btn-mini" id="btnLeaveRefresh" title="รีเฟรช">↻</button>
                 </div>
               </div>
@@ -432,6 +545,67 @@
       </div>
     </main>
 
+    <div class="ledck-modal" id="leaveSubmitModal" aria-hidden="true">
+      <div class="ledck-modal-backdrop" id="leaveSubmitModalBackdrop"></div>
+      <div class="ledck-modal-box ledck-modal-box-wide">
+        <div class="ledck-modal-header">
+          <h3>ส่งคำขอลางาน</h3>
+          <button type="button" class="ledck-modal-close" id="leaveSubmitModalClose" aria-label="ปิด">×</button>
+        </div>
+        <div class="ledck-modal-body">
+          <div class="web-form leave-submit-form">
+            <div class="nas-field">
+              <label>ประเภทการลา</label>
+              <div class="leave-type-btns" id="leaveSubmitTypeBtns"><span class="muted leave-chip-loading">กำลังโหลด...</span></div>
+            </div>
+            <div class="nas-field">
+              <label>รูปแบบการลา</label>
+              <div class="leave-partial-btns" id="leaveSubmitPartialBtns"></div>
+            </div>
+            <div class="leave-submit-dates">
+              <div class="nas-field">
+                <label for="leaveSubmitStartText">วันที่เริ่ม</label>
+                <div class="thai-date-wrap">
+                  <input type="text" id="leaveSubmitStartText" class="thai-date-text" placeholder="21/05/2569" inputmode="numeric" autocomplete="off" maxlength="10">
+                  <input type="hidden" id="leaveSubmitStart">
+                  <button type="button" class="thai-date-cal-btn" data-thai-date-btn="leaveSubmitStart" aria-label="เลือกวันที่">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  </button>
+                  <input type="date" class="thai-date-native" id="leaveSubmitStartNative" tabindex="-1" aria-hidden="true">
+                </div>
+              </div>
+              <div class="nas-field">
+                <label for="leaveSubmitEndText">วันที่สิ้นสุด</label>
+                <div class="thai-date-wrap">
+                  <input type="text" id="leaveSubmitEndText" class="thai-date-text" placeholder="21/05/2569" inputmode="numeric" autocomplete="off" maxlength="10">
+                  <input type="hidden" id="leaveSubmitEnd">
+                  <button type="button" class="thai-date-cal-btn" data-thai-date-btn="leaveSubmitEnd" aria-label="เลือกวันที่">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  </button>
+                  <input type="date" class="thai-date-native" id="leaveSubmitEndNative" tabindex="-1" aria-hidden="true">
+                </div>
+              </div>
+            </div>
+            <div class="leave-submit-duration" id="leaveSubmitDuration">จำนวนวัน: —</div>
+            <div class="nas-field leave-reason-field">
+              <label for="leaveSubmitReason">เหตุผล / หมายเหตุ</label>
+              <div class="leave-reason-box">
+                <textarea id="leaveSubmitReason" rows="3" maxlength="500" placeholder="เช่น ติดธุระส่วนตัว, ไปพบแพทย์, ลาพักผ่อน..."></textarea>
+                <div class="leave-reason-footer">
+                  <span class="leave-reason-count" id="leaveSubmitReasonCount">0/500</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="nas-result" id="leaveSubmitResult" aria-live="polite"></div>
+        </div>
+        <div class="ledck-modal-footer">
+          <button type="button" class="btn-test btn-secondary" id="leaveSubmitCancel">ยกเลิก</button>
+          <button type="button" class="btn-test btn-primary" id="leaveSubmitConfirm">ยืนยัน &amp; ส่งคำขอ</button>
+        </div>
+      </div>
+    </div>
+
     <div class="ledck-modal" id="monitorPinModal" aria-hidden="true">
       <div class="ledck-modal-backdrop" id="monitorPinModalBackdrop"></div>
       <div class="ledck-modal-box">
@@ -592,13 +766,27 @@
       /** ฝั่งที่ออกโทเคน (local = ว่าง, remote = URL) — ต้องตรงกับตอนล็อกอิน รีเฟรชจึงไม่เด้งออก */
       var monitorSessionBase = '';
       var MONITOR_LOGIN_API_BASE_KEY = 'monitor_login_api_base';
-      function resolveMonitorSessionBaseFromStorage(configMonitorUrl) {
+      function readSavedSessionBase() {
         var saved = localStorage.getItem(MONITOR_LOGIN_API_BASE_KEY);
-        if (saved === null || saved === undefined) {
-          return (configMonitorUrl || '').trim().replace(/\/$/, '');
-        }
-        if (saved === 'local') return '';
+        if (saved === 'local' || saved === null || saved === undefined || saved === '') return '';
         return String(saved).trim().replace(/\/$/, '');
+      }
+      function fetchWithTimeout(url, options, ms) {
+        ms = ms || 8000;
+        options = options || {};
+        if (typeof AbortController !== 'undefined') {
+          var ctrl = new AbortController();
+          var timer = setTimeout(function() {
+            try {
+              ctrl.abort();
+            } catch (eAbort) {}
+          }, ms);
+          options.signal = ctrl.signal;
+          return fetch(url, options).finally(function() {
+            clearTimeout(timer);
+          });
+        }
+        return fetch(url, options);
       }
       function monitorUrlForBase(base, apiPath) {
         if (!base) return apiPath;
@@ -608,15 +796,15 @@
         return monitorUrlForBase(monitorSessionBase, apiPath);
       }
       function buildMonitorMeAttempts() {
-        var primary = resolveMonitorSessionBaseFromStorage(apiBase);
-        var attempts = [];
-        if (primary) {
-          attempts.push(primary);
-          attempts.push('');
-        } else {
-          attempts.push('');
-          if (apiBase) attempts.push(String(apiBase).trim().replace(/\/$/, ''));
+        var attempts = [''];
+        var saved = localStorage.getItem(MONITOR_LOGIN_API_BASE_KEY);
+        var remote = '';
+        if (saved && saved !== 'local') {
+          remote = String(saved).trim().replace(/\/$/, '');
+        } else if (apiBase) {
+          remote = String(apiBase).trim().replace(/\/$/, '');
         }
+        if (remote && attempts.indexOf(remote) < 0) attempts.push(remote);
         return attempts;
       }
       function meUrlFromAttemptBase(b) {
@@ -885,7 +1073,7 @@
             return;
           }
           var b = attempts[idx++];
-          fetch(meUrlFromAttemptBase(b), { headers: { 'X-Monitor-Token': token } })
+          fetchWithTimeout(meUrlFromAttemptBase(b), { headers: { 'X-Monitor-Token': token }, cache: 'no-store' }, b ? 8000 : 5000)
             .then(function(r) {
               var st = r.status;
               if (st === 401) {
@@ -903,12 +1091,18 @@
                 return;
               }
               if (idx < attempts.length) next();
-              else onAuthReady();
+              else {
+                clearMonitorAuth();
+                redirectToLogin();
+              }
             })
             .catch(function(err) {
               console.warn('monitor-me', err);
               if (idx < attempts.length) next();
-              else onAuthReady();
+              else {
+                clearMonitorAuth();
+                redirectToLogin();
+              }
             });
         }
         next();
@@ -1159,11 +1353,11 @@
       }
       fetch('/api/config').then(function(r) { return r.json(); }).then(function(c) {
         apiBase = (c.monitorApiUrl || '').trim().replace(/\/$/, '');
-        monitorSessionBase = resolveMonitorSessionBaseFromStorage(apiBase);
+        monitorSessionBase = readSavedSessionBase();
         if (c && c.appVersion) setAppVersion(c.appVersion);
         checkMe();
       }).catch(function() {
-        monitorSessionBase = resolveMonitorSessionBaseFromStorage('');
+        monitorSessionBase = readSavedSessionBase();
         checkMe();
       });
       if (window.electronAPI && window.electronAPI.getAppVersion) {

@@ -38,7 +38,7 @@ const bucket = admin.storage().bucket();
 function pdfViewerHtml(url, docTitle) {
   const safe = url.replace(/"/g, '&quot;');
   const t = (docTitle || 'เอกสาร PDF').replace(/"/g, '');
-  return `<div class="pdf-viewer"><iframe src="${safe}#view=FitH" title="${t}" loading="lazy"></iframe></div>`;
+  return `<div class="pdf-viewer pdf-viewer--a4"><iframe src="${safe}#page=1&view=Fit" title="${t}" loading="lazy"></iframe></div>`;
 }
 
 async function uploadLocalFile(filePath, ext, contentType) {

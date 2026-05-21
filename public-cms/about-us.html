@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="สหกรณ์ออมทรัพย์สาธารณสุขหนองคาย จำกัด — ข่าวสาร บริการสมาชิก แจ้งโอนเงิน ดาวน์โหลดเอกสาร" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="NKBKCOOP" />
+  <meta property="og:title" content="เกี่ยวกับเรา — NKBKCOOP" />
+  <meta property="og:description" content="สหกรณ์ออมทรัพย์สาธารณสุขหนองคาย จำกัด — ข่าวสาร บริการสมาชิก แจ้งโอนเงิน ดาวน์โหลดเอกสาร" />
+  <meta property="og:image" content="https://res.cloudinary.com/dzs7zbikj/image/upload/c_pad,b_white,w_1200,h_630,f_jpg,q_auto/v1770613894/site-config/vd64o0efi0hdpetkzyrf.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:url" content="https://admin-panel-nkbkcoop-cbf10.web.app/about-us" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="https://res.cloudinary.com/dzs7zbikj/image/upload/c_pad,b_white,w_1200,h_630,f_jpg,q_auto/v1770613894/site-config/vd64o0efi0hdpetkzyrf.png" />
+  <title>เกี่ยวกับเรา — NKBKCOOP</title>
+  <link rel="icon" href="https://res.cloudinary.com/dzs7zbikj/image/upload/w_32,h_32,c_fit,f_png,q_auto/v1770613894/site-config/vd64o0efi0hdpetkzyrf.png" type="image/png" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="cms-header"></div>
+  <div id="cms-page-title"></div>
+  <main id="cms-page-content"></main>
+  <div id="cms-footer"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
+  <script src="/firebase-config.js"></script>
+  <script src="/site-config.js"></script>
+  <script src="/social-meta.js"></script>
+  <script src="/i18n.js"></script>
+  <script src="/icons.js"></script>
+  <script src="/layout.js"></script>
+  <script src="/about-page.js?v=4"></script>
+  <script src="/app.js?v=6"></script>
+  <script>
+    initStaticPage().catch(function (e) {
+      var main = document.getElementById('cms-page-content');
+      if (main) main.innerHTML = '<p class="error text-center">' + (e.message || e) + '</p>';
+    });
+  </script>
+</body>
+</html>

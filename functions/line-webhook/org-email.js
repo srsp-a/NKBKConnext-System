@@ -157,7 +157,15 @@ function cloudflareSend({ from, fromName, to, subject, html, replyTo }) {
             return reject(new Error(`Cloudflare invalid JSON: ${body.slice(0, 200)}`));
           }
           if (!data.success) {
+            const code = data.errors && data.errors[0] && data.errors[0].code;
             const msg = (data.errors && data.errors[0] && data.errors[0].message) || body.slice(0, 300);
+            if (code === 10000 || String(msg).includes('sending_disabled')) {
+              return reject(
+                new Error(
+                  'Cloudflare Email Sending ยังไม่เปิด — ไป Email Sending → Onboard Domain → nkbkcoop.com → Add records (ดู docs/PHASE4_CLOUDFLARE_EMAIL_SETUP.md)'
+                )
+              );
+            }
             return reject(new Error(msg));
           }
           resolve(data.result || data);

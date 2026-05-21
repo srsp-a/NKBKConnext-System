@@ -389,7 +389,7 @@
       var LINE_BC_NAME = 'nkbk-line-oauth';
       var LINE_STATE_KEY = 'line_oauth_state';
       var LINE_STARTED_KEY = 'line_oauth_started';
-      var pendingGithubRelease = null;
+      var pendingPortableRelease = null;
       try {
         var _sp = new URLSearchParams(window.location.search);
         if (_sp.get('line_resume') === '1') {
@@ -413,65 +413,114 @@
         loginMsg.textContent = '';
       }
       var MONITOR_LOGIN_API_BASE_KEY = 'monitor_login_api_base';
-      function resolveMonitorSessionBaseFromStorage(configMonitorUrl) {
-        var saved = localStorage.getItem(MONITOR_LOGIN_API_BASE_KEY);
-        if (saved === null || saved === undefined) {
-          return (configMonitorUrl || '').trim().replace(/\/$/, '');
-        }
-        if (saved === 'local') return '';
-        return String(saved).trim().replace(/\/$/, '');
+      var authRedirecting = false;
+      var authFormShown = false;
+      function showLoginFormNow() {
+        if (authRedirecting || authFormShown) return;
+        authFormShown = true;
+        authLoading.style.display = 'none';
+        loginForm.style.display = 'block';
       }
-      function monitorMeUrl(sessionBase) {
-        if (!sessionBase) return '/api/monitor-me';
-        return String(sessionBase).replace(/\/$/, '') + '/api/monitor-me';
+      function fetchWithTimeout(url, options, ms) {
+        ms = ms || 8000;
+        options = options || {};
+        if (typeof AbortController !== 'undefined') {
+          var ctrl = new AbortController();
+          var timer = setTimeout(function() {
+            try {
+              ctrl.abort();
+            } catch (eAbort) {}
+          }, ms);
+          options.signal = ctrl.signal;
+          return fetch(url, options).finally(function() {
+            clearTimeout(timer);
+          });
+        }
+        return fetch(url, options);
+      }
+      function persistMonitorSessionLocally(data, done) {
+        if (!data || !data.token) {
+          if (done) done();
+          return;
+        }
+        fetch('/api/monitor-session-register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Monitor-Token': data.token },
+          body: JSON.stringify({
+            username: data.username || '',
+            fullname: data.fullname || '',
+            email: data.email || '',
+            group: data.group || '',
+            role: data.role || ''
+          })
+        })
+          .then(function() {
+            if (done) done();
+          })
+          .catch(function() {
+            if (done) done();
+          });
       }
       function checkTokenAndShowForm() {
         var token = localStorage.getItem('monitor_token');
         if (!token) {
-          authLoading.style.display = 'none';
-          loginForm.style.display = 'block';
+          showLoginFormNow();
           return;
         }
-        var primary = resolveMonitorSessionBaseFromStorage(apiBase);
-        var attempts = [];
-        if (primary) {
-          attempts.push(primary);
-          attempts.push('');
-        } else {
-          attempts.push('');
-          if (apiBase) attempts.push(String(apiBase).trim().replace(/\/$/, ''));
-        }
-        var ai = 0;
-        function tryMe() {
-          if (ai >= attempts.length) {
-            authLoading.style.display = 'none';
-            loginForm.style.display = 'block';
-            return;
-          }
-          var b = attempts[ai++];
-          fetch(monitorMeUrl(b), { headers: { 'X-Monitor-Token': token } })
-            .then(function(r) {
-              if (r.status === 401) {
-                tryMe();
-                return null;
-              }
-              return r.json();
-            })
-            .then(function(data) {
-              if (!data) return;
-              if (data && data.ok) {
-                if (b === '') localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, 'local');
-                else localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, String(b).replace(/\/$/, ''));
-                window.location.replace('index.html');
-                return;
-              }
-              tryMe();
-            })
-            .catch(function() {
-              tryMe();
+        fetchWithTimeout(
+          '/api/monitor-me',
+          { headers: { 'X-Monitor-Token': token }, cache: 'no-store' },
+          8000
+        )
+          .then(function(r) {
+            if (r.status === 401) return { ok: false };
+            return r.json().catch(function() {
+              return { ok: false };
             });
+          })
+          .then(function(data) {
+            if (data && data.ok) {
+              authRedirecting = true;
+              localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, 'local');
+              window.location.replace('index.html');
+              return;
+            }
+            showLoginFormNow();
+          })
+          .catch(function() {
+            showLoginFormNow();
+          });
+      }
+
+      function applyLoginConfig(c) {
+        if (!c) return;
+        if (c.appVersion) setLoginVersion(c.appVersion);
+        apiBase = c.monitorApiUrl ? String(c.monitorApiUrl).trim().replace(/\/$/, '') : '';
+        monitorRemoteLogin = !!c.remoteLogin;
+        if (saFirestoreHint) {
+          if (c.monitorFirestoreReady === false) {
+            saFirestoreHint.style.display = 'block';
+            saFirestoreHint.textContent =
+              'ยังไม่เชื่อม Firestore บนเครื่องนี้ — วางไฟล์ firebase-service-account.json (หรือ serviceAccountKey.json) ในโฟลเดอร์เดียวกับโปรแกรม หรือตั้งค่า FIREBASE_SERVICE_ACCOUNT_PATH ชี้ไปที่ไฟล์ JSON จาก Firebase Console (โปรเจกต์ > บริการบัญชี) — ไฟล์นี้ไม่รวมใน Git';
+          } else {
+            saFirestoreHint.style.display = 'none';
+            saFirestoreHint.textContent = '';
+          }
         }
-        tryMe();
+        if (monitorRemoteLogin) {
+          pinInput.removeAttribute('maxlength');
+          pinInput.removeAttribute('pattern');
+          pinInput.removeAttribute('inputmode');
+          pinInput.placeholder = 'รหัส PIN หรือรหัสผ่าน';
+        } else {
+          pinInput.setAttribute('maxlength', '6');
+          pinInput.setAttribute('inputmode', 'numeric');
+          pinInput.placeholder = 'PIN 6 หลัก';
+        }
+        if (c.lineLoginEnabled && btnLine && lineLoginDivider) {
+          lineLoginDivider.style.display = 'block';
+          btnLine.classList.add('show');
+        }
       }
 
       var forcedUpdateOverlay = document.getElementById('forcedUpdateOverlay');
@@ -505,7 +554,7 @@
         if (forcedUpdateTail) {
           forcedUpdateTail.textContent = installedPackaged
             ? ' — ตัวติดตั้ง: ดาวน์โหลดแล้วติดตั้งทับอัตโนมัติ จากนั้นกดรีสตาร์ทตามที่หน้าจอแจ้ง (จำเป็นต้องอัปเดตก่อนใช้งานต่อ)'
-            : ' — แบบพกพา: จาก GitHub ดาวน์โหลดไฟล์ใหม่แล้วแทนไฟล์ .exe เดิม';
+            : ' — แบบพกพา: ดาวน์โหลดไฟล์ใหม่จากเซิร์ฟเวอร์องค์กร (Firebase) แล้วแทนไฟล์ .exe เดิม';
         }
         if (btnForcedUpdateSkip) {
           if (installedPackaged) btnForcedUpdateSkip.classList.add('hidden');
@@ -558,27 +607,29 @@
           }
           return;
         }
-        if (window.electronAPI.checkGithubRelease) {
-          window.electronAPI
-            .checkGithubRelease()
+        var checkPortableFn =
+          window.electronAPI.checkDesktopRelease || window.electronAPI.checkGithubRelease;
+        var dlPortableFn =
+          window.electronAPI.downloadDesktopRelease || window.electronAPI.downloadGithubRelease;
+        if (checkPortableFn) {
+          checkPortableFn()
             .then(function(u) {
               if (u && u.hasUpdate && u.latestVersion) {
-                pendingGithubRelease = u;
+                pendingPortableRelease = u;
                 showForcedUpdateOverlay(u.latestVersion);
               }
             })
             .catch(function() {});
         }
-        if (window.electronAPI.downloadGithubRelease) {
+        if (dlPortableFn) {
           btnForcedUpdateDl.addEventListener('click', function() {
-            if (!pendingGithubRelease) return;
+            if (!pendingPortableRelease) return;
             btnForcedUpdateDl.disabled = true;
             btnForcedUpdateDl.textContent = 'กำลังดาวน์โหลด...';
-            window.electronAPI
-              .downloadGithubRelease({
-                url: pendingGithubRelease.downloadUrl,
-                fileName: pendingGithubRelease.fileName
-              })
+            dlPortableFn({
+              url: pendingPortableRelease.downloadUrl,
+              fileName: pendingPortableRelease.fileName
+            })
               .then(function(res) {
                 btnForcedUpdateDl.disabled = false;
                 btnForcedUpdateDl.textContent = 'ดาวน์โหลดอัปเดต';
@@ -628,36 +679,18 @@
       var monitorRemoteLogin = false;
       var apiBase = '';
       var saFirestoreHint = document.getElementById('saFirestoreHint');
+      var hasStoredToken = !!localStorage.getItem('monitor_token');
+      if (hasStoredToken) {
+        checkTokenAndShowForm();
+      } else {
+        setTimeout(function() {
+          if (!authFormShown && !authRedirecting) showLoginFormNow();
+        }, 3000);
+      }
       fetch('/api/config', { cache: 'no-store' })
         .then(function(r) { return r.json(); })
         .then(function(c) {
-          if (c && c.appVersion) setLoginVersion(c.appVersion);
-          apiBase = (c && c.monitorApiUrl) ? String(c.monitorApiUrl).trim().replace(/\/$/, '') : '';
-          monitorRemoteLogin = !!(c && c.remoteLogin);
-          if (saFirestoreHint) {
-            if (c && c.monitorFirestoreReady === false) {
-              saFirestoreHint.style.display = 'block';
-              saFirestoreHint.textContent =
-                'ยังไม่เชื่อม Firestore บนเครื่องนี้ — วางไฟล์ firebase-service-account.json (หรือ serviceAccountKey.json) ในโฟลเดอร์เดียวกับโปรแกรม หรือตั้งค่า FIREBASE_SERVICE_ACCOUNT_PATH ชี้ไปที่ไฟล์ JSON จาก Firebase Console (โปรเจกต์ > บริการบัญชี) — ไฟล์นี้ไม่รวมใน Git';
-            } else {
-              saFirestoreHint.style.display = 'none';
-              saFirestoreHint.textContent = '';
-            }
-          }
-          if (monitorRemoteLogin) {
-            pinInput.removeAttribute('maxlength');
-            pinInput.removeAttribute('pattern');
-            pinInput.removeAttribute('inputmode');
-            pinInput.placeholder = 'รหัส PIN หรือรหัสผ่าน';
-          } else {
-            pinInput.setAttribute('maxlength', '6');
-            pinInput.setAttribute('inputmode', 'numeric');
-            pinInput.placeholder = 'PIN 6 หลัก';
-          }
-          if (c && c.lineLoginEnabled && btnLine && lineLoginDivider) {
-            lineLoginDivider.style.display = 'block';
-            btnLine.classList.add('show');
-          }
+          applyLoginConfig(c);
           try {
             var savedSt = sessionStorage.getItem(LINE_STATE_KEY);
             var started = parseInt(sessionStorage.getItem(LINE_STARTED_KEY) || '0', 10);
@@ -673,10 +706,10 @@
               startLineLoginPoll(savedSt);
             }
           } catch (xResume) {}
-          checkTokenAndShowForm();
+          if (!hasStoredToken) showLoginFormNow();
         })
         .catch(function() {
-          checkTokenAndShowForm();
+          if (!hasStoredToken) showLoginFormNow();
         });
 
       pinInput.addEventListener('input', function() {
@@ -889,13 +922,16 @@
         function finishLogin(res) {
           var data = res.data;
           if (data && data.ok && data.token) {
-            localStorage.setItem('monitor_token', data.token);
-            localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, sessionBaseToStore);
-            if (window.electronAPI && typeof window.electronAPI.setMonitorPushToken === 'function') {
-              window.electronAPI.setMonitorPushToken(data.token);
+            function completeLogin() {
+              localStorage.setItem('monitor_token', data.token);
+              localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, 'local');
+              if (window.electronAPI && typeof window.electronAPI.setMonitorPushToken === 'function') {
+                window.electronAPI.setMonitorPushToken(data.token);
+              }
+              showMsg('เข้าสู่ระบบสำเร็จ กำลังเปลี่ยนหน้า...', false);
+              window.location.replace('index.html');
             }
-            showMsg('เข้าสู่ระบบสำเร็จ กำลังเปลี่ยนหน้า...', false);
-            window.location.replace('index.html');
+            persistMonitorSessionLocally(data, completeLogin);
           } else {
             btnSubmit.disabled = false;
             btnSubmit.textContent = 'เข้าสู่ระบบ';
@@ -909,28 +945,30 @@
           }
         }
         var directUrl = apiBase ? (apiBase + '/api/monitor-login') : '';
-        var sessionBaseToStore = directUrl ? String(apiBase).trim().replace(/\/$/, '') : 'local';
-        var loginPromise = directUrl
-          ? fetch(directUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: body
-            }).then(parseLoginResponse)
-          : fetch('/api/monitor-login', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: body
-            }).then(parseLoginResponse);
-        loginPromise
+        function shouldFallbackToDirectRemote(res) {
+          if (!directUrl || !res) return false;
+          if (res.data && res.data.ok && res.data.token) return false;
+          if (res.status === 502 || res.status === 503 || res.status === 504) return true;
+          if (res.status === 403 && res.data && String(res.data.message || '').indexOf('<') >= 0) return true;
+          return false;
+        }
+        function postLocalLogin() {
+          return fetch('/api/monitor-login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: body
+          }).then(parseLoginResponse);
+        }
+        function postDirectLogin() {
+          return fetch(directUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: body
+          }).then(parseLoginResponse);
+        }
+        postLocalLogin()
           .then(function(res) {
-            if (directUrl && res.status === 403 && res.data && String(res.data.message || '').indexOf('<') >= 0) {
-              sessionBaseToStore = 'local';
-              return fetch('/api/monitor-login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: body
-              }).then(parseLoginResponse);
-            }
+            if (shouldFallbackToDirectRemote(res)) return postDirectLogin();
             return res;
           })
           .then(function(res) {
@@ -938,13 +976,7 @@
           })
           .catch(function() {
             if (directUrl) {
-              sessionBaseToStore = 'local';
-              return fetch('/api/monitor-login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: body
-              })
-                .then(parseLoginResponse)
+              return postDirectLogin()
                 .then(finishLogin)
                 .catch(function() {
                   btnSubmit.disabled = false;

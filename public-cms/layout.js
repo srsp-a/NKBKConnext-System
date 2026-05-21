@@ -16,6 +16,12 @@
     const p = wpPath.startsWith('/') ? wpPath : `/${wpPath}`;
     const withSlash = p.endsWith('/') ? p : `${p}/`;
     if (withSlash === '/download/' || p === '/download') return '/download';
+    if (withSlash === '/about-us/' || p === '/about-us') return '/about-us';
+    if (withSlash === '/team/' || p === '/team') return '/team';
+    if (withSlash === '/management/' || p === '/management') return '/management';
+    if (withSlash === '/contact/' || p === '/contact') return '/contact';
+    if (withSlash === '/infrom-payment/' || p === '/infrom-payment') return '/infrom-payment';
+    if (withSlash === '/infrom-payment-line/' || p === '/infrom-payment-line') return '/infrom-payment-line';
     const id = pages[withSlash] || pages[p];
     return id ? pageUrl(id) : legacyUrl(p);
   }

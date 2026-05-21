@@ -27,6 +27,11 @@ function getPostIdFromLocation() {
 function getPageIdFromLocation() {
   const path = (location.pathname || '').replace(/\/+$/, '') || '/';
   if (path === '/download') return '7934';
+  if (path === '/about-us') return '241';
+  if (path === '/team') return '420';
+  if (path === '/management') return '8929';
+  if (path === '/contact') return '354';
+  if (path === '/infrom-payment' || path === '/infrom-payment-line') return '9304';
   const pathKey = path === '/' ? '/' : `${path}/`;
   const pages = (window.CMS_SITE && window.CMS_SITE.cmsPages) || {};
   if (pages[pathKey]) return String(pages[pathKey]);
@@ -57,6 +62,22 @@ function isPdfUrl(url) {
   }
 }
 
+/** URL สำหรับ iframe PDF — แสดงเต็มหน้าแบบ A4 แนวตั้ง */
+function pdfIframeSrc(url) {
+  const base = String(url || '').split('#')[0];
+  return `${base}#page=1&view=Fit`;
+}
+
+function normalizePdfViewers(root) {
+  if (!root) return;
+  root.querySelectorAll('.pdf-viewer iframe').forEach((iframe) => {
+    const src = iframe.getAttribute('src') || '';
+    if (!isPdfUrl(src)) return;
+    const next = pdfIframeSrc(src);
+    if (src !== next) iframe.setAttribute('src', next);
+  });
+}
+
 function enhancePostContent(root) {
   if (!root) return;
   root.querySelectorAll('a[href]').forEach((a) => {
@@ -67,9 +88,9 @@ function enhancePostContent(root) {
     const inPdfBlock = !!a.closest('.wp-block-pdfemb-pdf-embedder-viewer, [class*="pdfemb"]');
     if (!isPdfUrl(href) && !isPdfemb && !inPdfBlock) return;
     const wrap = document.createElement('div');
-    wrap.className = 'pdf-viewer';
+    wrap.className = 'pdf-viewer pdf-viewer--a4';
     const iframe = document.createElement('iframe');
-    iframe.src = href.includes('#') ? href : `${href}#view=FitH`;
+    iframe.src = pdfIframeSrc(href);
     iframe.title = (a.textContent || 'PDF').trim() || 'PDF';
     iframe.loading = 'lazy';
     wrap.appendChild(iframe);
@@ -80,6 +101,7 @@ function enhancePostContent(root) {
       a.replaceWith(wrap);
     }
   });
+  normalizePdfViewers(root);
 }
 
 function rewriteContentLinks(root) {
@@ -100,7 +122,16 @@ function rewriteContentLinks(root) {
       const pages = (window.CMS_SITE && window.CMS_SITE.cmsPages) || {};
       const pathKey = u.pathname.endsWith('/') ? u.pathname : `${u.pathname}/`;
       if (pages[pathKey]) {
-        a.setAttribute('href', `/page/${pages[pathKey]}`);
+        const pageId = pages[pathKey];
+        const pretty = {
+          '7934': '/download',
+          '241': '/about-us',
+          '420': '/team',
+          '8929': '/management',
+          '354': '/contact',
+          '9304': '/infrom-payment'
+        };
+        a.setAttribute('href', pretty[pageId] || `/page/${pageId}`);
         return;
       }
       if (u.pathname === '/' || u.pathname === '') {
@@ -118,6 +149,32 @@ function siteTabTitle() {
 
 async function loadSiteName() {
   document.title = siteTabTitle();
+}
+
+function applyPageSocial(opts) {
+  if (!window.CmsSocial) return;
+  CmsSocial.apply(opts);
+}
+
+function socialFromPage(page, urlPath) {
+  const title = page.title || siteTabTitle();
+  const html = page.html || '';
+  const desc =
+    (window.CmsSocial && CmsSocial.stripHtml(html).slice(0, 200)) ||
+    (window.CMS_SITE && CMS_SITE.og && CMS_SITE.og.description) ||
+    '';
+  const img =
+    (window.CmsSocial && CmsSocial.firstImgFromHtml(html)) ||
+    (window.CmsSocial && CmsSocial.defaultImage()) ||
+    '';
+  const origin = location.origin.replace(/\/$/, '');
+  applyPageSocial({
+    title,
+    documentTitle: title + ' — ' + siteTabTitle(),
+    description: desc,
+    image: img,
+    url: origin + (urlPath || location.pathname)
+  });
 }
 
 function loadElementorPageCss(pageId) {
@@ -143,25 +200,105 @@ async function fetchPageHtml(pageId) {
   return { html: json.content?.rendered || '', title: json.title?.rendered || '' };
 }
 
+const CMS_VIEW_SESSION = 'cms_pv_v3_';
+
+function formatViewCount(n) {
+  const num = Number(n) || 0;
+  const lang = window.CmsI18n?.getLang() || 'th';
+  return num.toLocaleString(lang === 'en' ? 'en-US' : 'th-TH');
+}
+
+function renderViewBadge(count) {
+  const label = t('news.views');
+  return `<span class="kb-news-views" title="${escapeHtml(label)}">${kbIcon('eye', 14)}<span class="kb-news-views-num">${formatViewCount(count)}</span></span>`;
+}
+
+async function fetchPostViewCounts(ids) {
+  if (window.CmsCounters) {
+    return CmsCounters.fetchMap('cms_post_views', ids);
+  }
+  return {};
+}
+
+async function trackPostView(postId) {
+  if (!postId || !window.CmsCounters) return 0;
+  const id = String(postId);
+  const sessionKey = CMS_VIEW_SESSION + id;
+  const existing = await fetchPostViewCounts([id]);
+  const stored = existing[id] || 0;
+  if (sessionStorage.getItem(sessionKey)) {
+    return stored;
+  }
+  try {
+    const next = await CmsCounters.bump('cms_post_views', id);
+    if (next != null) sessionStorage.setItem(sessionKey, '1');
+    return next != null ? next : stored;
+  } catch (e) {
+    return stored;
+  }
+}
+
+async function loadCategoryNameMap() {
+  const map = {};
+  if (typeof db === 'undefined') return map;
+  try {
+    const snap = await db.collection('cms_categories').get();
+    snap.docs.forEach((doc) => {
+      const name = doc.data().name || doc.data().slug || '';
+      map[String(doc.id)] = name;
+    });
+  } catch (e) {
+    console.warn('categories', e.message);
+  }
+  return map;
+}
+
+function postCategoryLabel(d, categoryMap) {
+  const ids = (d.categoryIds || []).map(String);
+  if (!ids.length || !categoryMap) return '';
+  const hit = ids.find((id) => categoryMap[id]);
+  return hit ? categoryMap[hit] : '';
+}
+
 function renderNewsCard(post, opts) {
   const id = post.id;
   const d = post.data();
   const href = postUrl(id);
   const compact = opts && opts.compact;
-  const img = d.featuredImageUrl
-    ? `<img src="${escapeHtml(d.featuredImageUrl)}" alt="" loading="lazy">`
-    : '';
-  const cardClass = compact ? 'kb-news-card kb-news-card--compact' : 'kb-news-card';
+  const list = opts && opts.list;
+  const viewCount = opts && opts.viewCount != null ? opts.viewCount : 0;
   const title = escapeHtml(d.title || '');
+  const catLabel = postCategoryLabel(d, opts && opts.categoryMap);
+  const mediaInner = d.featuredImageUrl
+    ? `<img src="${escapeHtml(d.featuredImageUrl)}" alt="" loading="lazy">`
+    : `<div class="kb-news-card-placeholder" aria-hidden="true">${kbIcon('news', 32)}</div>`;
+  const cardClass = [
+    'kb-news-card',
+    compact ? 'kb-news-card--compact' : '',
+    list ? 'kb-news-card--list' : ''
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const excerpt =
+    !compact && d.excerpt ? `<p class="kb-news-card-excerpt kb-clamp-3">${escapeHtml(d.excerpt)}</p>` : '';
+  const catBadge = catLabel
+    ? `<span class="kb-news-card-cat">${escapeHtml(catLabel)}</span>`
+    : '';
   return `
 <article class="${cardClass}">
-  ${img}
-  <div class="kb-news-card-body">
-    <time class="kb-news-date">${formatDate(d.publishedAt)}</time>
-    <h3 class="kb-clamp-2"><a href="${href}" title="${title}">${title}</a></h3>
-    ${!compact && d.excerpt ? `<p class="kb-clamp-2">${escapeHtml(d.excerpt)}</p>` : ''}
-    <a class="kb-link-more" href="${href}">${t('news.readMore')} ${kbIcon('arrow-right', 16)}</a>
-  </div>
+  <a class="kb-news-card-hit" href="${href}">
+    <div class="kb-news-card-media">${mediaInner}</div>
+    <div class="kb-news-card-body">
+      ${catBadge}
+      <div class="kb-news-card-meta">
+        <time class="kb-news-date">${formatDate(d.publishedAt)}</time>
+        ${renderViewBadge(viewCount)}
+      </div>
+      <h3 class="kb-news-card-title kb-clamp-2">${title}</h3>
+      ${excerpt}
+      <span class="kb-news-card-cta">${t('news.readMore')} ${kbIcon('arrow-right', 16)}</span>
+    </div>
+  </a>
 </article>`;
 }
 
@@ -224,14 +361,25 @@ async function initHome() {
   const grid = document.getElementById('homeNewsGrid');
   try {
     const docs = await fetchPosts(6);
+    const viewMap = await fetchPostViewCounts(docs.map((p) => p.id));
     if (grid) {
       grid.innerHTML = docs.length
-        ? docs.map((p) => renderNewsCard(p, { compact: true })).join('')
+        ? docs
+            .map((p) => renderNewsCard(p, { compact: true, viewCount: viewMap[p.id] || 0 }))
+            .join('')
         : `<p class="muted">${t('news.empty')}</p>`;
     }
   } catch (e) {
     if (grid) grid.innerHTML = `<p class="error">${escapeHtml(e.message)}</p>`;
   }
+  const c = window.CMS_SITE || {};
+  applyPageSocial({
+    title: c.brandTitle || 'NKBKCOOP',
+    documentTitle: siteTabTitle(),
+    description: (c.og && c.og.description) || c.brandSubTh || '',
+    image: (c.og && c.og.image) || c.heroImage || c.logos?.header,
+    url: location.origin.replace(/\/$/, '') + '/'
+  });
 }
 
 async function initNewsList() {
@@ -256,10 +404,22 @@ async function initNewsList() {
   list.innerHTML = CmsLayout.renderLoading();
   try {
     const docs = await fetchPosts(300, cat);
+    const [viewMap, categoryMap] = await Promise.all([
+      fetchPostViewCounts(docs.map((p) => p.id)),
+      loadCategoryNameMap()
+    ]);
     list.innerHTML = docs.length
-      ? docs.map((p) => renderNewsCard(p, true)).join('')
+      ? docs
+          .map((p) =>
+            renderNewsCard(p, {
+              list: true,
+              viewCount: viewMap[p.id] || 0,
+              categoryMap
+            })
+          )
+          .join('')
       : `<p class="muted">${t('news.empty')}</p>`;
-    list.classList.add('kb-news-list');
+    list.classList.add('kb-news-list', 'kb-news-list--grid');
   } catch (e) {
     list.innerHTML = `<p class="error">${escapeHtml(e.message)}</p>`;
   }
@@ -295,7 +455,8 @@ async function initPost() {
     const d = doc.data();
     titleEl.textContent = d.title || '';
     document.title = (d.title || '') + ' — ' + siteTabTitle();
-    metaEl.textContent = formatDate(d.publishedAt);
+    const views = await trackPostView(doc.id);
+    metaEl.innerHTML = `<span class="kb-article-meta-date">${formatDate(d.publishedAt)}</span>${renderViewBadge(views)}`;
     if (history.replaceState) history.replaceState(null, '', postUrl(doc.id));
     bodyEl.innerHTML = d.contentHtml || '';
     bodyEl.classList.add('kb-prose');
@@ -304,6 +465,21 @@ async function initPost() {
     if (d.featuredImageUrl && heroEl) {
       heroEl.innerHTML = `<img src="${escapeHtml(d.featuredImageUrl)}" alt="">`;
     }
+    const desc =
+      (window.CmsSocial && CmsSocial.stripHtml(d.contentHtml || '').slice(0, 200)) ||
+      (window.CMS_SITE && CMS_SITE.og && CMS_SITE.og.description) ||
+      '';
+    applyPageSocial({
+      title: d.title || siteTabTitle(),
+      documentTitle: (d.title || '') + ' — ' + siteTabTitle(),
+      description: desc,
+      image:
+        d.featuredImageUrl ||
+        (window.CmsSocial && CmsSocial.firstImgFromHtml(d.contentHtml)) ||
+        (window.CmsSocial && CmsSocial.defaultImage()),
+      url: location.origin.replace(/\/$/, '') + postUrl(doc.id),
+      type: 'article'
+    });
   } catch (e) {
     bodyEl.innerHTML = `<p class="error">${escapeHtml(e.message)}</p>`;
   }
@@ -311,6 +487,71 @@ async function initPost() {
 
 const AGENDA_PAGE_ID = '13575';
 const DOWNLOAD_PAGE_ID = '7934';
+const ABOUT_PAGE_ID = '241';
+const TEAM_PAGE_ID = '420';
+const MANAGEMENT_PAGE_ID = '8929';
+const CONTACT_PAGE_ID = '354';
+const PAYMENT_PAGE_ID = '9304';
+
+async function initPaymentPage(main) {
+  main.innerHTML = CmsLayout.renderLoading();
+  try {
+    const page = await fetchPageHtml(PAYMENT_PAGE_ID);
+    const title = page.title || t('nav.payment') || 'แจ้งโอนเงิน';
+    document.title = title + ' — ' + siteTabTitle();
+    const titleWrap = document.getElementById('cms-page-title');
+    if (titleWrap) {
+      titleWrap.innerHTML = CmsLayout.renderPageTitle(escapeHtml(title), '');
+    }
+    main.innerHTML = window.CmsPaymentPage
+      ? CmsPaymentPage.renderPaymentPage()
+      : page.html;
+    if (location.pathname.match(/^\/page\/9304\/?$/i)) {
+      history.replaceState(null, '', '/infrom-payment');
+    }
+    CmsI18n?.applyTranslations();
+    window.CmsPaymentPage?.bindPaymentForm(main);
+    applyPageSocial({
+      title: page.title || t('nav.payment'),
+      documentTitle: title + ' — ' + siteTabTitle(),
+      description: t('payment.intro') || (window.CMS_SITE && CMS_SITE.og && CMS_SITE.og.description),
+      image: window.CmsSocial && CmsSocial.defaultImage(),
+      url: location.href
+    });
+  } catch (e) {
+    main.innerHTML = `<p class="error text-center">${escapeHtml(e.message)}</p>`;
+  }
+}
+
+async function initContactPage(main) {
+  main.innerHTML = CmsLayout.renderLoading();
+  try {
+    const page = await fetchPageHtml(CONTACT_PAGE_ID);
+    const title = page.title || t('nav.contact') || 'ติดต่อเรา';
+    document.title = title + ' — ' + siteTabTitle();
+    const titleWrap = document.getElementById('cms-page-title');
+    if (titleWrap) {
+      titleWrap.innerHTML = CmsLayout.renderPageTitle(escapeHtml(title), '');
+    }
+    main.innerHTML = window.CmsContactPage
+      ? CmsContactPage.renderContactPage()
+      : page.html;
+    if (location.pathname.match(/^\/page\/354\/?$/i)) {
+      history.replaceState(null, '', '/contact');
+    }
+    CmsI18n?.applyTranslations();
+    window.CmsContactPage?.bindContactForm(main);
+    applyPageSocial({
+      title: page.title || t('nav.contact'),
+      documentTitle: title + ' — ' + siteTabTitle(),
+      description: t('contact.intro') || (window.CMS_SITE && CMS_SITE.og && CMS_SITE.og.description),
+      image: window.CmsSocial && CmsSocial.defaultImage(),
+      url: location.href
+    });
+  } catch (e) {
+    main.innerHTML = `<p class="error text-center">${escapeHtml(e.message)}</p>`;
+  }
+}
 
 async function initDownloadPage(main) {
   main.innerHTML = CmsLayout.renderLoading();
@@ -325,15 +566,93 @@ async function initDownloadPage(main) {
     const sections = window.CmsDownloadPage
       ? CmsDownloadPage.parseDownloadSections(page.html)
       : [];
+    const downloadIds = sections.flatMap((s) => s.items.map((it) => it.id)).filter(Boolean);
+    const downloadCounts = window.CmsCounters
+      ? await CmsCounters.fetchMap('cms_download_counts', downloadIds)
+      : {};
     main.innerHTML = window.CmsDownloadPage
-      ? CmsDownloadPage.renderDownloadTable(sections)
+      ? CmsDownloadPage.renderDownloadTable(sections, downloadCounts)
       : page.html;
     if (location.pathname.match(/^\/page\/7934\/?$/i)) {
       history.replaceState(null, '', '/download');
     }
     CmsI18n?.applyTranslations();
-    await window.CmsDownloadPage?.loadDownloadCounts(main);
     window.CmsDownloadPage?.bindDownloadButtons(main);
+    socialFromPage(page, location.pathname);
+  } catch (e) {
+    main.innerHTML = `<p class="error text-center">${escapeHtml(e.message)}</p>`;
+  }
+}
+
+async function initAboutPage(main) {
+  main.innerHTML = CmsLayout.renderLoading();
+  try {
+    const page = await fetchPageHtml(ABOUT_PAGE_ID);
+    const title = page.title || t('nav.aboutUs') || 'เกี่ยวกับสหกรณ์';
+    document.title = title + ' — ' + siteTabTitle();
+    const titleWrap = document.getElementById('cms-page-title');
+    if (titleWrap) {
+      titleWrap.innerHTML = CmsLayout.renderPageTitle(escapeHtml(title), '');
+    }
+    const data = window.CmsAboutPage
+      ? CmsAboutPage.parseAboutPage(page.html)
+      : { hero: null, tables: [] };
+    main.innerHTML = window.CmsAboutPage
+      ? CmsAboutPage.renderAboutPage(data)
+      : page.html;
+    if (location.pathname.match(/^\/page\/241\/?$/i)) {
+      history.replaceState(null, '', '/about-us');
+    }
+    CmsI18n?.applyTranslations();
+    window.CmsAboutPage?.bindAboutPage(main);
+    socialFromPage(page, '/about-us');
+  } catch (e) {
+    main.innerHTML = `<p class="error text-center">${escapeHtml(e.message)}</p>`;
+  }
+}
+
+async function initTeamPage(main) {
+  main.innerHTML = CmsLayout.renderLoading();
+  try {
+    const page = await fetchPageHtml(TEAM_PAGE_ID);
+    const title = t('nav.team') || 'คณะกรรมการสหกรณ์';
+    document.title = title + ' — ' + siteTabTitle();
+    const titleWrap = document.getElementById('cms-page-title');
+    if (titleWrap) {
+      titleWrap.innerHTML = CmsLayout.renderPageTitle(escapeHtml(title), '');
+    }
+    if (window.CmsTeamPage) {
+      await CmsTeamPage.initTeamPage(main);
+    } else {
+      main.innerHTML = `<p class="error text-center">ไม่พบโมดูลหน้าคณะกรรมการ</p>`;
+    }
+    if (location.pathname.match(/^\/page\/420\/?$/i)) {
+      history.replaceState(null, '', '/team');
+    }
+    CmsI18n?.applyTranslations();
+  } catch (e) {
+    main.innerHTML = `<p class="error text-center">${escapeHtml(e.message)}</p>`;
+  }
+}
+
+async function initManagementPage(main) {
+  main.innerHTML = CmsLayout.renderLoading();
+  try {
+    const title = t('nav.management') || 'ทำเนียบฝ่ายจัดการ';
+    document.title = title + ' — ' + siteTabTitle();
+    const titleWrap = document.getElementById('cms-page-title');
+    if (titleWrap) {
+      titleWrap.innerHTML = CmsLayout.renderPageTitle(escapeHtml(title), '');
+    }
+    if (window.CmsManagementPage) {
+      await CmsManagementPage.initManagementPage(main);
+    } else {
+      main.innerHTML = `<p class="error text-center">ไม่พบโมดูลหน้าทำเนียบฝ่ายจัดการ</p>`;
+    }
+    if (location.pathname.match(/^\/page\/8929\/?$/i)) {
+      history.replaceState(null, '', '/management');
+    }
+    CmsI18n?.applyTranslations();
   } catch (e) {
     main.innerHTML = `<p class="error text-center">${escapeHtml(e.message)}</p>`;
   }
@@ -368,13 +687,28 @@ async function initStaticPage() {
   const activeNav = CmsLayout.activeNavForPageId(pageId);
   const isAgenda = String(pageId) === AGENDA_PAGE_ID;
   const isDownload = String(pageId) === DOWNLOAD_PAGE_ID;
+  const isAbout = String(pageId) === ABOUT_PAGE_ID;
+  const isTeam = String(pageId) === TEAM_PAGE_ID;
+  const isManagement = String(pageId) === MANAGEMENT_PAGE_ID;
+  const isContact = String(pageId) === CONTACT_PAGE_ID;
+  const isPayment = String(pageId) === PAYMENT_PAGE_ID;
   CmsLayout.initCmsShell({
     activeNav,
     bodyClass: isAgenda
       ? 'kb-site kb-page kb-page--agenda'
       : isDownload
         ? 'kb-site kb-page kb-page--download'
-        : 'kb-site kb-page'
+        : isAbout
+          ? 'kb-site kb-page kb-page--about'
+          : isTeam
+            ? 'kb-site kb-page kb-page--team'
+            : isManagement
+              ? 'kb-site kb-page kb-page--management'
+              : isContact
+                ? 'kb-site kb-page kb-page--contact'
+                : isPayment
+                  ? 'kb-site kb-page kb-page--payment'
+                  : 'kb-site kb-page'
   });
   await loadSiteName();
 
@@ -391,6 +725,31 @@ async function initStaticPage() {
 
   if (isDownload && window.CmsDownloadPage) {
     await initDownloadPage(main);
+    return;
+  }
+
+  if (isAbout && window.CmsAboutPage) {
+    await initAboutPage(main);
+    return;
+  }
+
+  if (isTeam && window.CmsTeamPage) {
+    await initTeamPage(main);
+    return;
+  }
+
+  if (isManagement && window.CmsManagementPage) {
+    await initManagementPage(main);
+    return;
+  }
+
+  if (isContact && window.CmsContactPage) {
+    await initContactPage(main);
+    return;
+  }
+
+  if (isPayment && window.CmsPaymentPage) {
+    await initPaymentPage(main);
     return;
   }
 
@@ -411,6 +770,7 @@ async function initStaticPage() {
 </div>`;
     rewriteContentLinks(main);
     enhancePostContent(main);
+    socialFromPage(page, location.pathname);
   } catch (e) {
     main.innerHTML = `<p class="error text-center">${escapeHtml(e.message)}</p>`;
   }

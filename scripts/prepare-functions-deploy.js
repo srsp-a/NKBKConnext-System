@@ -64,6 +64,14 @@ copyDir(monitorSrc, monitorDest);
 
 console.log('[prepare-functions-deploy] copied monitor-api -> functions/monitor-api');
 
+const libSrc = path.join(root, 'lib');
+const libDest = path.join(functionsDir, 'lib');
+fs.mkdirSync(libDest, { recursive: true });
+for (const name of ['nkbk-ai.js', 'nkbk-ai-routes.js']) {
+  fs.copyFileSync(path.join(libSrc, name), path.join(libDest, name));
+}
+console.log('[prepare-functions-deploy] copied lib/nkbk-ai*.js -> functions/lib');
+
 
 
 if (!fs.existsSync(lineSrc)) {

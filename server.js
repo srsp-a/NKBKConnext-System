@@ -197,7 +197,7 @@ async function getWindowsNetworkExtrasCached() {
   return data;
 }
 
-app.use(express.json());
+app.use(express.json({ limit: '15mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // รัน PowerShell แบบไม่บล็อก (async) เพื่อไม่ให้ระบบค้าง
@@ -1713,7 +1713,9 @@ function ensureMonitorFirestore() {
     }
     monitorFirestoreInitReason = 'admin_failed';
     if (!admin.apps.length) admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-    getMonitorDb = () => admin.firestore();
+    const db = admin.firestore();
+    db.settings({ ignoreUndefinedProperties: true });
+    getMonitorDb = () => db;
     monitorFirestoreInitReason = null;
     return true;
   } catch (e) {
@@ -2469,6 +2471,48 @@ function getMonitorApiUrlFallback() {
   return '';
 }
 
+/** URL โฟลเดอร์ที่เก็บ latest.yml + ตัวติดตั้ง (electron-updater generic) และ desktop-update-manifest.json (Portable) — Firebase Hosting / Storage CDN */
+function normalizeDesktopUpdateFeedUrl(u) {
+  const s = String(u || '').trim();
+  if (!s || !/^https?:\/\//i.test(s)) return '';
+  return s.endsWith('/') ? s : `${s}/`;
+}
+
+function desktopUpdateFeedUrlFromConfigRaw(raw) {
+  try {
+    const j = JSON.parse(raw);
+    if (j && j.type === 'service_account') return '';
+    return normalizeDesktopUpdateFeedUrl(j.desktopUpdateFeedUrl || '');
+  } catch (_) {
+    return '';
+  }
+}
+
+function getDesktopUpdateFeedUrlFromConfig() {
+  const env = normalizeDesktopUpdateFeedUrl(process.env.DESKTOP_UPDATE_FEED_URL || '');
+  if (env) return env;
+  for (const dir of getMonitorConfigSearchDirs()) {
+    try {
+      const p = path.join(dir, 'monitor-config.json');
+      if (fsSync.existsSync(p) && fsSync.statSync(p).isFile()) {
+        const raw = fsSync.readFileSync(p, 'utf8');
+        const u = desktopUpdateFeedUrlFromConfigRaw(raw);
+        if (u) return u;
+      }
+    } catch (_) {}
+  }
+  return '';
+}
+
+const DEFAULT_DESKTOP_UPDATE_FEED_URL = normalizeDesktopUpdateFeedUrl(
+  process.env.DEFAULT_DESKTOP_UPDATE_FEED_URL ||
+    'https://admin-panel-nkbkcoop-cbf10.web.app/desktop-app-updates/'
+);
+
+function getResolvedDesktopUpdateFeedUrl() {
+  return getDesktopUpdateFeedUrlFromConfig() || DEFAULT_DESKTOP_UPDATE_FEED_URL;
+}
+
 let PKG_VERSION = '0.0.0';
 try {
   PKG_VERSION = require(path.join(__dirname, 'package.json')).version;
@@ -2507,6 +2551,7 @@ app.get('/api/config', async (req, res) => {
     remoteLogin: !!base,
     lineLoginEnabled,
     monitorFirestoreReady,
+    desktopUpdateFeedUrl: getResolvedDesktopUpdateFeedUrl(),
     ...(base ? { monitorApiUrl: base } : {}),
     ...(monitorWorkstationsUrl ? { monitorWorkstationsUrl } : {})
   });
@@ -2928,6 +2973,28 @@ app.post('/api/monitor-login', async (req, res) => {
           return res.status(502).json({ ok: false, message: errMsg(r.status, raw) });
         }
         if (!data || typeof data !== 'object') data = { ok: false, message: 'ตอบกลับจากเซิร์ฟเวอร์ไม่ถูกต้อง' };
+        // เก็บ session ใน RAM เครื่องนี้ด้วย — เดิมโปร็กซี่ไป remote แล้วได้แค่ JSON ไม่เก็บ → resolveMonitorSessionFromToken พัง
+        // (Node fetch ไป /api/monitor-me บางทางล้มเหลวแม้ remote มีโทเคนอยู่) → เมนูลางานขึ้น no_session แต่ภาพรวมว่าง
+        if (
+          r.status >= 200 &&
+          r.status < 300 &&
+          data &&
+          data.ok === true &&
+          typeof data.token === 'string' &&
+          String(data.token).trim()
+        ) {
+          try {
+            const tok = String(data.token).trim();
+            monitorSessionsSet(tok, {
+              username: String(data.username || username).trim() || username,
+              createdAt: Date.now(),
+              fullname: String(data.fullname || '').trim(),
+              email: String(data.email || '').trim(),
+              group: String(data.group || '').trim(),
+              role: String(data.role || '').trim()
+            });
+          } catch (_) {}
+        }
         return res.status(r.status >= 200 && r.status < 300 ? 200 : r.status).json(data);
       } catch (err) {
         const isTimeout = err.message === 'ETIMEDOUT' || err.code === 'ETIMEDOUT';
@@ -3204,6 +3271,16 @@ async function resolveMonitorSessionFromToken(token) {
   return null;
 }
 
+// =====================================================
+// NKBK Desktop AI — ChatGPT (NKBK) สำหรับแอปเดสก์ท็อป
+// =====================================================
+const { registerNkbkAiRoutes } = require('./lib/nkbk-ai-routes');
+registerNkbkAiRoutes(app, {
+  getDb: () => (ensureMonitorFirestore() ? getMonitorDb() : null),
+  resolveSession: resolveMonitorSessionFromToken,
+  proxyToRemote: proxyLeaveToRemote
+});
+
 function _leaveFiscalYearKey(now) {
   const d = now instanceof Date ? now : new Date();
   return d.getFullYear();
@@ -3229,6 +3306,279 @@ async function _leaveLoadTypes(db) {
     return out;
   } catch (_) { return {}; }
 }
+
+const LEAVE_RETRO_MAX_DAYS = 60;
+const LEAVE_RETRO_MAX_MONTHS = 3;
+let _leaveStaticHolidayDatesCache = null;
+
+function _leaveStaticHolidayDates() {
+  if (_leaveStaticHolidayDatesCache) return _leaveStaticHolidayDatesCache;
+  try {
+    const p = path.join(__dirname, 'thai-public-holidays.json');
+    const arr = JSON.parse(fsSync.readFileSync(p, 'utf8'));
+    _leaveStaticHolidayDatesCache = new Set((arr || []).map((x) => x.date).filter(Boolean));
+  } catch (_) {
+    _leaveStaticHolidayDatesCache = new Set();
+  }
+  return _leaveStaticHolidayDatesCache;
+}
+
+function _leaveBangkokToday() {
+  const s = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+  const p = s.split('-').map((n) => parseInt(n, 10));
+  return new Date(p[0], p[1] - 1, p[2]);
+}
+
+function _leaveFormatLocal(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + day;
+}
+
+function _leaveEarliestRetrospectiveDate() {
+  const today = _leaveBangkokToday();
+  const d60 = new Date(today.getFullYear(), today.getMonth(), today.getDate() - LEAVE_RETRO_MAX_DAYS);
+  const d3m = new Date(today.getFullYear(), today.getMonth() - LEAVE_RETRO_MAX_MONTHS, today.getDate());
+  const earliest = d60 > d3m ? d60 : d3m;
+  return _leaveFormatLocal(earliest);
+}
+
+function _leaveParseModes(t) {
+  if (!t) return ['full'];
+  if (t.modes && typeof t.modes === 'object' && !Array.isArray(t.modes)) {
+    const keys = Object.keys(t.modes).filter((k) => t.modes[k]);
+    if (keys.length) return keys;
+  }
+  if (Array.isArray(t.modes) && t.modes.length) return t.modes.slice();
+  return ['full'];
+}
+
+async function _leaveHolidaySet(db) {
+  const set = new Set(_leaveStaticHolidayDates());
+  const hidden = new Set();
+  try {
+    const snap = await db.collection('holidays').get();
+    snap.forEach((doc) => {
+      const data = doc.data() || {};
+      if (data.hidden === true && data.date) hidden.add(String(data.date));
+      if (data.hidden !== true && data.date && data.type === 'custom') set.add(String(data.date));
+    });
+  } catch (_) {}
+  hidden.forEach((d) => set.delete(d));
+  return set;
+}
+
+function _leaveComputeDurationDays(startDate, endDate, partial, holidaySet) {
+  try {
+    const sp = String(startDate || '').split('-').map((n) => parseInt(n, 10));
+    const ep = String(endDate || startDate || '').split('-').map((n) => parseInt(n, 10));
+    if (sp.length !== 3 || ep.length !== 3 || !partial) return 0;
+    let current = new Date(sp[0], sp[1] - 1, sp[2]);
+    const endD = new Date(ep[0], ep[1] - 1, ep[2]);
+    const validDates = [];
+    while (current <= endD) {
+      const dow = current.getDay();
+      if (dow !== 0 && dow !== 6) {
+        const iso = _leaveFormatLocal(current);
+        if (!holidaySet || !holidaySet.has(iso)) validDates.push(iso);
+      }
+      current.setDate(current.getDate() + 1);
+    }
+    if (!validDates.length) return 0;
+    const p = String(partial).toLowerCase();
+    if (p === 'full') return validDates.length;
+    if (validDates.length === 1) return 0.5;
+    return 0.5 + (validDates.length - 1);
+  } catch (_) {
+    return 0;
+  }
+}
+
+function _leaveIsoDateRange(startDate, endDate) {
+  const out = [];
+  const start = new Date(String(startDate));
+  const end = new Date(String(endDate || startDate));
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    out.push(d.toISOString().split('T')[0]);
+  }
+  return out;
+}
+
+async function _leaveCheckDuplicate(db, userId, startDate, endDate, partial) {
+  const result = { hasDuplicate: false, conflictDates: [], status: '' };
+  try {
+    const qs = await db.collection('leaves').where('userId', '==', userId).limit(100).get();
+    const requestedDates = _leaveIsoDateRange(startDate, endDate);
+    const statusMap = {
+      pending: 'รอหัวหน้างานอนุมัติ',
+      approved_lv1: 'รอผู้จัดการยืนยัน',
+      approved: 'อนุมัติแล้ว',
+      rejected: 'ไม่อนุมัติ'
+    };
+    qs.forEach((doc) => {
+      const data = doc.data() || {};
+      const status = String(data.status || '').toLowerCase();
+      if (status === 'cancelled' || status === 'ยกเลิก') return;
+      const existingDates = _leaveIsoDateRange(data.startDate, data.endDate || data.startDate);
+      const existingPartial = String(data.partial || 'full').toLowerCase();
+      const newPartial = String(partial || 'full').toLowerCase();
+      requestedDates.forEach((reqDate) => {
+        if (!existingDates.includes(reqDate)) return;
+        if (existingPartial === 'full' || newPartial === 'full' || existingPartial === newPartial) {
+          result.hasDuplicate = true;
+          if (!result.conflictDates.includes(reqDate)) result.conflictDates.push(reqDate);
+          result.status = statusMap[status] || status;
+        }
+      });
+    });
+  } catch (e) {
+    console.warn('[leave-submit] duplicate check:', e.message);
+  }
+  return result;
+}
+
+async function _leaveNotifySubmitted(db, leaveDoc, leaveId, typeName) {
+  const tName = typeName || leaveDoc.type || '';
+  try {
+    await _notifCreate({
+      userId: leaveDoc.userId,
+      category: 'leave.submitted',
+      title: '📋 ส่งคำขอลาแล้ว',
+      body: 'คำขอลา ' + tName + ' ' + (leaveDoc.startDate || '') + ' จำนวน ' + (leaveDoc.durationDays || 0) + ' วัน — รอการอนุมัติ',
+      severity: 'info',
+      icon: 'fa-paper-plane',
+      relatedType: 'leave',
+      relatedId: leaveId
+    });
+    const qs = await db.collection('users').where('canApproveLeave', '==', true).limit(50).get();
+    const tasks = [];
+    qs.forEach((doc) => {
+      const approverId = doc.id;
+      if (approverId === leaveDoc.userId) return;
+      tasks.push(_notifCreate({
+        userId: approverId,
+        category: 'leave.pending_approval',
+        title: '📨 คำขอลาใหม่',
+        body: (leaveDoc.userName || 'พนักงาน') + ' ขอลา ' + tName + ' ' + (leaveDoc.startDate || '') + ' (' + (leaveDoc.durationDays || 0) + ' วัน)',
+        severity: 'warning',
+        icon: 'fa-inbox',
+        relatedType: 'leave',
+        relatedId: leaveId
+      }));
+    });
+    await Promise.all(tasks);
+  } catch (e) {
+    console.warn('[leave-submit] notify:', e.message);
+  }
+}
+
+function _leaveIsIsoDate(s) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''));
+}
+
+app.get('/api/monitor-leave-submit-meta', async (req, res) => {
+  const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
+  const session = await resolveMonitorSessionFromToken(token);
+  if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
+  if (!ensureMonitorFirestore()) return proxyLeaveToRemote(req, res, '/api/monitor-leave-submit-meta');
+  try {
+    const db = getMonitorDb();
+    const typesMap = await _leaveLoadTypes(db);
+    const types = Object.values(typesMap)
+      .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))
+      .map((t) => ({
+        id: t.id,
+        name: String(t.nameTH || t.name || t.id),
+        modes: _leaveParseModes(t),
+        yearlyQuota: Number(t.yearlyQuota || t.quota || 0) || 0
+      }));
+    return res.json({
+      ok: true,
+      types,
+      earliestRetrospective: _leaveEarliestRetrospectiveDate()
+    });
+  } catch (e) {
+    return res.status(500).json({ ok: false, reason: 'error', message: (e && e.message) || String(e) });
+  }
+});
+
+app.post('/api/monitor-leave-submit', async (req, res) => {
+  const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
+  const session = await resolveMonitorSessionFromToken(token);
+  if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
+  if (!ensureMonitorFirestore()) return proxyLeaveToRemote(req, res, '/api/monitor-leave-submit');
+  const body = req.body || {};
+  const typeId = String(body.type || '').trim();
+  const partial = String(body.partial || 'full').trim();
+  const startDate = String(body.startDate || '').trim();
+  const endDate = String(body.endDate || startDate).trim();
+  const reason = body.reason != null ? String(body.reason).trim() : '';
+  if (!typeId || !_leaveIsIsoDate(startDate) || !_leaveIsIsoDate(endDate)) {
+    return res.status(400).json({ ok: false, reason: 'invalid_input', message: 'กรุณาเลือกประเภทและวันที่ให้ครบ' });
+  }
+  if (startDate > endDate) {
+    return res.status(400).json({ ok: false, reason: 'bad_dates', message: 'วันเริ่มต้นต้องไม่เกินวันสิ้นสุด' });
+  }
+  const earliestRetro = _leaveEarliestRetrospectiveDate();
+  if (startDate < earliestRetro) {
+    return res.status(400).json({
+      ok: false,
+      reason: 'retrospective',
+      message: 'ไม่สามารถขอลาย้อนหลังเกิน ' + LEAVE_RETRO_MAX_DAYS + ' วัน หรือ ' + LEAVE_RETRO_MAX_MONTHS + ' เดือน'
+    });
+  }
+  try {
+    const db = getMonitorDb();
+    const adminSdk = require('firebase-admin');
+    const FieldValue = adminSdk.firestore.FieldValue;
+    const u = await findV2UserByUsername(db, session.username);
+    if (!u) return res.status(404).json({ ok: false, reason: 'no_user' });
+    const uid = u._docId || u.id;
+    const types = await _leaveLoadTypes(db);
+    const typeDef = types[typeId];
+    if (!typeDef) return res.status(400).json({ ok: false, reason: 'bad_type', message: 'ประเภทการลาไม่ถูกต้อง' });
+    const modes = _leaveParseModes(typeDef).map((m) => String(m).toLowerCase());
+    if (!modes.includes(String(partial).toLowerCase())) {
+      return res.status(400).json({ ok: false, reason: 'bad_partial', message: 'รูปแบบการลาไม่รองรับสำหรับประเภทนี้' });
+    }
+    const dup = await _leaveCheckDuplicate(db, uid, startDate, endDate, partial);
+    if (dup.hasDuplicate) {
+      return res.status(409).json({
+        ok: false,
+        reason: 'duplicate',
+        message: 'มีคำขอลาซ้ำในช่วงวันที่นี้แล้ว (' + (dup.status || 'รอดำเนินการ') + ')',
+        conflictDates: dup.conflictDates
+      });
+    }
+    const holidaySet = await _leaveHolidaySet(db);
+    const durationDays = _leaveComputeDurationDays(startDate, endDate, partial, holidaySet);
+    if (!durationDays || durationDays <= 0) {
+      return res.status(400).json({ ok: false, reason: 'no_workdays', message: 'ไม่มีวันทำงานในช่วงที่เลือก (อาจเป็นวันหยุด/เสาร์-อาทิตย์)' });
+    }
+    const typeName = String(typeDef.nameTH || typeDef.name || typeId);
+    const leaveDoc = {
+      userId: uid,
+      lineUserId: String(u.lineUserId || ''),
+      type: typeId,
+      partial: partial,
+      startDate: startDate,
+      endDate: endDate,
+      durationDays: durationDays,
+      status: 'pending',
+      userName: String(u.fullname || session.fullname || session.username || ''),
+      userAvatar: String(u.avatar || u.linePictureUrl || ''),
+      userDept: String(u.department || ''),
+      createdAt: FieldValue.serverTimestamp(),
+      reason: reason
+    };
+    const docRef = await db.collection('leaves').add(leaveDoc);
+    await _leaveNotifySubmitted(db, leaveDoc, docRef.id, typeName);
+    return res.json({ ok: true, leaveId: docRef.id, durationDays, typeName });
+  } catch (e) {
+    return res.status(500).json({ ok: false, reason: 'error', message: (e && e.message) || String(e) });
+  }
+});
 
 app.get('/api/monitor-my-leaves', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
@@ -3935,6 +4285,29 @@ app.post('/api/monitor-change-pin', async (req, res) => {
     }
   }
   return res.status(401).json({ ok: false, message: 'กรุณาเข้าสู่ระบบใหม่' });
+});
+
+/** บันทึกโทเคนจาก remote login ลงเครื่อง — เปิดแอปใหม่ยังใช้ /api/monitor-me ในเครื่องได้ */
+app.post('/api/monitor-session-register', (req, res) => {
+  if (!isLocalhostSnapshotRequest(req)) {
+    return res.status(403).json({ ok: false, message: 'localhost only' });
+  }
+  const token = (req.headers['x-monitor-token'] || req.body?.token || '').trim();
+  if (!token || token.length < 16) {
+    return res.status(400).json({ ok: false, message: 'missing token' });
+  }
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const username = String(body.username || '').trim();
+  if (!username) return res.status(400).json({ ok: false, message: 'missing username' });
+  monitorSessionsSet(token, {
+    username,
+    createdAt: Date.now(),
+    fullname: body.fullname != null ? String(body.fullname).trim() : '',
+    email: body.email != null ? String(body.email).trim() : '',
+    group: body.group != null ? String(body.group).trim() : '',
+    role: body.role != null ? String(body.role).trim() : ''
+  });
+  return res.json({ ok: true });
 });
 
 app.post('/api/monitor-logout', async (req, res) => {

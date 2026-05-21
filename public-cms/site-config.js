@@ -26,6 +26,13 @@ window.CMS_SITE = {
     '/app/': '9208'
   },
   wpLegacy: 'https://nkbkcoop.com',
+  og: {
+    siteName: 'NKBKCOOP',
+    description:
+      'สหกรณ์ออมทรัพย์สาธารณสุขหนองคาย จำกัด — ข่าวสาร บริการสมาชิก แจ้งโอนเงิน ดาวน์โหลดเอกสาร',
+    image:
+      'https://res.cloudinary.com/dzs7zbikj/image/upload/c_pad,b_white,w_1200,h_630,f_jpg,q_auto/v1770613894/site-config/vd64o0efi0hdpetkzyrf.png'
+  },
   logos: {
     header:
       'https://res.cloudinary.com/dzs7zbikj/image/upload/v1770613894/site-config/vd64o0efi0hdpetkzyrf.png',
@@ -50,8 +57,7 @@ window.CMS_SITE = {
     '/assets/img/hero-sps0073.png',
     '/assets/img/hero-sps0062.png'
   ],
-  mapUrl:
-    'https://www.google.com/maps/search/?api=1&query=919+หมู่+5+ต.โพธิ์ชัย+อ.เมืองหนองคาย',
+  mapUrl: 'https://maps.app.goo.gl/FhT4ThAC2VPwt7dm9',
   interestRates: {
     deposit: [
       {
@@ -194,6 +200,44 @@ window.CMS_SITE = {
   address: '919 หมู่ 5 ต.โพธิ์ชัย อ.เมืองหนองคาย จ.หนองคาย 43000',
   addressEn:
     '919 Moo 5, Phochai Sub-district, Mueang Nong Khai, Nong Khai 43000',
+  payment: {
+    banks: [
+      {
+        value: '0994000375891 พร้อมเพย์',
+        label: 'พร้อมเพย์',
+        account: '0994000375891',
+        icon: 'wallet'
+      },
+      {
+        value: '413-1-00856-4 ธ.กรุงไทย สาขาหนองคาย',
+        label: 'ธ.กรุงไทย สาขาหนองคาย',
+        account: '413-1-00856-4',
+        icon: 'bank'
+      },
+      {
+        value: '980-6-21826-4 ธ.กรุงไทย สาขาสี่แยกบึงกาฬ',
+        label: 'ธ.กรุงไทย สาขาสี่แยกบึงกาฬ',
+        account: '980-6-21826-4',
+        icon: 'bank'
+      }
+    ],
+    transferTypes: [
+      ['deposit', 'typeDeposit'],
+      ['shares', 'typeShares'],
+      ['loan', 'typeLoan'],
+      ['membership', 'typeMembership'],
+      ['fund', 'typeFund'],
+      ['other', 'typeOther']
+    ]
+  },
+  contact: {
+    hoursTh: 'วันจันทร์–วันศุกร์: 08:30 น. – 16:30 น.',
+    hoursEn: 'Monday–Friday: 8:30 AM – 4:30 PM',
+    fax: '042-420740',
+    mobile: ['087-8604004', '089-8619198'],
+    mapEmbed:
+      'https://www.google.com/maps?q=17.8675463,102.7564733&hl=th&z=16&output=embed'
+  },
   newsCategories: [
     {
       slug: 'command-announce',
@@ -221,7 +265,7 @@ window.CMS_SITE = {
         newsAll: 'ข่าวทั้งหมด',
         about: 'เกี่ยวกับเรา',
         services: 'บริการของเรา',
-        team: 'คณะกรรมการดำเนินการ',
+        team: 'คณะกรรมการสหกรณ์',
         management: 'ทำเนียบฝ่ายจัดการ',
         agenda: 'วาระและรายงานการประชุม',
         aboutUs: 'เกี่ยวกับสหกรณ์',
@@ -288,6 +332,7 @@ window.CMS_SITE = {
         subtitle: 'ประกาศ · ข่าวสาร · กิจกรรม · ประชาสัมพันธ์',
         categories: 'หมวดข่าว',
         readMore: 'อ่านต่อ',
+        views: 'เข้าชม',
         back: 'กลับรายการข่าว',
         empty: 'ยังไม่มีข่าวในหมวดนี้'
       },
@@ -306,6 +351,78 @@ window.CMS_SITE = {
         btn: 'ดาวน์โหลด',
         noFile: 'ยังไม่มีไฟล์',
         noDate: '—'
+      },
+      contact: {
+        intro:
+          'ติดต่อสำนักงานใหญ่ สอบถามบริการ หรือส่งข้อความถึงเจ้าหน้าที่ — เราพร้อมให้บริการในวันและเวลาทำการ',
+        hoursLabel: 'เวลาเปิดทำการ',
+        addressLabel: 'ที่อยู่สำนักงาน',
+        emailLabel: 'อีเมล',
+        phoneLabel: 'โทรศัพท์',
+        faxLabel: 'โทรสาร',
+        mobileLabel: 'มือถือ',
+        mapLabel: 'แผนที่',
+        mapOpen: 'เปิดใน Google Maps',
+        formTitle: 'แบบฟอร์มติดต่อ',
+        formHint: 'กรอกแบบฟอร์มด้านล่าง ทีมงานจะติดต่อกลับโดยเร็วที่สุด',
+        followUs: 'ช่องทางโซเชียล',
+        fieldName: 'ชื่อ-นามสกุล',
+        fieldEmail: 'อีเมล',
+        fieldPhone: 'เบอร์โทรศัพท์',
+        fieldTopic: 'หัวข้อที่ต้องการสอบถาม',
+        fieldMessage: 'ข้อความ',
+        topicGeneral: 'สอบถามทั่วไป',
+        topicDeposit: 'เงินฝาก / บัญชี',
+        topicLoan: 'เงินกู้',
+        topicApp: 'แอป NKBKConnect',
+        topicOther: 'อื่นๆ',
+        submit: 'ส่งข้อความ',
+        sending: 'กำลังส่ง...',
+        success: 'ส่งข้อความเรียบร้อยแล้ว ขอบคุณที่ติดต่อเรา',
+        error: 'ไม่สามารถส่งได้ กรุณาลองใหม่อีกครั้ง',
+        required: 'กรุณากรอกข้อมูลที่จำเป็น',
+        privacy: 'ข้อมูลของท่านจะถูกใช้เพื่อติดต่อกลับเท่านั้น'
+      },
+      payment: {
+        intro: 'แจ้งการโอนเงินฝาก หุ้น หรือชำระหนี้ — กรุณากรอกข้อมูลให้ครบถ้วนและแนบสลิปเพื่อให้เจ้าหน้าที่ตรวจสอบได้รวดเร็ว',
+        step1: 'โอนเงินเข้าบัญชีสหกรณ์',
+        step2: 'กรอกแบบฟอร์มแจ้งโอน',
+        step3: 'รอเจ้าหน้าที่ตรวจสอบ',
+        accountsTitle: 'บัญชีรับโอน',
+        accountsHint: 'กดไอคอนคัดลอกเพื่อคัดลอกเลขบัญชี',
+        formTitle: 'แบบฟอร์มแจ้งโอนเงิน',
+        formHint: 'กรอกข้อมูลตามสลิปการโอน — ฟิลด์ที่มี * จำเป็นต้องกรอก',
+        fieldName: 'ชื่อ-สกุล',
+        fieldMember: 'เลขที่สมาชิก',
+        fieldPhone: 'โทรศัพท์',
+        fieldAmount: 'จำนวนเงิน',
+        fieldType: 'รายการโอน',
+        fieldBank: 'บัญชีที่โอนเข้า',
+        fieldBankPlaceholder: '— เลือกบัญชี —',
+        fieldDate: 'วันที่โอน',
+        fieldDateHint: 'วัน/เดือน/ปี (พ.ศ.) เช่น 21/05/2569',
+        fieldTime: 'เวลาที่โอน',
+        dateInvalid: 'รูปแบบวันที่ไม่ถูกต้อง — ใช้ วัน/เดือน/ปี พ.ศ. เช่น 21/05/2569',
+        dateFuture: 'วันที่โอนต้องไม่เกินวันนี้',
+        fieldNote: 'ข้อความเพิ่มเติม',
+        fieldSlip: 'สลิปการโอน',
+        slipHint: 'ลากไฟล์มาวาง หรือเลือกรูปสลิป',
+        slipPick: 'เลือกรูปสลิป',
+        slipMax: 'รองรับ JPG, PNG ไม่เกิน 5 MB',
+        typeDeposit: 'โอนเงินฝาก',
+        typeShares: 'โอนซื้อหุ้น',
+        typeLoan: 'โอนชำระหนี้',
+        typeMembership: 'โอนค่าสมัครสมาชิก',
+        typeFund: 'โอนชำระกองทุน',
+        typeOther: 'โอนรายการอื่นๆ',
+        submit: 'ยืนยันแจ้งโอนเงิน',
+        sending: 'กำลังส่ง...',
+        success: 'แจ้งโอนเงินเรียบร้อยแล้ว ขอบคุณครับ',
+        error: 'ส่งไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
+        required: 'กรุณากรอกข้อมูลที่จำเป็นให้ครบ',
+        slipTooBig: 'ไฟล์สลิปใหญ่เกิน 5 MB',
+        privacy: 'ข้อมูลและสลิปใช้เพื่อตรวจสอบการโอนเท่านั้น',
+        lineBanner: 'เปิดจาก LINE แล้ว? สามารถแจ้งผ่านแชทได้เช่นกัน'
       },
       footer: {
         company: 'เกี่ยวกับองค์กร',
@@ -401,6 +518,7 @@ window.CMS_SITE = {
         subtitle: 'Announcements · News · Activities · PR',
         categories: 'Categories',
         readMore: 'Read more',
+        views: 'Views',
         back: 'Back to news',
         empty: 'No news in this category'
       },
@@ -419,6 +537,78 @@ window.CMS_SITE = {
         btn: 'Download',
         noFile: 'No file yet',
         noDate: '—'
+      },
+      contact: {
+        intro:
+          'Reach our head office for enquiries or send us a message — we are available during office hours.',
+        hoursLabel: 'Office hours',
+        addressLabel: 'Address',
+        emailLabel: 'Email',
+        phoneLabel: 'Telephone',
+        faxLabel: 'Fax',
+        mobileLabel: 'Mobile',
+        mapLabel: 'Map',
+        mapOpen: 'Open in Google Maps',
+        formTitle: 'Contact form',
+        formHint: 'Fill in the form below and our team will get back to you soon.',
+        followUs: 'Social channels',
+        fieldName: 'Full name',
+        fieldEmail: 'Email',
+        fieldPhone: 'Phone',
+        fieldTopic: 'Topic',
+        fieldMessage: 'Message',
+        topicGeneral: 'General enquiry',
+        topicDeposit: 'Deposits / accounts',
+        topicLoan: 'Loans',
+        topicApp: 'NKBKConnect app',
+        topicOther: 'Other',
+        submit: 'Send message',
+        sending: 'Sending...',
+        success: 'Thank you — your message has been sent.',
+        error: 'Could not send. Please try again.',
+        required: 'Please fill in required fields',
+        privacy: 'Your details are used only to respond to your enquiry.'
+      },
+      payment: {
+        intro: 'Notify us of your transfer for deposits, shares, or loan payments. Complete the form and attach your slip for faster processing.',
+        step1: 'Transfer to a cooperative account',
+        step2: 'Submit this notification form',
+        step3: 'Wait for staff verification',
+        accountsTitle: 'Receiving accounts',
+        accountsHint: 'Tap copy to copy the account number',
+        formTitle: 'Transfer notification',
+        formHint: 'Enter details as shown on your slip — * required fields',
+        fieldName: 'Full name',
+        fieldMember: 'Member ID',
+        fieldPhone: 'Phone',
+        fieldAmount: 'Amount',
+        fieldType: 'Transfer type',
+        fieldBank: 'Destination account',
+        fieldBankPlaceholder: '— Select account —',
+        fieldDate: 'Transfer date',
+        fieldDateHint: 'DD/MM/YYYY (B.E.) e.g. 21/05/2569',
+        fieldTime: 'Transfer time',
+        dateInvalid: 'Invalid date — use DD/MM/YYYY (B.E.) e.g. 21/05/2569',
+        dateFuture: 'Transfer date cannot be in the future',
+        fieldNote: 'Additional note',
+        fieldSlip: 'Payment slip',
+        slipHint: 'Drag & drop or choose an image',
+        slipPick: 'Choose slip image',
+        slipMax: 'JPG or PNG, max 5 MB',
+        typeDeposit: 'Savings deposit',
+        typeShares: 'Share purchase',
+        typeLoan: 'Loan repayment',
+        typeMembership: 'Membership fee',
+        typeFund: 'Fund payment',
+        typeOther: 'Other',
+        submit: 'Submit notification',
+        sending: 'Sending...',
+        success: 'Thank you — your transfer notification has been received.',
+        error: 'Could not submit. Please try again.',
+        required: 'Please complete all required fields',
+        slipTooBig: 'Slip file exceeds 5 MB',
+        privacy: 'Your data and slip are used only for verification.',
+        lineBanner: 'Opened from LINE? You may also notify us via chat.'
       },
       footer: {
         company: 'Organization',

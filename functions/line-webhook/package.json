@@ -9,6 +9,9 @@
   "engines": {
     "node": ">=14.0.0"
   },
+  "dependencies": {
+    "firebase-admin": "^12.6.0"
+  },
   "optionalDependencies": {
     "puppeteer": "^23.0.0"
   }

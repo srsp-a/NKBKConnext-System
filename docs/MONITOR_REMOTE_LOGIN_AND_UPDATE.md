@@ -55,28 +55,29 @@
 
 - **แนะนำ: GitHub Releases** — ใช้ได้ทันที ไม่ต้องตั้งเซิร์ฟเวอร์เอง
   - สร้าง repo (เช่น `NKBKConnext-Monitor`) แล้วตั้ง `repository` ใน package.json
-  - Build แล้วอัปโหลดด้วย `electron-builder --win -p` (ต้องมี `GH_TOKEN`) หรืออัปโหลดไฟล์จาก `dist/` ขึ้น Release เอง
-  - แอปจะเช็คอัปเดตจาก GitHub ได้อัตโนมัติ (repo แบบ public ไม่ต้องใส่ token)
-- **ตัวเลือกอื่น**: โฟลเดอร์บน NAS เช่น `https://api.nkbkcoop.com/releases/monitor/` (ตั้ง `publish.provider: "generic"`)
+  - Build แล้วอัปโหลดไฟล์จาก `dist/` ขึ้น **Firebase Hosting** (`public-cms/desktop-app-updates/` → deploy hosting **main**) — ดู **`docs/FIREBASE_DESKTOP_UPDATES.md`** (`npm run release` = build เท่านั้น ไม่ใช้ GH_TOKEN)
+  - แอปจะเช็คอัปเดตจาก URL generic / manifest (ไม่บังคับ GitHub Release)
+- **ตัวเลือกอื่น**: โฟลเดอร์บน CDN/NAS เช่น `https://example.com/releases/` — ตั้ง `desktopUpdateFeedUrl` ใน `monitor-config.json`
 
 ### ไฟล์ที่ต้องมีบนเซิร์ฟเวอร์ (Windows)
 
 - **latest.yml** — ไฟล์ที่ electron-updater อ่านเพื่อเช็คเวอร์ชัน (มี `version`, `path` หรือ `url` ของ installer, `sha512` ฯลฯ)
 - **NKBKConnext System Setup x.x.x.exe** — ตัวติดตั้งที่ดาวน์โหลดได้จาก URL ใน latest.yml
+- **desktop-update-manifest.json** — สำหรับแบบ **Portable** (`latestVersion`, `portableUrl`, `portableFileName`)
 
-หลัง build ด้วย electron-builder จะได้ไฟล์เหล่านี้ใน `dist/` อยู่แล้ว — แค่อัปโหลดขึ้นโฟลเดอร์ releases/monitor และให้ URL สาธารณะอ่านได้ (HTTPS แนะนำ)
+หลัง build ด้วย electron-builder จะได้ไฟล์เหล่านี้ใน `dist/` อยู่แล้ว — คัดลอกขึ้นโฟลเดอร์ที่โฮสต์ด้วย HTTPS (Firebase Hosting แนะนำ)
 
-### การตั้งค่าในโปรเจกต์ (it) — ใช้ GitHub
+### การตั้งค่าในโปรเจกต์ (it) — Firebase generic feed
 
-- **package.json**: ตั้ง `repository` ให้ชี้ไปที่ repo จริง (เช่น `"url": "https://github.com/your-org/NKBKConnext-Monitor.git"`) และมี `build.publish`: `{ "provider": "github", "releaseType": "release" }` (ใส่ไว้แล้ว)
-- **electron-main.js**: ติดตั้ง `electron-updater` แล้วเรียก `autoUpdater.checkForUpdates()` หลังแอปพร้อม (และเพิ่มปุ่ม/เมนู “ตรวจสอบอัปเดต” ได้)
-- เมื่อมีอัปเดต: แสดง dialog “มีเวอร์ชันใหม่ xxx ต้องการดาวน์โหลดและติดตั้งไหม?” → ดาวน์โหลดแล้ว `quitAndInstall()`
+- **package.json**: `build.publish.provider` = **`generic`** และ `url` ชี้โฟลเดอร์บน Hosting (ค่าเริ่มต้นใน repo)
+- **electron-main.js**: `electron-updater` + `setFeedURL({ provider: 'generic', url })` และตรวจ Portable จาก `desktop-update-manifest.json`
+- เมื่อมีอัปเดต: dialog / overlay → ดาวน์โหลด → NSIS ใช้ `quitAndInstall()` ตามเดิม
 
-### Flow การอัปเดต (GitHub)
+### Flow การอัปเดต (Firebase Hosting)
 
-1. แก้โค้ด → เพิ่ม `version` ใน package.json (เช่น 1.0.1) → build: `npm run build:installer`
-2. สร้าง Release บน GitHub: Tag เช่น `v1.0.1` แล้วอัปโหลดไฟล์จาก `dist/` (ไฟล์ `.exe` และ `latest.yml`) หรือใช้คำสั่ง `GH_TOKEN=xxx npm run build:installer -- -p` ให้อัปโหลดขึ้น Release ให้อัตโนมัติ
-3. ผู้ใช้เปิดแอป → แอปเช็คจาก GitHub Releases → ถ้าเวอร์ชันใหม่กว่า แจ้งให้อัปเดต → ดาวน์โหลดและติดตั้ง
+1. แก้โค้ด → เพิ่ม `version` ใน package.json → `npm run build:installer`
+2. คัดลอก `latest.yml`, `.exe`, `.blockmap` และแก้ `desktop-update-manifest.json` → `firebase deploy --only hosting:main` (หรือโฟลเดอร์ Hosting ของคุณ)
+3. ผู้ใช้เปิดแอป → เช็ค feed → ถ้าเวอร์ชันใหม่กว่า แจ้งให้อัปเดต
 
 ---
 

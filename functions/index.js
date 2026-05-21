@@ -56,7 +56,7 @@ exports.monitorApi = onRequest(
 
     memory: '512MiB',
 
-    timeoutSeconds: 120,
+    timeoutSeconds: 300,
 
     secrets: [
 
@@ -94,7 +94,30 @@ async function lineHttpHandler(req, res) {
 
   }
 
-  line.server.emit('request', req, res);
+  await new Promise((resolve, reject) => {
+    const origEnd = res.end.bind(res);
+    let finished = false;
+    const done = () => {
+      if (finished) return;
+      finished = true;
+      resolve();
+    };
+    res.end = function (...args) {
+      const out = origEnd(...args);
+      done();
+      return out;
+    };
+    res.on('error', reject);
+    try {
+      line.server.emit('request', req, res);
+    } catch (e) {
+      reject(e);
+    }
+  });
+
+  if (typeof line.drainPendingImageJobs === 'function') {
+    await line.drainPendingImageJobs();
+  }
 
 }
 
@@ -110,7 +133,7 @@ exports.lineApi = onRequest(
 
     memory: '1GiB',
 
-    timeoutSeconds: 120,
+    timeoutSeconds: 300,
 
     minInstances: 1,
 
@@ -181,6 +204,32 @@ exports.lineCronAttendanceAutoFetch = onSchedule(
     await line.runAttendanceAutoFetchServer();
 
   }
+
+);
+
+
+
+// --- CMS social preview (Facebook / LINE crawler) ---
+
+const { cmsOgHandler } = require('./cms-og');
+
+
+
+exports.cmsOg = onRequest(
+
+  {
+
+    invoker: 'public',
+
+    region: 'asia-southeast1',
+
+    memory: '256MiB',
+
+    timeoutSeconds: 30
+
+  },
+
+  cmsOgHandler
 
 );
 

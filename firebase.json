@@ -43,26 +43,92 @@
               "value": "no-cache"
             }
           ]
+        },
+        {
+          "source": "/desktop-app-updates/**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            },
+            {
+              "key": "Access-Control-Allow-Origin",
+              "value": "*"
+            }
+          ]
         }
       ],
       "rewrites": [
         {
           "source": "/n/**",
-          "destination": "/post.html"
-        },
-        {
-          "source": "/download",
-          "destination": "/download.html"
+          "function": "cmsOg"
         },
         {
           "source": "/page/**",
-          "destination": "/page.html"
+          "function": "cmsOg"
+        },
+        {
+          "source": "/news",
+          "function": "cmsOg"
+        },
+        {
+          "source": "/download",
+          "function": "cmsOg"
+        },
+        {
+          "source": "/about-us",
+          "function": "cmsOg"
+        },
+        {
+          "source": "/team",
+          "function": "cmsOg"
+        },
+        {
+          "source": "/management",
+          "function": "cmsOg"
+        },
+        {
+          "source": "/contact",
+          "function": "cmsOg"
+        },
+        {
+          "source": "/infrom-payment",
+          "function": "cmsOg"
+        },
+        {
+          "source": "/infrom-payment-line",
+          "function": "cmsOg"
         }
       ],
       "redirects": [
         {
           "source": "/page/7934",
           "destination": "/download",
+          "type": 301
+        },
+        {
+          "source": "/page/241",
+          "destination": "/about-us",
+          "type": 301
+        },
+        {
+          "source": "/page/420",
+          "destination": "/team",
+          "type": 301
+        },
+        {
+          "source": "/page/8929",
+          "destination": "/management",
+          "type": 301
+        },
+        {
+          "source": "/page/354",
+          "destination": "/contact",
+          "type": 301
+        },
+        {
+          "source": "/page/9304",
+          "destination": "/infrom-payment",
           "type": 301
         },
         {
@@ -343,6 +409,32 @@
               "value": "no-cache"
             }
           ]
+        }
+      ]
+    },
+    {
+      "target": "ai",
+      "public": "ai-web",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "headers": [
+        {
+          "source": "**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        }
+      ],
+      "rewrites": [
+        {
+          "source": "/api/**",
+          "function": "monitorApi"
         }
       ]
     }

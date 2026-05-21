@@ -13,14 +13,17 @@ git push -u origin main
 
 ถ้า push ไม่ได้เพราะ SSH เป็น user อื่น → ดู `push-to-github.bat` หรือ `docs/GITHUB_RELEASE.md`
 
-## ปล่อยเวอร์ชัน (อัปโหลด installer)
+## ปล่อยเวอร์ชัน (ไฟล์ติดตั้ง / อัปเดต)
+
+คู่มือหลัก: **[docs/FIREBASE_DESKTOP_UPDATES.md](docs/FIREBASE_DESKTOP_UPDATES.md)** — อัปโหลดขึ้น **Firebase Hosting** (โฟลเดอร์ `public-cms/desktop-app-updates/`)
 
 ```bat
-set GH_TOKEN=ghp_xxxx
-npm run release
+npm run build:installer
 ```
 
-รายละเอียด: [docs/GITHUB_RELEASE.md](docs/GITHUB_RELEASE.md)
+จากนั้นคัดลอกจาก `dist/` + deploy hosting (ดูคู่มือด้านบน)
+
+ขั้นตอน Git / GitHub Release (ถ้ายังใช้): [docs/GITHUB_RELEASE.md](docs/GITHUB_RELEASE.md)
 
 ---
 

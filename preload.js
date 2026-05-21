@@ -21,8 +21,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     });
   },
   minimize: () => ipcRenderer.send('window-minimize'),
+  maximize: () => ipcRenderer.send('window-maximize'),
   close: () => ipcRenderer.send('window-close'),
   openWebviewLogin: (payload) => ipcRenderer.send('open-webview-login', payload),
+  openNkbkAiChat: (token) => ipcRenderer.invoke('open-nkbk-ai-chat', token),
   onUpdateAvailable: (cb) => {
     ipcRenderer.on('app-update-available', (_e, info) => cb(info));
   },
@@ -42,8 +44,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   quitAppCompletely: () => ipcRenderer.send('app-quit-completely'),
   getPendingUpdate: () => ipcRenderer.invoke('app-get-pending-update'),
   downloadAppUpdate: () => ipcRenderer.invoke('app-download-update'),
-  checkGithubRelease: () => ipcRenderer.invoke('github-check-update'),
-  downloadGithubRelease: (opts) => ipcRenderer.invoke('github-download-update', opts || {}),
+  /** Portable / manifest — desktop-update-manifest.json บน Firebase Hosting */
+  checkDesktopRelease: () => ipcRenderer.invoke('desktop-check-update'),
+  downloadDesktopRelease: (opts) => ipcRenderer.invoke('desktop-download-update', opts || {}),
+  /** @deprecated ใช้ checkDesktopRelease — ชื่อเดิมยังเรียกชุด Firebase เดียวกัน */
+  checkGithubRelease: () => ipcRenderer.invoke('desktop-check-update'),
+  /** @deprecated ใช้ downloadDesktopRelease */
+  downloadGithubRelease: (opts) => ipcRenderer.invoke('desktop-download-update', opts || {}),
   /** แสดงแจ้งเตือนแบบ OS (Windows toast/Action Center) */
   showNativeNotification: (opts) => ipcRenderer.invoke('show-native-notification', opts || {}),
   onNativeNotificationClick: (cb) => {

@@ -552,11 +552,12 @@ async function pullWebFromAdmin() {
     if (webRemember && webRemember.checked) {
       saveWebSaved(w.url || '', w.database || '', w.username || '', w.password || '', true);
     }
-    const netPanel = document.getElementById('panel-network');
+    const netPanel = document.getElementById('panel-webapp');
     if (webResult && netPanel && netPanel.classList.contains('active')) {
       webResult.className = 'nas-result success';
       webResult.textContent = '✓ อัปเดตค่าเว็บไซต์จากแอดมินแล้ว';
     }
+    refreshWebappHub();
   } catch (_) {}
 }
 
@@ -577,11 +578,12 @@ async function pullNasFromWebAdmin() {
     if (nasRemember && nasRemember.checked) {
       saveNasSaved(NAS_DEFAULT_UNC, nas.username, nas.password, true, nas.driveLetter || '');
     }
-    const netPanel = document.getElementById('panel-network');
+    const netPanel = document.getElementById('panel-webapp');
     if (nasResult && netPanel && netPanel.classList.contains('active')) {
       nasResult.className = 'nas-result success';
       nasResult.textContent = '✓ อัปเดตการตั้งค่า NAS จากแอดมินเว็บแล้ว (กดเชื่อมต่อเมื่อพร้อม)';
     }
+    refreshWebappHub();
   } catch (_) {}
 }
 loadNasSaved();
@@ -639,6 +641,7 @@ if (btnNasConnect) {
         } catch (_) {}
       }
       if (btnNasOpenDrive) btnNasOpenDrive.classList.toggle('nas-open-hidden', !data.ok);
+      refreshWebappHub();
     } catch (err) {
       if (nasResult) {
         nasResult.className = 'nas-result error';
@@ -805,6 +808,427 @@ function pushCurrentWebFromDom(opts) {
 }
 
 loadWebSaved();
+
+const GPT_STORAGE_KEY = 'webapp_gpt';
+const GPT_DEFAULT_URL = 'https://chatgpt.com/';
+const gptEnabled = el('gptEnabled');
+const gptResult = el('gptResult');
+
+function loadGptSaved() {
+  try {
+    const raw = localStorage.getItem(GPT_STORAGE_KEY);
+    const data = raw ? JSON.parse(raw) : null;
+    if (gptEnabled) gptEnabled.checked = !!(data && data.enabled);
+  } catch (_) {}
+}
+function saveGptSaved(enabled) {
+  try {
+    localStorage.setItem(GPT_STORAGE_KEY, JSON.stringify({ enabled: !!enabled, url: GPT_DEFAULT_URL }));
+  } catch (_) {}
+}
+function webappGptIsConfigured() {
+  try {
+    const raw = localStorage.getItem(GPT_STORAGE_KEY);
+    if (!raw) return false;
+    return JSON.parse(raw).enabled === true;
+  } catch (_) {
+    return false;
+  }
+}
+function openGptInApp() {
+  if (!webappGptIsConfigured()) return;
+  if (typeof window.electronAPI !== 'undefined' && window.electronAPI.openWebviewLogin) {
+    window.electronAPI.openWebviewLogin({ url: GPT_DEFAULT_URL, database: '', username: '', password: '' });
+  } else if (gptResult) {
+    gptResult.className = 'nas-result error';
+    gptResult.textContent = 'เปิดในแอปได้เฉพาะ NKBKConnext System (Electron)';
+  }
+}
+loadGptSaved();
+
+const NKBK_AI_STORAGE_KEY = 'webapp_nkbk_ai';
+const nkbkAiEnabled = el('nkbkAiEnabled');
+const nkbkAiStandingLocal = el('nkbkAiStandingLocal');
+const nkbkAiCallNameInBox = el('nkbkAiCallNameInBox');
+const nkbkAiCallNameLocal = el('nkbkAiCallNameLocal');
+const nkbkAiResult = el('nkbkAiResult');
+let nkbkAiServerReady = false;
+let nkbkAiUserCallName = '';
+let nkbkAiStatusHint = '';
+
+function nkbkAiStatusMessage(data) {
+  if (!data || !data.ok) return 'กรุณาเข้าสู่ระบบใหม่';
+  if (!data.enabled) return 'แอดมินยังไม่เปิด ChatGPT โมเน่';
+  if (!data.hasApiKey) return 'ยังไม่ตั้ง OpenAI API Key';
+  if (data.allowed === false) return 'ยังไม่อยู่ในรายชื่อที่อนุญาต';
+  if (!data.ready) return 'รอเปิดจากแอดมิน';
+  return nkbkAiUserCallName ? 'เรียก: ' + nkbkAiUserCallName : 'พร้อมใช้งาน';
+}
+
+function updateNkbkAiCallNameHint(name) {
+  nkbkAiUserCallName = name && String(name).trim() ? String(name).trim() : '';
+  if (nkbkAiCallNameLocal) nkbkAiCallNameLocal.value = nkbkAiUserCallName;
+  if (nkbkAiCallNameInBox) nkbkAiCallNameInBox.hidden = false;
+}
+
+function loadNkbkAiSaved() {
+  try {
+    const raw = localStorage.getItem(NKBK_AI_STORAGE_KEY);
+    const data = raw ? JSON.parse(raw) : null;
+    if (nkbkAiEnabled) nkbkAiEnabled.checked = !!(data && data.enabled);
+  } catch (_) {}
+}
+function saveNkbkAiSaved(enabled) {
+  try {
+    localStorage.setItem(NKBK_AI_STORAGE_KEY, JSON.stringify({ enabled: !!enabled }));
+  } catch (_) {}
+}
+function webappNkbkAiLocalEnabled() {
+  try {
+    const raw = localStorage.getItem(NKBK_AI_STORAGE_KEY);
+    if (!raw) return false;
+    return JSON.parse(raw).enabled === true;
+  } catch (_) {
+    return false;
+  }
+}
+function webappNkbkAiIsConfigured() {
+  return webappNkbkAiLocalEnabled() && nkbkAiServerReady;
+}
+function getMonitorToken() {
+  try {
+    return localStorage.getItem('monitor_token') || '';
+  } catch (_) {
+    return '';
+  }
+}
+async function fetchNkbkAiStatus() {
+  const token = getMonitorToken();
+  if (!token) {
+    nkbkAiServerReady = false;
+    nkbkAiStatusHint = 'กรุณาเข้าสู่ระบบใหม่';
+    return null;
+  }
+  try {
+    const r = await fetch('/api/nkbk-ai-status', {
+      headers: { 'X-Monitor-Token': token },
+      cache: 'no-store'
+    });
+    const data = await r.json();
+    if (data && data.ok) updateNkbkAiCallNameHint(data.userCallName);
+    nkbkAiServerReady = !!(data && data.ok && data.ready);
+    nkbkAiStatusHint = nkbkAiStatusMessage(data);
+    return data;
+  } catch (_) {
+    nkbkAiServerReady = false;
+    nkbkAiStatusHint = 'เชื่อมต่อระบบ AI ไม่ได้';
+    return null;
+  }
+}
+async function loadNkbkAiMemoryToForm() {
+  const token = getMonitorToken();
+  if (!token || !nkbkAiStandingLocal) return;
+  try {
+    const r = await fetch('/api/nkbk-ai-memory', {
+      headers: { 'X-Monitor-Token': token },
+      cache: 'no-store'
+    });
+    const data = await r.json();
+    if (data.ok) {
+      nkbkAiStandingLocal.value = data.standingInstructions || '';
+      updateNkbkAiCallNameHint(data.userCallName);
+    }
+  } catch (_) {}
+}
+async function saveNkbkAiMemoryRemote() {
+  const token = getMonitorToken();
+  if (!token) throw new Error('กรุณาเข้าสู่ระบบก่อน');
+  const r = await fetch('/api/nkbk-ai-memory', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Monitor-Token': token },
+    body: JSON.stringify({
+      standingInstructions: nkbkAiStandingLocal ? nkbkAiStandingLocal.value : '',
+      userCallName: nkbkAiCallNameLocal ? nkbkAiCallNameLocal.value.trim() : ''
+    })
+  });
+  const data = await r.json();
+  if (!data.ok) throw new Error(data.message || 'บันทึกความจำไม่สำเร็จ');
+  if (data.userCallName != null) updateNkbkAiCallNameHint(data.userCallName);
+}
+function openNkbkAiChat() {
+  if (!webappNkbkAiIsConfigured()) return;
+  const token = getMonitorToken();
+  if (typeof window.electronAPI !== 'undefined' && window.electronAPI.openNkbkAiChat) {
+    window.electronAPI.openNkbkAiChat(token);
+  } else {
+    const url = '/nkbk-ai.html' + (token ? '?t=' + encodeURIComponent(token) : '');
+    window.open(url, '_blank', 'noopener');
+  }
+}
+loadNkbkAiSaved();
+
+const WEBAPP_COOP_TITLE = 'ระบบสหกรณ์';
+
+function webappNasIsConfigured() {
+  const u = (nasUsername && nasUsername.value) ? nasUsername.value.trim() : '';
+  const p = nasPassword ? nasPassword.value : '';
+  return !!(u && p);
+}
+function webappWebIsConfigured() {
+  let url = (webUrl && webUrl.value) ? webUrl.value.trim() : '';
+  const u = (webUsername && webUsername.value) ? webUsername.value.trim() : '';
+  const p = webPassword ? webPassword.value : '';
+  return !!(url && u && p);
+}
+function webappShortUrl(url) {
+  if (!url) return '—';
+  try {
+    const u = new URL(/^https?:\/\//i.test(url) ? url : 'http://' + url);
+    return u.hostname + (u.pathname && u.pathname !== '/' ? u.pathname : '');
+  } catch (_) {
+    return url.length > 42 ? url.slice(0, 39) + '…' : url;
+  }
+}
+function refreshWebappHub() {
+  const cardNas = document.getElementById('webappCardNas');
+  const cardWeb = document.getElementById('webappCardWeb');
+  const cardGpt = document.getElementById('webappCardGpt');
+  const cardNkbkAi = document.getElementById('webappCardNkbkAi');
+  const badgeNas = document.getElementById('webappNasBadge');
+  const badgeWeb = document.getElementById('webappWebBadge');
+  const badgeGpt = document.getElementById('webappGptBadge');
+  const badgeNkbkAi = document.getElementById('webappNkbkAiBadge');
+  const metaWeb = document.getElementById('webappWebMeta');
+  const metaNkbkAi = document.getElementById('webappNkbkAiMeta');
+  const titleWeb = document.getElementById('webappWebTitle');
+  const btnNasUse = document.getElementById('btnWebappNasUse');
+  const btnWebUse = document.getElementById('btnWebappWebUse');
+  const btnGptUse = document.getElementById('btnWebappGptUse');
+  const btnNkbkAiUse = document.getElementById('btnWebappNkbkAiUse');
+  const nasOk = webappNasIsConfigured();
+  const webOk = webappWebIsConfigured();
+  const gptOk = webappGptIsConfigured();
+  const nkbkAiOk = webappNkbkAiIsConfigured();
+  if (cardNas) cardNas.setAttribute('data-configured', nasOk ? 'true' : 'false');
+  if (cardWeb) cardWeb.setAttribute('data-configured', webOk ? 'true' : 'false');
+  if (cardGpt) cardGpt.setAttribute('data-configured', gptOk ? 'true' : 'false');
+  if (cardNkbkAi) cardNkbkAi.setAttribute('data-configured', nkbkAiOk ? 'true' : 'false');
+  if (badgeNas) {
+    badgeNas.textContent = nasOk ? 'พร้อมใช้งาน' : 'ต้องตั้งค่าก่อน';
+    badgeNas.className = 'webapp-card-badge ' + (nasOk ? 'webapp-card-badge--ready' : 'webapp-card-badge--pending');
+  }
+  if (badgeWeb) {
+    badgeWeb.textContent = webOk ? 'พร้อมใช้งาน' : 'ต้องตั้งค่าก่อน';
+    badgeWeb.className = 'webapp-card-badge ' + (webOk ? 'webapp-card-badge--ready' : 'webapp-card-badge--pending');
+  }
+  if (badgeGpt) {
+    badgeGpt.textContent = gptOk ? 'พร้อมใช้งาน' : 'ต้องตั้งค่าก่อน';
+    badgeGpt.className = 'webapp-card-badge ' + (gptOk ? 'webapp-card-badge--ready' : 'webapp-card-badge--pending');
+  }
+  if (badgeNkbkAi) {
+    if (!webappNkbkAiLocalEnabled()) {
+      badgeNkbkAi.textContent = 'ต้องตั้งค่าก่อน';
+      badgeNkbkAi.className = 'webapp-card-badge webapp-card-badge--pending';
+    } else if (!nkbkAiServerReady) {
+      badgeNkbkAi.textContent = nkbkAiStatusHint || 'รอเปิดจากแอดมิน';
+      badgeNkbkAi.className = 'webapp-card-badge webapp-card-badge--pending';
+    } else {
+      badgeNkbkAi.textContent = 'พร้อมใช้งาน';
+      badgeNkbkAi.className = 'webapp-card-badge webapp-card-badge--ready';
+    }
+  }
+  if (metaNkbkAi && nkbkAiServerReady) {
+    metaNkbkAi.textContent = nkbkAiUserCallName ? 'เรียก: ' + nkbkAiUserCallName : 'พร้อมใช้งาน';
+  } else if (metaNkbkAi && !webappNkbkAiLocalEnabled()) {
+    metaNkbkAi.textContent = 'โมเน่';
+  } else if (metaNkbkAi) {
+    metaNkbkAi.textContent = nkbkAiStatusHint || 'รอเปิดจากแอดมิน';
+  }
+  if (metaWeb) {
+    let url = (webUrl && webUrl.value) ? webUrl.value.trim() : '';
+    metaWeb.textContent = url ? webappShortUrl(url) : 'ยังไม่ระบุ URL';
+  }
+  if (titleWeb) titleWeb.textContent = WEBAPP_COOP_TITLE;
+  if (btnNasUse) btnNasUse.disabled = !nasOk;
+  if (btnWebUse) btnWebUse.disabled = !webOk;
+  if (btnGptUse) btnGptUse.disabled = !gptOk;
+  if (btnNkbkAiUse) btnNkbkAiUse.disabled = !nkbkAiOk;
+}
+async function refreshWebappHubAsync() {
+  await fetchNkbkAiStatus();
+  refreshWebappHub();
+}
+function openWebappSettings(kind) {
+  const modal = document.getElementById('webappSettingsModal');
+  const panelNas = document.getElementById('webappSettingsPanelNas');
+  const panelWeb = document.getElementById('webappSettingsPanelWeb');
+  const panelGpt = document.getElementById('webappSettingsPanelGpt');
+  const panelNkbkAi = document.getElementById('webappSettingsPanelNkbkAi');
+  const title = document.getElementById('webappSettingsTitle');
+  const btnSave = document.getElementById('btnWebSaveSettings');
+  const btnGptSave = document.getElementById('btnGptSaveSettings');
+  const btnNkbkAiSave = document.getElementById('btnNkbkAiSaveSettings');
+  const btnOpen = document.getElementById('btnWebOpenInApp');
+  if (!modal) return;
+  if (panelNas) panelNas.hidden = kind !== 'nas';
+  if (panelWeb) panelWeb.hidden = kind !== 'web';
+  if (panelGpt) panelGpt.hidden = kind !== 'gpt';
+  if (panelNkbkAi) panelNkbkAi.hidden = kind !== 'nkbkai';
+  if (title) {
+    if (kind === 'nas') title.textContent = 'ตั้งค่า NAS / Network Drive';
+    else if (kind === 'gpt') title.textContent = 'ตั้งค่า ChatGPT';
+    else if (kind === 'nkbkai') title.textContent = 'ตั้งค่า ChatGPT โมเน่';
+    else title.textContent = 'ตั้งค่าเว็บแอป';
+  }
+  if (btnSave) btnSave.style.display = kind === 'web' ? '' : 'none';
+  if (btnGptSave) btnGptSave.style.display = kind === 'gpt' ? '' : 'none';
+  if (btnNkbkAiSave) btnNkbkAiSave.style.display = kind === 'nkbkai' ? '' : 'none';
+  if (btnOpen) btnOpen.style.display = kind === 'web' ? '' : 'none';
+  if (kind === 'nkbkai') {
+    fetchNkbkAiStatus().then(() => loadNkbkAiMemoryToForm());
+  }
+  modal.setAttribute('aria-hidden', 'false');
+  modal.classList.add('ledck-modal-open');
+}
+function closeWebappSettings() {
+  const modal = document.getElementById('webappSettingsModal');
+  if (!modal) return;
+  modal.setAttribute('aria-hidden', 'true');
+  modal.classList.remove('ledck-modal-open');
+  refreshWebappHub();
+}
+function bindWebappHub() {
+  const btnNasSet = document.getElementById('btnWebappNasSettings');
+  const btnWebSet = document.getElementById('btnWebappWebSettings');
+  const btnGptSet = document.getElementById('btnWebappGptSettings');
+  const btnNkbkAiSet = document.getElementById('btnWebappNkbkAiSettings');
+  const btnNasUse = document.getElementById('btnWebappNasUse');
+  const btnWebUse = document.getElementById('btnWebappWebUse');
+  const btnGptUse = document.getElementById('btnWebappGptUse');
+  const btnNkbkAiUse = document.getElementById('btnWebappNkbkAiUse');
+  const btnClose = document.getElementById('webappSettingsClose');
+  const btnCancel = document.getElementById('webappSettingsCancel');
+  const backdrop = document.getElementById('webappSettingsBackdrop');
+  const btnSave = document.getElementById('btnWebSaveSettings');
+  const btnGptSave = document.getElementById('btnGptSaveSettings');
+  const btnNkbkAiSave = document.getElementById('btnNkbkAiSaveSettings');
+  if (btnNasSet) btnNasSet.addEventListener('click', () => openWebappSettings('nas'));
+  if (btnWebSet) btnWebSet.addEventListener('click', () => openWebappSettings('web'));
+  if (btnGptSet) btnGptSet.addEventListener('click', () => openWebappSettings('gpt'));
+  if (btnNkbkAiSet) btnNkbkAiSet.addEventListener('click', () => openWebappSettings('nkbkai'));
+  [btnClose, btnCancel, backdrop].forEach((el) => {
+    if (el) el.addEventListener('click', closeWebappSettings);
+  });
+  if (btnNasUse && btnNasConnect) {
+    btnNasUse.addEventListener('click', () => {
+      if (!webappNasIsConfigured()) {
+        openWebappSettings('nas');
+        return;
+      }
+      btnNasConnect.click();
+    });
+  }
+  if (btnWebUse) {
+    btnWebUse.addEventListener('click', () => {
+      if (!webappWebIsConfigured()) {
+        openWebappSettings('web');
+        return;
+      }
+      const openBtn = document.getElementById('btnWebOpenInApp');
+      if (openBtn) openBtn.click();
+    });
+  }
+  if (btnGptUse) {
+    btnGptUse.addEventListener('click', () => {
+      if (!webappGptIsConfigured()) {
+        openWebappSettings('gpt');
+        return;
+      }
+      openGptInApp();
+    });
+  }
+  if (btnNkbkAiUse) {
+    btnNkbkAiUse.addEventListener('click', () => {
+      if (!webappNkbkAiIsConfigured()) {
+        openWebappSettings('nkbkai');
+        return;
+      }
+      openNkbkAiChat();
+    });
+  }
+  if (btnGptSave) {
+    btnGptSave.addEventListener('click', () => {
+      const on = !!(gptEnabled && gptEnabled.checked);
+      saveGptSaved(on);
+      if (gptResult) {
+        gptResult.className = 'nas-result success';
+        gptResult.textContent = on ? '✓ บันทึกการตั้งค่าแล้ว' : '✓ ปิดใช้งาน ChatGPT แล้ว';
+      }
+      refreshWebappHub();
+      setTimeout(closeWebappSettings, 450);
+    });
+  }
+  if (btnNkbkAiSave) {
+    btnNkbkAiSave.addEventListener('click', async () => {
+      const on = !!(nkbkAiEnabled && nkbkAiEnabled.checked);
+      saveNkbkAiSaved(on);
+      try {
+        if (on) await saveNkbkAiMemoryRemote();
+        if (nkbkAiResult) {
+          nkbkAiResult.className = 'nas-result success';
+          nkbkAiResult.textContent = on ? '✓ บันทึกแล้ว' : '✓ ปิดใช้งานแล้ว';
+        }
+      } catch (e) {
+        if (nkbkAiResult) {
+          nkbkAiResult.className = 'nas-result error';
+          nkbkAiResult.textContent = e.message || 'บันทึกไม่สำเร็จ';
+        }
+        return;
+      }
+      await refreshWebappHubAsync();
+      setTimeout(closeWebappSettings, 450);
+    });
+  }
+  if (btnSave) {
+    btnSave.addEventListener('click', () => {
+      let url = (webUrl && webUrl.value) ? webUrl.value.trim() : '';
+      if (!url) {
+        if (webResult) {
+          webResult.className = 'nas-result error';
+          webResult.textContent = 'กรุณาระบุ URL';
+        }
+        return;
+      }
+      if (!/^https?:\/\//i.test(url)) url = 'http://' + url;
+      const database = (webDatabase && webDatabase.value) ? webDatabase.value.trim() : '';
+      const username = (webUsername && webUsername.value) ? webUsername.value : '';
+      const password = (webPassword && webPassword.value) ? webPassword.value : '';
+      if (!username || !password) {
+        if (webResult) {
+          webResult.className = 'nas-result error';
+          webResult.textContent = 'กรุณาระบุชื่อผู้ใช้และรหัสผ่าน';
+        }
+        return;
+      }
+      if (webRemember && webRemember.checked) {
+        saveWebSaved(url, database, username, password, true);
+      }
+      if (webResult) {
+        webResult.className = 'nas-result success';
+        webResult.textContent = '✓ บันทึกการตั้งค่าแล้ว';
+      }
+      refreshWebappHub();
+      setTimeout(closeWebappSettings, 450);
+    });
+  }
+  if (gptEnabled) {
+    gptEnabled.addEventListener('change', refreshWebappHub);
+  }
+  [nasUsername, nasPassword, webUrl, webDatabase, webUsername, webPassword].forEach((inp) => {
+    if (!inp) return;
+    inp.addEventListener('input', refreshWebappHub);
+  });
+}
 try {
   const _saved = JSON.parse(localStorage.getItem(WEB_STORAGE_KEY) || 'null');
   if (_saved && _saved.remember !== false && _saved.url && (_saved.username || _saved.password)) {
@@ -861,6 +1285,9 @@ if (btnWebOpenInApp) {
   }
 }
 
+bindWebappHub();
+refreshWebappHubAsync();
+
 document.querySelectorAll('.tab-nav-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     const tab = btn.getAttribute('data-tab');
@@ -869,7 +1296,7 @@ document.querySelectorAll('.tab-nav-btn').forEach((btn) => {
     btn.classList.add('active');
     const panel = document.getElementById('panel-' + tab);
     if (panel) panel.classList.add('active');
-    if (tab === 'webapp') { pullNasFromWebAdmin(); pullWebFromAdmin(); }
+    if (tab === 'webapp') { pullNasFromWebAdmin(); pullWebFromAdmin(); refreshWebappHubAsync(); }
     if (tab === 'leave') refreshLeaveTab();
   });
 });
@@ -948,7 +1375,10 @@ async function loadLeaveBalance() {
     const res = await window.__nkbkAuthFetch('/api/monitor-my-leave-balance');
     const data = await res.json().catch(() => ({ ok: false }));
     if (!data.ok) { grid.innerHTML = '<p class="muted">โหลดไม่สำเร็จ (' + _leaveEsc(data.reason || res.status) + (data.message ? ' — ' + _leaveEsc(data.message) : '') + ')</p>'; return; }
-    if (badge) badge.textContent = 'ปี ' + (data.year || '-');
+    if (badge) {
+      const y = parseInt(data.year, 10);
+      badge.textContent = Number.isFinite(y) ? ('ปี ' + (y + 543)) : '—';
+    }
     if (!data.items || !data.items.length) { grid.innerHTML = '<p class="muted">ยังไม่มีข้อมูลยอดลา</p>'; return; }
     grid.innerHTML = data.items.map(it => {
       const pct = it.quota > 0 ? Math.min(100, (it.used / it.quota) * 100) : 0;
@@ -1202,7 +1632,342 @@ document.addEventListener('DOMContentLoaded', () => {
   if (sel) sel.addEventListener('change', loadMyLeaves);
   const btn = document.getElementById('btnLeaveRefresh');
   if (btn) btn.addEventListener('click', refreshLeaveTab);
+  bindLeaveSubmitModal();
 });
+
+// ----- ส่งคำขอลางาน (จากในโปรแกรม) -----
+let _leaveSubmitMeta = { types: [], earliestRetrospective: '', partial: 'full', typeId: '' };
+
+function _leaveSubmitIsoToday() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function _leaveIsoToThaiSlash(iso) {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return '';
+  const parts = iso.split('-').map((n) => parseInt(n, 10));
+  const y = parts[0];
+  const m = parts[1];
+  const d = parts[2];
+  return String(d).padStart(2, '0') + '/' + String(m).padStart(2, '0') + '/' + (y + 543);
+}
+
+function _leaveThaiSlashToIso(text) {
+  const m = String(text || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return null;
+  const d = parseInt(m[1], 10);
+  const mo = parseInt(m[2], 10);
+  const be = parseInt(m[3], 10);
+  if (d < 1 || d > 31 || mo < 1 || mo > 12 || be < 2400 || be > 2700) return null;
+  const ad = be - 543;
+  const iso = ad + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  const dt = new Date(ad, mo - 1, d);
+  if (dt.getFullYear() !== ad || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+  return iso;
+}
+
+function _leaveFormatThaiDateInput(text) {
+  let digits = String(text || '').replace(/[^\d]/g, '').slice(0, 8);
+  if (digits.length > 2) digits = digits.slice(0, 2) + '/' + digits.slice(2);
+  if (digits.length > 5) digits = digits.slice(0, 5) + '/' + digits.slice(5);
+  return digits;
+}
+
+function _leaveSetDateField(baseId, iso) {
+  const hidden = document.getElementById(baseId);
+  const text = document.getElementById(baseId + 'Text');
+  const native = document.getElementById(baseId + 'Native');
+  if (hidden) hidden.value = iso || '';
+  if (text) text.value = iso ? _leaveIsoToThaiSlash(iso) : '';
+  if (native) native.value = iso || '';
+}
+
+function _leaveGetDateFieldIso(baseId) {
+  const hidden = document.getElementById(baseId);
+  if (hidden && hidden.value && /^\d{4}-\d{2}-\d{2}$/.test(hidden.value)) return hidden.value;
+  const text = document.getElementById(baseId + 'Text');
+  if (!text) return null;
+  return _leaveThaiSlashToIso(text.value);
+}
+
+function _leaveSyncDateFieldFromText(baseId) {
+  const text = document.getElementById(baseId + 'Text');
+  const hidden = document.getElementById(baseId);
+  const native = document.getElementById(baseId + 'Native');
+  if (!text) return null;
+  const iso = _leaveThaiSlashToIso(text.value);
+  if (iso) {
+    if (hidden) hidden.value = iso;
+    if (native) native.value = iso;
+    return iso;
+  }
+  return hidden && hidden.value ? hidden.value : null;
+}
+
+function bindThaiLeaveDateField(baseId, onChange) {
+  const text = document.getElementById(baseId + 'Text');
+  const native = document.getElementById(baseId + 'Native');
+  const btn = document.querySelector('[data-thai-date-btn="' + baseId + '"]');
+  const notify = () => { if (typeof onChange === 'function') onChange(); };
+  if (text) {
+    text.addEventListener('input', () => {
+      text.value = _leaveFormatThaiDateInput(text.value);
+      if (text.value.length >= 10) _leaveSyncDateFieldFromText(baseId);
+      notify();
+    });
+    text.addEventListener('blur', () => {
+      const iso = _leaveSyncDateFieldFromText(baseId);
+      if (!iso && text.value.trim()) text.classList.add('thai-date-invalid');
+      else text.classList.remove('thai-date-invalid');
+      if (iso) _leaveSetDateField(baseId, iso);
+      notify();
+    });
+  }
+  if (native) {
+    native.addEventListener('change', () => {
+      if (native.value) _leaveSetDateField(baseId, native.value);
+      notify();
+    });
+  }
+  if (btn && native) {
+    btn.addEventListener('click', () => {
+      const cur = _leaveGetDateFieldIso(baseId);
+      if (cur) native.value = cur;
+      if (typeof native.showPicker === 'function') {
+        try { native.showPicker(); return; } catch (_) {}
+      }
+      native.click();
+    });
+  }
+}
+
+function _leaveSubmitPartialLabel(p) {
+  const k = String(p || '').toLowerCase();
+  if (k === 'full') return 'เต็มวัน';
+  if (k === 'am') return 'ครึ่งเช้า';
+  if (k === 'pm') return 'ครึ่งบ่าย';
+  return p;
+}
+
+function openLeaveSubmitModal() {
+  const modal = document.getElementById('leaveSubmitModal');
+  if (!modal) return;
+  modal.setAttribute('aria-hidden', 'false');
+  modal.classList.add('ledck-modal-open');
+  const res = document.getElementById('leaveSubmitResult');
+  if (res) res.textContent = '';
+  loadLeaveSubmitMeta();
+}
+
+function closeLeaveSubmitModal() {
+  const modal = document.getElementById('leaveSubmitModal');
+  if (!modal) return;
+  modal.setAttribute('aria-hidden', 'true');
+  modal.classList.remove('ledck-modal-open');
+}
+
+async function loadLeaveSubmitMeta() {
+  const typeWrap = document.getElementById('leaveSubmitTypeBtns');
+  const partialWrap = document.getElementById('leaveSubmitPartialBtns');
+  const reasonEl = document.getElementById('leaveSubmitReason');
+  if (!typeWrap || !window.__nkbkAuthFetch) return;
+  typeWrap.innerHTML = '<span class="muted leave-chip-loading">กำลังโหลด...</span>';
+  if (partialWrap) partialWrap.innerHTML = '';
+  try {
+    const res = await window.__nkbkAuthFetch('/api/monitor-leave-submit-meta');
+    const data = await res.json().catch(() => ({ ok: false }));
+    if (!data.ok) throw new Error(data.message || data.reason || 'โหลดไม่สำเร็จ');
+    _leaveSubmitMeta.types = Array.isArray(data.types) ? data.types : [];
+    _leaveSubmitMeta.earliestRetrospective = data.earliestRetrospective || '';
+    _leaveSubmitMeta.typeId = _leaveSubmitMeta.types[0] ? _leaveSubmitMeta.types[0].id : '';
+    const today = _leaveSubmitIsoToday();
+    const earliest = _leaveSubmitMeta.earliestRetrospective || '';
+    _leaveSetDateField('leaveSubmitStart', today);
+    _leaveSetDateField('leaveSubmitEnd', today);
+    ['leaveSubmitStartNative', 'leaveSubmitEndNative'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el && earliest) el.min = earliest;
+    });
+    if (reasonEl) {
+      reasonEl.value = '';
+      updateLeaveSubmitReasonCount();
+    }
+    renderLeaveSubmitTypeButtons();
+    renderLeaveSubmitPartialButtons();
+    updateLeaveSubmitDurationPreview();
+  } catch (e) {
+    typeWrap.innerHTML = '<span class="muted leave-chip-loading">โหลดไม่สำเร็จ</span>';
+    const resEl = document.getElementById('leaveSubmitResult');
+    if (resEl) resEl.textContent = e.message || String(e);
+  }
+}
+
+function renderLeaveSubmitTypeButtons() {
+  const typeWrap = document.getElementById('leaveSubmitTypeBtns');
+  if (!typeWrap) return;
+  const types = _leaveSubmitMeta.types || [];
+  if (!types.length) {
+    typeWrap.innerHTML = '<span class="muted leave-chip-loading">ไม่พบประเภทการลา</span>';
+    _leaveSubmitMeta.typeId = '';
+    return;
+  }
+  if (!_leaveSubmitMeta.typeId || !types.some((t) => t.id === _leaveSubmitMeta.typeId)) {
+    _leaveSubmitMeta.typeId = types[0].id;
+  }
+  typeWrap.innerHTML = types.map((t) => {
+    const variant = _leaveTypeVariant(t.name);
+    const active = t.id === _leaveSubmitMeta.typeId;
+    return '<button type="button" class="leave-type-btn leave-type-' + variant + (active ? ' is-active' : '') + '" data-type-id="' + _leaveEsc(t.id) + '">' + _leaveEsc(t.name) + '</button>';
+  }).join('');
+  typeWrap.querySelectorAll('.leave-type-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      _leaveSubmitMeta.typeId = btn.getAttribute('data-type-id') || '';
+      typeWrap.querySelectorAll('.leave-type-btn').forEach((b) => b.classList.toggle('is-active', b === btn));
+      renderLeaveSubmitPartialButtons();
+      updateLeaveSubmitDurationPreview();
+    });
+  });
+}
+
+function updateLeaveSubmitReasonCount() {
+  const reasonEl = document.getElementById('leaveSubmitReason');
+  const countEl = document.getElementById('leaveSubmitReasonCount');
+  if (!reasonEl || !countEl) return;
+  const n = (reasonEl.value || '').length;
+  countEl.textContent = n + '/500';
+  countEl.classList.toggle('is-near-limit', n >= 450);
+}
+
+function renderLeaveSubmitPartialButtons() {
+  const partialWrap = document.getElementById('leaveSubmitPartialBtns');
+  if (!partialWrap) return;
+  const t = _leaveSubmitMeta.types.find((x) => x.id === _leaveSubmitMeta.typeId);
+  const modes = (t && t.modes && t.modes.length) ? t.modes : ['full'];
+  if (!_leaveSubmitMeta.partial || !modes.some((m) => String(m).toLowerCase() === String(_leaveSubmitMeta.partial).toLowerCase())) {
+    _leaveSubmitMeta.partial = String(modes[0] || 'full');
+  }
+  partialWrap.innerHTML = modes.map((m) => {
+    const active = String(m).toLowerCase() === String(_leaveSubmitMeta.partial).toLowerCase();
+    return '<button type="button" class="leave-partial-btn' + (active ? ' is-active' : '') + '" data-partial="' + _leaveEsc(m) + '">' + _leaveEsc(_leaveSubmitPartialLabel(m)) + '</button>';
+  }).join('');
+  partialWrap.querySelectorAll('.leave-partial-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      _leaveSubmitMeta.partial = btn.getAttribute('data-partial') || 'full';
+      partialWrap.querySelectorAll('.leave-partial-btn').forEach((b) => b.classList.toggle('is-active', b === btn));
+      updateLeaveSubmitDurationPreview();
+    });
+  });
+}
+
+function updateLeaveSubmitDurationPreview() {
+  const durEl = document.getElementById('leaveSubmitDuration');
+  if (!durEl) return;
+  const start = _leaveGetDateFieldIso('leaveSubmitStart');
+  let end = _leaveGetDateFieldIso('leaveSubmitEnd') || start;
+  if (start && end && end < start) {
+    _leaveSetDateField('leaveSubmitEnd', start);
+    end = start;
+  }
+  if (!start) { durEl.textContent = 'จำนวนวัน: —'; return; }
+  const days = _leaveSubmitEstimateDays(start, end, _leaveSubmitMeta.partial || 'full');
+  durEl.textContent = days > 0
+    ? ('จำนวนวัน: ' + (days % 1 === 0 ? days : days.toFixed(1)) + ' วัน (ไม่นับเสาร์-อาทิตย์)')
+    : 'จำนวนวัน: 0 — ช่วงที่เลือกอาจเป็นวันหยุด';
+}
+
+function _leaveSubmitEstimateDays(startDate, endDate, partial) {
+  try {
+    const sp = startDate.split('-').map((n) => parseInt(n, 10));
+    const ep = (endDate || startDate).split('-').map((n) => parseInt(n, 10));
+    if (sp.length !== 3 || ep.length !== 3) return 0;
+    let current = new Date(sp[0], sp[1] - 1, sp[2]);
+    const endD = new Date(ep[0], ep[1] - 1, ep[2]);
+    let count = 0;
+    while (current <= endD) {
+      const dow = current.getDay();
+      if (dow !== 0 && dow !== 6) count++;
+      current.setDate(current.getDate() + 1);
+    }
+    if (!count) return 0;
+    const p = String(partial).toLowerCase();
+    if (p === 'full') return count;
+    if (count === 1) return 0.5;
+    return 0.5 + (count - 1);
+  } catch (_) { return 0; }
+}
+
+async function submitLeaveRequest() {
+  const reasonEl = document.getElementById('leaveSubmitReason');
+  const resEl = document.getElementById('leaveSubmitResult');
+  const confirmBtn = document.getElementById('leaveSubmitConfirm');
+  if (!window.__nkbkAuthFetch) return;
+  const type = _leaveSubmitMeta.typeId || '';
+  const startDate = _leaveSyncDateFieldFromText('leaveSubmitStart') || _leaveGetDateFieldIso('leaveSubmitStart');
+  const endDate = _leaveSyncDateFieldFromText('leaveSubmitEnd') || _leaveGetDateFieldIso('leaveSubmitEnd') || startDate;
+  const partial = _leaveSubmitMeta.partial || 'full';
+  const reason = reasonEl ? reasonEl.value.trim() : '';
+  if (!type || !startDate) {
+    if (resEl) resEl.textContent = 'กรุณาเลือกประเภทและวันที่ (รูปแบบ วัน/เดือน/ปี พ.ศ.)';
+    return;
+  }
+  const earliest = _leaveSubmitMeta.earliestRetrospective || '';
+  if (earliest && startDate < earliest) {
+    if (resEl) resEl.textContent = 'วันที่เริ่มต้นต้องไม่เก่ากว่า ' + _leaveIsoToThaiSlash(earliest);
+    return;
+  }
+  if (endDate < startDate) {
+    if (resEl) resEl.textContent = 'วันเริ่มต้นต้องไม่เกินวันสิ้นสุด';
+    return;
+  }
+  if (confirmBtn) confirmBtn.disabled = true;
+  if (resEl) resEl.textContent = 'กำลังส่งคำขอ...';
+  try {
+    const res = await window.__nkbkAuthFetch('/api/monitor-leave-submit', {
+      method: 'POST',
+      body: JSON.stringify({ type, partial, startDate, endDate, reason })
+    });
+    const data = await res.json().catch(() => ({ ok: false }));
+    if (!data.ok) {
+      if (resEl) resEl.textContent = data.message || data.reason || 'ส่งไม่สำเร็จ';
+      return;
+    }
+    closeLeaveSubmitModal();
+    if (typeof window.nkbkAlert === 'function') {
+      await window.nkbkAlert({
+        title: 'ส่งคำขอลาเรียบร้อย',
+        message: (data.typeName || 'การลา') + ' จำนวน ' + (data.durationDays || 0) + ' วัน — รอการอนุมัติ',
+        variant: 'success'
+      });
+    }
+    refreshLeaveTab();
+  } catch (e) {
+    if (resEl) resEl.textContent = e.message || String(e);
+  } finally {
+    if (confirmBtn) confirmBtn.disabled = false;
+  }
+}
+
+function bindLeaveSubmitModal() {
+  const openBtn = document.getElementById('btnLeaveSubmit');
+  if (openBtn) openBtn.addEventListener('click', openLeaveSubmitModal);
+  const closeBtn = document.getElementById('leaveSubmitModalClose');
+  const cancelBtn = document.getElementById('leaveSubmitCancel');
+  const backdrop = document.getElementById('leaveSubmitModalBackdrop');
+  const confirmBtn = document.getElementById('leaveSubmitConfirm');
+  [closeBtn, cancelBtn, backdrop].forEach((el) => {
+    if (el) el.addEventListener('click', closeLeaveSubmitModal);
+  });
+  if (confirmBtn) confirmBtn.addEventListener('click', submitLeaveRequest);
+  bindThaiLeaveDateField('leaveSubmitStart', () => {
+    const start = _leaveGetDateFieldIso('leaveSubmitStart');
+    const end = _leaveGetDateFieldIso('leaveSubmitEnd');
+    if (start && end && end < start) _leaveSetDateField('leaveSubmitEnd', start);
+    updateLeaveSubmitDurationPreview();
+  });
+  bindThaiLeaveDateField('leaveSubmitEnd', updateLeaveSubmitDurationPreview);
+  const reasonEl = document.getElementById('leaveSubmitReason');
+  if (reasonEl) reasonEl.addEventListener('input', updateLeaveSubmitReasonCount);
+}
 
 // ----- ใบลา (PDF/Print) -----
 async function openLeaveFormWindow(leaveId) {

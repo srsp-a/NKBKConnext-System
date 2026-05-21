@@ -1953,7 +1953,7 @@ async function handleMessage(event) {
   try {
     const aiChat = require('./ai-chat.js');
     await aiChat.tryAiChat(
-      { replyMessage, firebaseGet, firebaseSet, firebaseGetCollection, firebaseQuery },
+      { replyMessage, pushMessage, firebaseGet, firebaseSet, firebaseGetCollection, firebaseQuery },
       replyToken,
       text,
       userId,
@@ -3554,10 +3554,20 @@ async function start() {
   });
 }
 
+function drainPendingImageJobs() {
+  try {
+    const aiChat = require('./ai-chat.js');
+    return aiChat.drainPendingImageJobs ? aiChat.drainPendingImageJobs() : Promise.resolve();
+  } catch (_) {
+    return Promise.resolve();
+  }
+}
+
 module.exports = {
   server,
   ensureBootstrapped,
   bufferRequestBody,
+  drainPendingImageJobs,
   loadLineConfig,
   loadAutoReplyRules,
   runAttendanceNotify,

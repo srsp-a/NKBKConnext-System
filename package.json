@@ -1,6 +1,6 @@
 {
   "name": "system-status-monitor",
-  "version": "1.0.6",
+  "version": "1.0.8",
   "description": "ระบบตรวจสอบและจัดการข้อมูลสหกรณ์",
   "main": "electron-main.js",
   "scripts": {
@@ -16,7 +16,10 @@
     "build:portable": "electron-builder --win --config.win.target=portable",
     "build:dir": "electron-builder --win --dir",
     "build:unpacked": "electron-builder --win --dir",
-    "release": "electron-builder --win --publish always"
+    "release": "electron-builder --win --publish never",
+    "sync-desktop-updates": "node scripts/sync-desktop-updates-to-hosting.js",
+    "deploy-desktop-updates": "npm run sync-desktop-updates && firebase deploy --only hosting:main",
+    "publish-desktop-updates": "npm run build && npm run sync-desktop-updates && firebase deploy --only hosting:main"
   },
   "keywords": [
     "system",
@@ -102,9 +105,8 @@
       "artifactName": "${productName} ${version} Portable.exe"
     },
     "publish": {
-      "provider": "github",
-      "releaseType": "release",
-      "vPrefixedTagName": true
+      "provider": "generic",
+      "url": "https://admin-panel-nkbkcoop-cbf10.web.app/desktop-app-updates/"
     }
   }
 }

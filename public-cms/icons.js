@@ -30,6 +30,8 @@
     chart:
       '<path d="M3 3v18h18"/><path d="M7 16v-4"/><path d="M12 16V8"/><path d="M17 16v-6"/>',
     check: '<path d="M20 6 9 17l-5-5"/>',
+    eye:
+      '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
     'arrow-right': '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
     'arrow-up': '<path d="m12 19V5"/><path d="m5 12 7-7 7 7"/>',
     'chevron-left': '<path d="m15 18-6-6 6-6"/>',
