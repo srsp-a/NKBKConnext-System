@@ -5,6 +5,27 @@ const fs = require('fs');
 const { pipeline } = require('stream/promises');
 const { Readable } = require('stream');
 
+/** กัน popup EPIPE เมื่อไม่มี stdout (เปิดจาก .exe โดยไม่มี console) */
+function ignoreStreamEpipe(stream) {
+  if (stream && typeof stream.on === 'function') {
+    stream.on('error', (err) => {
+      if (err && err.code === 'EPIPE') return;
+    });
+  }
+}
+ignoreStreamEpipe(process.stdout);
+ignoreStreamEpipe(process.stderr);
+process.on('uncaughtException', (err) => {
+  if (err && err.code === 'EPIPE') return;
+  try {
+    console.error('[NKBKConnext] uncaughtException:', err);
+    dialog.showErrorBox(
+      'NKBKConnext System',
+      (err && err.message) || String(err || 'เกิดข้อผิดพลาด')
+    );
+  } catch (_) {}
+});
+
 /** พอร์ตจริงหลัง listen (3333 ถูกใช้จะไล่ 3334, …) */
 let serverListenPort = 3333;
 let autoUpdater = null;
@@ -1465,6 +1486,8 @@ if (!gotTheLock) {
         if (mainWindow.isMinimized()) mainWindow.restore();
         mainWindow.show();
         mainWindow.focus();
+      } else {
+        createWindow();
       }
     } catch (_) {}
   });
@@ -1476,6 +1499,14 @@ if (!gotTheLock) {
     await startServer();
   } catch (e) {
     console.error('Server start failed', e);
+    try {
+      dialog.showErrorBox(
+        'NKBKConnext System',
+        'ไม่สามารถเริ่มระบบได้: ' +
+          ((e && e.message) || String(e)) +
+          '\n\nตรวจว่าไม่มีโปรแกรมอื่นใช้พอร์ต 3333–3373 หรือลองรีสตาร์ทเครื่อง'
+      );
+    } catch (_) {}
     app.quit();
     return;
   }

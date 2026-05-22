@@ -39,7 +39,7 @@ function getContactData() {
     facebook: c.facebook,
     line: c.line,
     youtube: c.youtube,
-    privacyPath: '/page/3'
+    privacyPath: '/privacy-policy'
   };
 }
 
@@ -218,6 +218,24 @@ function setFormStatus(form, type, message) {
   el.className = 'kb-contact-form-status' + (type ? ` is-${type}` : '');
 }
 
+function rerenderContactPage() {
+  if (window._kbLegalPageType) return;
+  const main = document.getElementById('cms-page-content');
+  if (!main || !document.body.classList.contains('kb-page--contact')) return;
+  main.innerHTML = renderContactPage();
+  bindContactForm(main);
+  const title = window.CmsI18n ? CmsI18n.t('nav.contact') : 'ติดต่อเรา';
+  window.CmsLayout?.setPageTitle?.(title, '');
+  window.CmsI18n?.applyTranslations();
+  window.CmsLayout?.refreshFooterLocale?.();
+}
+
+function bindContactLang(root) {
+  if (!root || window._kbContactLangInit) return;
+  window._kbContactLangInit = true;
+  window.addEventListener('cms:langchange', rerenderContactPage);
+}
+
 function bindContactForm(root) {
   const form = root?.querySelector('#kb-contact-form');
   if (!form) return;
@@ -276,5 +294,6 @@ window.CmsContactPage = {
   CMS_CONTACT_PAGE_ID,
   getContactData,
   renderContactPage,
-  bindContactForm
+  bindContactForm,
+  bindContactLang
 };

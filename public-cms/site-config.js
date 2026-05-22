@@ -18,9 +18,11 @@ window.CMS_SITE = {
     '/infrom-payment-line/': '9304',
     '/contact/': '354',
     '/faq/': '294',
+    '/terms/': '525',
     '/customer-login/': '1263',
     '/terms-conditions/': '525',
     '/privacy-policy/': '3',
+    '/pdpa/': '3',
     '/agenda/': '13575',
     '/cookies-policy/': '9142',
     '/app/': '9208'
@@ -206,19 +208,25 @@ window.CMS_SITE = {
         value: '0994000375891 พร้อมเพย์',
         label: 'พร้อมเพย์',
         account: '0994000375891',
-        icon: 'wallet'
+        icon: 'wallet',
+        logoUrl:
+          'https://res.cloudinary.com/dzs7zbikj/image/upload/v1777910843/6789cc7973863d34426baf54_678316f2a65ae45dd6a22f9f_678303b39e0a1b2f05c23bc4_673ac03613ce1d036f897c16_thaiqr_logosimbolo_chvgzt.png'
       },
       {
         value: '413-1-00856-4 ธ.กรุงไทย สาขาหนองคาย',
         label: 'ธ.กรุงไทย สาขาหนองคาย',
         account: '413-1-00856-4',
-        icon: 'bank'
+        icon: 'bank',
+        logoUrl:
+          'https://res.cloudinary.com/dzs7zbikj/image/upload/v1778185285/next_jhsxfs.png'
       },
       {
         value: '980-6-21826-4 ธ.กรุงไทย สาขาสี่แยกบึงกาฬ',
         label: 'ธ.กรุงไทย สาขาสี่แยกบึงกาฬ',
         account: '980-6-21826-4',
-        icon: 'bank'
+        icon: 'bank',
+        logoUrl:
+          'https://res.cloudinary.com/dzs7zbikj/image/upload/v1778185285/next_jhsxfs.png'
       }
     ],
     transferTypes: [
@@ -273,6 +281,9 @@ window.CMS_SITE = {
         payment: 'แจ้งโอนเงิน',
         contact: 'ติดต่อเรา',
         faq: 'คำถามที่พบบ่อย',
+        terms: 'ข้อกำหนดและเงื่อนไข',
+        privacy: 'นโยบายความเป็นส่วนตัว',
+        pdpa: 'PDPA',
         login: 'เข้าสู่ระบบสมาชิก'
       },
       hero: {
@@ -286,7 +297,7 @@ window.CMS_SITE = {
         badgeTitle: 'มั่นคง โปร่งใส',
         badgeSub: 'ใส่ใจบริการเพื่อสมาชิก',
         stackChip: 'สหกรณ์ • เปิดบริการ',
-        stackCaption: 'สำนักงานใหญ่ หนองคาย',
+        stackCaption: 'สหกรณ์ฯ หนองคาย',
         stackMeta: 'บริการครบ • โปร่งใส',
         floatSecureTitle: 'บริการออนไลน์',
         floatSecureSub: 'พร้อมใช้งานทุกวัน',
@@ -344,6 +355,9 @@ window.CMS_SITE = {
       download: {
         intro:
           'ดาวน์โหลดแบบฟอร์มและเอกสารสำคัญของสหกรณ์ — รายการที่ยังไม่มีไฟล์จะแสดงปุ่มไม่พร้อมใช้งาน',
+        searchLabel: 'ค้นหาเอกสาร',
+        searchPlaceholder: 'พิมพ์ชื่อแบบฟอร์มหรือคำค้นหา...',
+        searchEmpty: 'ไม่พบเอกสารที่ตรงกับคำค้นหา',
         colDoc: 'เอกสาร',
         colUpdated: 'อัปเดตไฟล์ ณ วันที่แนบ',
         colAction: 'ดาวน์โหลด',
@@ -352,11 +366,27 @@ window.CMS_SITE = {
         noFile: 'ยังไม่มีไฟล์',
         noDate: '—'
       },
+      legal: {
+        faqTitle: 'คำถามที่พบบ่อย',
+        faqSubtitle: 'คำตอบสำหรับสมาชิกและผู้สนใจ',
+        termsTitle: 'ข้อกำหนดและเงื่อนไข',
+        termsSubtitle: 'การใช้งานเว็บไซต์และบริการออนไลน์',
+        privacyTitle: 'นโยบายความเป็นส่วนตัว',
+        privacySubtitle: 'PDPA — การคุ้มครองข้อมูลส่วนบุคคล',
+        tocLabel: 'สารบัญ',
+        faqTopics: 'หัวข้อคำถาม',
+        searchLabel: 'ค้นหาคำถาม',
+        searchPlaceholder: 'พิมพ์คำค้นหา...',
+        updatedLabel: 'ปรับปรุงล่าสุด:',
+        ctaText: 'ยังมีคำถาม? ติดต่อเจ้าหน้าที่ได้โดยตรง',
+        ctaContact: 'ติดต่อเรา',
+        ctaPhone: 'โทร 042-420750'
+      },
       contact: {
         intro:
-          'ติดต่อสำนักงานใหญ่ สอบถามบริการ หรือส่งข้อความถึงเจ้าหน้าที่ — เราพร้อมให้บริการในวันและเวลาทำการ',
+          'ติดต่อสหกรณ์ฯ สอบถามบริการ หรือส่งข้อความถึงเจ้าหน้าที่ — เราพร้อมให้บริการในวันและเวลาทำการ',
         hoursLabel: 'เวลาเปิดทำการ',
-        addressLabel: 'ที่อยู่สำนักงาน',
+        addressLabel: 'ที่อยู่สหกรณ์',
         emailLabel: 'อีเมล',
         phoneLabel: 'โทรศัพท์',
         faxLabel: 'โทรสาร',
@@ -424,10 +454,30 @@ window.CMS_SITE = {
         privacy: 'ข้อมูลและสลิปใช้เพื่อตรวจสอบการโอนเท่านั้น',
         lineBanner: 'เปิดจาก LINE แล้ว? สามารถแจ้งผ่านแชทได้เช่นกัน'
       },
+      appPage: {
+        pageTitle: 'วิธีดาวน์โหลด/วิธีสมัครใช้บริการ App NKBKConnext',
+        pageSubtitle: 'ดาวน์โหลดแอป สมัครใช้งาน และเริ่มต้นใช้บริการสมาชิกบนมือถือ',
+        kicker: 'แอปสมาชิก',
+        heroTitle: 'NKBKConnect',
+        heroDesc: 'ตรวจสอบยอดเงินฝาก เงินกู้ แจ้งโอน และรับข่าวสารจากสหกรณ์ — ใช้งานได้ทุกที่ทุกเวลา',
+        f1: 'ตรวจสอบยอดบัญชีแบบเรียลไทม์',
+        f2: 'แจ้งโอนเงินและชำระเงินกู้',
+        f3: 'รับข่าวสารและประกาศจากสหกรณ์',
+        appStore: 'App Store',
+        googlePlay: 'Google Play',
+        videoTitle: 'วิดีโอแนะนำการใช้งาน',
+        videoDesc: 'ชมขั้นตอนการดาวน์โหลดและสมัครใช้บริการแอป NKBKConnect',
+        videoFallback: 'เบราว์เซอร์ของคุณไม่รองรับการเล่นวิดีโอ',
+        stepsTitle: 'ขั้นตอนการใช้งาน',
+        stepsDesc: 'ทำตามภาพด้านล่างทีละขั้นตอน — จากดาวน์โหลดจนถึงเข้าใช้งานได้',
+        stepLabel: 'ขั้นตอนที่',
+        ctaTitle: 'พร้อมเริ่มใช้งานแล้ว?',
+        ctaDesc: 'ดาวน์โหลด NKBKConnect ได้ทั้ง iOS และ Android'
+      },
       footer: {
         company: 'เกี่ยวกับองค์กร',
         support: 'ช่วยเหลือ',
-        address: 'ที่ตั้งสำนักงาน',
+        address: 'ที่ตั้งสหกรณ์',
         copyright: 'สงวนลิขสิทธิ์',
         hotlineLabel: 'สายด่วนสหกรณ์',
         tagline: 'บริการทุกระดับประทับใจ',
@@ -459,6 +509,9 @@ window.CMS_SITE = {
         payment: 'Transfer',
         contact: 'Contact',
         faq: 'FAQ',
+        terms: 'Terms & Conditions',
+        privacy: 'Privacy Policy',
+        pdpa: 'PDPA',
         login: 'Member login'
       },
       hero: {
@@ -472,7 +525,7 @@ window.CMS_SITE = {
         badgeTitle: 'Stable & transparent',
         badgeSub: 'Service with heart for members',
         stackChip: 'Co-op • Open',
-        stackCaption: 'Head office, Nong Khai',
+        stackCaption: 'Cooperative, Nong Khai',
         stackMeta: 'Full services · Transparent',
         floatSecureTitle: 'Online services',
         floatSecureSub: 'Available every day',
@@ -530,6 +583,9 @@ window.CMS_SITE = {
       download: {
         intro:
           'Download cooperative forms and documents. Items without a file show a disabled button.',
+        searchLabel: 'Search documents',
+        searchPlaceholder: 'Type a form name or keyword...',
+        searchEmpty: 'No documents match your search',
         colDoc: 'Document',
         colUpdated: 'File updated',
         colAction: 'Download',
@@ -538,11 +594,27 @@ window.CMS_SITE = {
         noFile: 'No file yet',
         noDate: '—'
       },
+      legal: {
+        faqTitle: 'Frequently asked questions',
+        faqSubtitle: 'Answers for members and visitors',
+        termsTitle: 'Terms & Conditions',
+        termsSubtitle: 'Website and online service use',
+        privacyTitle: 'Privacy Policy',
+        privacySubtitle: 'PDPA — personal data protection',
+        tocLabel: 'Contents',
+        faqTopics: 'Topics',
+        searchLabel: 'Search questions',
+        searchPlaceholder: 'Type to search...',
+        updatedLabel: 'Last updated:',
+        ctaText: 'Still have questions? Contact us directly.',
+        ctaContact: 'Contact us',
+        ctaPhone: 'Call 042-420750'
+      },
       contact: {
         intro:
-          'Reach our head office for enquiries or send us a message — we are available during office hours.',
+          'Contact the cooperative for enquiries or send us a message — we are available during office hours.',
         hoursLabel: 'Office hours',
-        addressLabel: 'Address',
+        addressLabel: 'Cooperative address',
         emailLabel: 'Email',
         phoneLabel: 'Telephone',
         faxLabel: 'Fax',
@@ -610,10 +682,30 @@ window.CMS_SITE = {
         privacy: 'Your data and slip are used only for verification.',
         lineBanner: 'Opened from LINE? You may also notify us via chat.'
       },
+      appPage: {
+        pageTitle: 'How to download & register — NKBKConnect app',
+        pageSubtitle: 'Download, sign up, and start using member services on your phone',
+        kicker: 'Member app',
+        heroTitle: 'NKBKConnect',
+        heroDesc: 'Check balances, loans, transfer notices, and cooperative news — anytime, anywhere.',
+        f1: 'Real-time account balances',
+        f2: 'Transfer notices & loan payments',
+        f3: 'News and announcements',
+        appStore: 'App Store',
+        googlePlay: 'Google Play',
+        videoTitle: 'How-to video',
+        videoDesc: 'Watch how to download and register for the NKBKConnect app',
+        videoFallback: 'Your browser does not support video playback',
+        stepsTitle: 'Step-by-step guide',
+        stepsDesc: 'Follow each screenshot from download to your first login',
+        stepLabel: 'Step',
+        ctaTitle: 'Ready to get started?',
+        ctaDesc: 'Download NKBKConnect on iOS and Android'
+      },
       footer: {
         company: 'Organization',
         support: 'Support',
-        address: 'Office address',
+        address: 'Cooperative location',
         copyright: 'All rights reserved',
         hotlineLabel: 'Cooperative hotline',
         tagline: 'Service you can trust',

@@ -1,7 +1,7 @@
 /* NKBK — modern pink theme (dark pink primary) */
 
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Noto+Sans:wght@400;500;600;700&display=swap');
-@import url('/v2.css');
+@import url('/v2.css?v=34');
 
 :root {
   --kb-primary: #c2185b;
@@ -354,6 +354,9 @@ html[lang='en'] .kb-brand {
   padding-top: 8px;
   background: transparent;
   box-shadow: none;
+}
+.kb-header-nav .kb-drop {
+  z-index: 120;
 }
 .kb-drop > ul {
   background: #fff;
@@ -902,11 +905,10 @@ html[lang='en'] .kb-brand {
   margin: 0;
 }
 
-/* Page head */
+/* Page head — ความสูง/ระดับกำหนดใน v2.css */
 .kb-page-head {
   background: var(--kb-gradient-warm);
   color: #fff;
-  padding: 2rem 0;
 }
 .kb-page-head h1 {
   margin: 0;
@@ -1535,28 +1537,131 @@ html[lang='en'] .kb-brand {
   .kb-layout {
     grid-template-columns: 1fr;
   }
-  .kb-footer-phonebar-inner {
-    flex-direction: column;
-    align-items: flex-start;
+  .kb-footer-body {
+    padding: 1.75rem 0 1.5rem;
   }
-  .kb-footer-phonebar .kb-footer-phone {
-    text-align: left;
-    width: 100%;
+  .kb-footer-body > .kb-container {
+    padding-inline: 1rem;
   }
   .kb-footer-app-block {
     grid-column: 1 / -1;
-    margin-top: clamp(-3.5rem, -8vw, -4.5rem);
+    margin-top: clamp(-2.5rem, -6vw, -3.5rem);
+    padding-inline: 0.25rem;
+  }
+  .kb-footer-app-showcase {
+    max-width: 240px;
+  }
+  .kb-footer-phones {
+    min-height: 140px;
+  }
+  .kb-footer-phones .kb-footer-phone {
+    width: clamp(72px, 22vw, 100px);
+  }
+  .kb-footer-store-badges {
+    max-width: 100%;
+    gap: 0.5rem;
   }
   .kb-footer-grid {
     grid-template-columns: 1fr;
+    gap: 1.25rem;
   }
   .kb-footer-links {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    justify-items: start;
-    text-align: left;
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+    width: 100%;
   }
   .kb-footer-links > div {
     max-width: none;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 16px;
+    padding: 1rem 1.1rem;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .kb-footer h4 {
+    margin: 0 0 0.6rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.95;
+  }
+  .kb-footer li {
+    margin-bottom: 0.3rem;
+  }
+  .kb-footer li:last-child {
+    margin-bottom: 0;
+  }
+  .kb-footer-contact li {
+    line-height: 1.55;
+    font-size: 0.92rem;
+    opacity: 0.95;
+  }
+  .kb-footer-phonebar {
+    padding: 1.35rem 0 1.5rem;
+  }
+  .kb-footer-phonebar::after {
+    opacity: 0.4;
+    width: 200px;
+    height: 140px;
+  }
+  .kb-footer-phonebar-inner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  .kb-footer-social {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+    width: 100%;
+  }
+  .kb-footer-social-label {
+    grid-column: 1 / -1;
+    margin: 0 0 0.15rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.9;
+  }
+  .kb-social-link {
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.7rem 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 14px;
+    text-align: center;
+  }
+  .kb-social-link .kb-icon-svg {
+    width: 22px;
+    height: 22px;
+  }
+  .kb-footer-phonebar .kb-footer-phone {
+    text-align: center;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 16px;
+    padding: 1rem 1.1rem;
+  }
+  .kb-footer-phone-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 0.35rem;
+  }
+  .kb-footer-phone-num {
+    font-size: 1.75rem;
+    display: block;
+    width: 100%;
   }
   .kb-news-grid,
   .kb-news-list--grid {
@@ -1571,13 +1676,46 @@ html[lang='en'] .kb-brand {
   .kb-services {
     grid-template-columns: 1fr;
   }
-  .kb-footer-grid {
-    grid-template-columns: 1fr;
+  .kb-footer-body {
+    padding: 1.5rem 0 1.25rem;
   }
-  .kb-footer-links {
-    grid-template-columns: 1fr;
+  .kb-footer-links > div {
+    padding: 0.9rem 1rem;
+    border-radius: 14px;
+  }
+  .kb-footer h4 {
+    font-size: 0.78rem;
+  }
+  .kb-footer li a,
+  .kb-footer-contact li {
+    font-size: 0.88rem;
   }
   .kb-footer-store-badges {
     flex-wrap: nowrap;
+  }
+  .kb-footer-store {
+    padding: 0.45rem 0.5rem;
+  }
+  .kb-footer-store-hint {
+    font-size: 0.58rem;
+  }
+  .kb-footer-store-name {
+    font-size: 0.82rem;
+  }
+  .kb-social-link span {
+    font-size: 0.68rem;
+  }
+  .kb-footer-phone-num {
+    font-size: 1.55rem;
+  }
+  .kb-footer-tagline {
+    padding: 0.75rem 0;
+  }
+  .kb-footer-tagline p {
+    font-size: 0.88rem;
+  }
+  .kb-footer-bottom {
+    padding: 0.75rem 0;
+    font-size: 0.8rem;
   }
 }

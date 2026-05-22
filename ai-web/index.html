@@ -4,14 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <title>ChatGPT โมเน่ — สหกรณ์ออมทรัพย์สาธารณสุขหนองคาย จำกัด</title>
-  <meta name="description" content="ChatGPT โมเน่ — สหกรณ์ออมทรัพย์สาธารณสุขหนองคาย จำกัด">
+  <title>Chat โมเน่ - NKBKCOOP</title>
+  <meta name="description" content="Chat โมเน่ — สหกรณ์ออมทรัพย์สาธารณสุขหนองคาย จำกัด">
   <link rel="icon" href="chatgpt-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="chatgpt-icon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20260522chatui22">
 </head>
 <body class="theme-light">
   <div id="authScreen" class="auth-screen">
@@ -19,11 +19,17 @@
       <div class="auth-logo" aria-hidden="true">
         <img src="chatgpt-icon.svg" alt="" width="40" height="40">
       </div>
-      <h1 class="auth-title">ChatGPT โมเน่</h1>
+      <h1 class="auth-title" id="authTitle">Chat โมเน่</h1>
       <p class="auth-sub">แชท · วิเคราะห์รูป · สร้างภาพ</p>
       <div id="authLoading" class="auth-loading">
-        <div class="auth-spinner"></div>
-        <p>กำลังเชื่อมต่อ LINE...</p>
+        <div class="auth-boot-logo-wrap" aria-hidden="true">
+          <span class="auth-boot-ring"></span>
+          <span class="auth-boot-ring auth-boot-ring--delay"></span>
+          <img class="auth-boot-logo" src="chatgpt-icon.svg" alt="" width="40" height="40">
+        </div>
+        <p class="auth-boot-brand" id="authBootBrand">Chat โมเน่</p>
+        <p class="auth-boot-status">กำลังเชื่อมต่อ LINE...</p>
+        <div class="auth-boot-dots" aria-hidden="true"><span></span><span></span><span></span></div>
       </div>
       <div id="authActions" class="auth-actions hidden">
         <button type="button" id="btnLineLogin" class="btn-line">เข้าสู่ระบบด้วย LINE</button>
@@ -39,37 +45,98 @@
   <div id="appRoot" class="app-root hidden">
     <div class="nkbk-ai-shell">
       <aside class="nkbk-ai-sidebar" id="nkbkAiSidebar">
-        <div class="sidebar-top">
+        <div class="sidebar-head">
+          <a class="sidebar-logo" href="/" id="sidebarLogoHome" aria-label="Chat โมเน่">
+            <img src="chatgpt-icon.svg" alt="" width="24" height="24">
+          </a>
+          <button type="button" id="btnSidebarExpand" class="sidebar-expand-btn" aria-label="ขยายแถบด้านข้าง" title="ขยายแถบด้านข้าง">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M14 9l3 3-3 3"/></svg>
+          </button>
+          <button type="button" id="btnSidebarCollapse" class="sidebar-icon-btn" aria-label="ซ่อนแถบด้านข้าง" title="ซ่อนแถบด้านข้าง">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>
+          </button>
           <button type="button" id="btnSidebarClose" class="sidebar-close" aria-label="ปิดเมนู">×</button>
-          <button type="button" id="btnNkbkAiNewThread" class="nkbk-ai-sidebar-new">+ แชทใหม่</button>
         </div>
-        <div class="nkbk-ai-sidebar-label">บทสนทนา</div>
-        <nav class="nkbk-ai-thread-list" id="nkbkAiThreadList" aria-label="รายการบทสนทนา"></nav>
+        <nav class="sidebar-nav" aria-label="เมนูหลัก">
+          <button type="button" id="btnNkbkAiNewThread" class="sidebar-nav-item" title="แชทใหม่">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+            <span>แชทใหม่</span>
+          </button>
+          <button type="button" id="btnSearchChats" class="sidebar-nav-item" title="ค้นหาแชต">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
+            <span>ค้นหาแชต</span>
+          </button>
+          <button type="button" id="btnLibrary" class="sidebar-nav-item" title="ไลบรารี">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            <span>ไลบรารี</span>
+          </button>
+        </nav>
+        <div class="sidebar-section">
+          <div class="sidebar-section-label">เมื่อเร็วๆ นี้</div>
+          <nav class="nkbk-ai-thread-list" id="nkbkAiThreadList" aria-label="รายการบทสนทนา"></nav>
+        </div>
         <div class="sidebar-foot">
-          <div id="userChip" class="user-chip hidden">
-            <img id="userChipImg" alt="" class="user-chip-img">
-            <span id="userChipName" class="user-chip-name"></span>
+          <button type="button" id="btnProfileMenu" class="sidebar-profile" aria-haspopup="true" aria-expanded="false" title="บัญชี">
+            <span class="sidebar-profile-avatar" id="sidebarProfileAvatar" aria-hidden="true"></span>
+            <span class="sidebar-profile-text">
+              <span id="sidebarProfileName" class="sidebar-profile-name">ผู้ใช้</span>
+              <span id="sidebarProfileSub" class="sidebar-profile-sub"></span>
+            </span>
+            <svg class="sidebar-profile-store" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          </button>
+          <div class="sidebar-profile-menu hidden" id="sidebarProfileMenu" role="menu">
+            <div class="sidebar-profile-menu-head sidebar-profile-menu-head--static">
+              <span class="sidebar-profile-avatar" id="sidebarProfileMenuAvatar" aria-hidden="true"></span>
+              <span class="sidebar-profile-text">
+                <span id="sidebarProfileMenuName" class="sidebar-profile-name">ผู้ใช้</span>
+                <span id="sidebarProfileMenuSub" class="sidebar-profile-sub"></span>
+              </span>
+            </div>
+            <div class="sidebar-profile-menu-divider"></div>
+            <button type="button" class="sidebar-profile-menu-item" data-action="personalize" role="menuitem">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+              <span>การปรับแต่งเฉพาะบุคคล</span>
+            </button>
+            <button type="button" class="sidebar-profile-menu-item" data-action="settings" role="menuitem">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              <span>การตั้งค่า</span>
+            </button>
+            <div class="sidebar-profile-menu-divider"></div>
+            <button type="button" class="sidebar-profile-menu-item" data-action="help" role="menuitem">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 1 1 5.82 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <span>ช่วยเหลือ</span>
+              <svg class="menu-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+            <button type="button" id="btnLogout" class="sidebar-profile-menu-item" data-action="logout" role="menuitem">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              <span>ลงชื่อออก</span>
+            </button>
           </div>
-          <button type="button" id="btnLogout" class="btn-logout">ออกจากระบบ</button>
         </div>
       </aside>
       <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
 
-      <div class="nkbk-ai-app">
+      <div class="nkbk-ai-app is-landing is-booting">
+        <div class="nkbk-ai-boot-splash" id="nkbkAiBootSplash" aria-live="polite" aria-busy="true">
+          <div class="nkbk-ai-boot-inner">
+            <div class="nkbk-ai-boot-logo-wrap" aria-hidden="true">
+              <span class="nkbk-ai-boot-ring"></span>
+              <span class="nkbk-ai-boot-ring nkbk-ai-boot-ring--delay"></span>
+              <img class="nkbk-ai-boot-logo" src="chatgpt-icon.svg" alt="" width="44" height="44">
+            </div>
+            <p class="nkbk-ai-boot-brand" id="nkbkAiBootBrand">น้องโมเน่</p>
+            <p class="nkbk-ai-boot-status" id="nkbkAiBootStatus">กำลังเตรียมแชทให้คุณ</p>
+            <div class="nkbk-ai-boot-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+          </div>
+        </div>
+        <div class="nkbk-ai-chat-view" id="nkbkAiChatView">
         <header class="nkbk-ai-header">
           <button type="button" id="btnSidebarOpen" class="btn-menu" aria-label="เปิดเมนู">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
           </button>
           <div class="nkbk-ai-header-main">
-            <div class="nkbk-ai-avatar" aria-hidden="true">
-              <img src="chatgpt-icon.svg" alt="" width="24" height="24">
-            </div>
             <div class="nkbk-ai-header-text">
-              <div class="nkbk-ai-title-row">
-                <h1 id="nkbkAiTitle">ChatGPT โมเน่</h1>
-                <span id="nkbkAiCallBadge" class="nkbk-ai-call-badge hidden"></span>
-              </div>
-              <p id="nkbkAiSubtitle" class="nkbk-ai-sub">แชท · วิเคราะห์รูป · สร้างภาพ</p>
+              <h1 id="nkbkAiTitle">น้องโมเน่</h1>
             </div>
           </div>
           <div class="nkbk-ai-header-actions">
@@ -77,7 +144,7 @@
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
               <span>แบ่งปัน</span>
             </button>
-            <div class="nkbk-ai-header-menu-wrap">
+            <div class="nkbk-ai-header-menu-wrap hidden" id="headerThreadMenuWrap">
               <button type="button" id="btnThreadMenu" class="nkbk-ai-btn-ghost nkbk-ai-btn-icon-sm" title="เมนูบทสนทนา" aria-label="เมนูบทสนทนา" aria-haspopup="true" aria-expanded="false">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.75"/><circle cx="12" cy="12" r="1.75"/><circle cx="19" cy="12" r="1.75"/></svg>
               </button>
@@ -96,7 +163,7 @@
                   <svg class="menu-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
                 </button>
                 <button type="button" class="nkbk-ai-header-menu-item" data-action="pin" role="menuitem">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 17v5"/><path d="M9 3h6l1 7h4l-5 6v-4H9v4L4 10h4z"/></svg>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-5"/><path d="M5 10.6c0-3.5 3.1-6.6 7-6.6s7 3.1 7 6.6c0 2.3-1.2 4.2-3 5.5l-1 5.4H9l-1-5.4C6.2 14.8 5 12.9 5 10.6z"/></svg>
                   <span id="nkbkAiMenuPinLabel">ปักหมุดแชต</span>
                 </button>
                 <button type="button" class="nkbk-ai-header-menu-item" data-action="archive" role="menuitem">
@@ -109,135 +176,449 @@
                 </button>
               </div>
             </div>
-            <button type="button" id="btnThemeToggle" class="nkbk-ai-btn-ghost nkbk-ai-btn-icon-sm" title="สลับธีม" aria-label="สลับธีม">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
-            </button>
-            <button type="button" id="btnNkbkAiMemory" class="nkbk-ai-btn-ghost nkbk-ai-btn-icon-sm" title="ความจำ" aria-label="ความจำ">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 1 7 7c0 2.5-1.2 4.5-3 6l-1 5H9l-1-5c-1.8-1.5-3-3.5-3-6a7 7 0 0 1 7-7z"/><path d="M9 18h6"/></svg>
-            </button>
           </div>
         </header>
 
         <div id="nkbkAiBanner" class="nkbk-ai-banner hidden" role="alert"></div>
 
+        <div class="nkbk-ai-body">
         <main class="nkbk-ai-messages" id="nkbkAiMessages" aria-live="polite">
           <div class="nkbk-ai-welcome" id="nkbkAiWelcome">
-            <p class="nkbk-ai-welcome-title" id="nkbkAiWelcomeTitle">สวัสดีค่ะ โมเน่พร้อมช่วยแล้ว</p>
-            <p class="nkbk-ai-welcome-hints">พิมพ์ข้อความ · แนบรูป · หรือเลือกสร้างรูปภาพด้านล่าง</p>
-            <div class="nkbk-ai-welcome-chips">
-              <button type="button" class="nkbk-ai-chip" data-prompt="สรุปข่าวสารสหกรณ์ให้ฟังหน่อย">💬 สรุปข่าว</button>
-              <button type="button" class="nkbk-ai-chip" data-prompt="ช่วยร่างจดหมายทางการให้หน่อย">✍️ ร่างจดหมาย</button>
-              <button type="button" class="nkbk-ai-chip" data-prompt="สร้างรูปโลโก้สหกรณ์สไตล์มินิมอล">🎨 สร้างรูป</button>
+            <div class="nkbk-ai-welcome-hero">
+              <div class="nkbk-ai-welcome-logo" aria-hidden="true">
+                <img src="chatgpt-icon.svg" alt="" width="36" height="36">
+              </div>
+              <p class="nkbk-ai-welcome-title" id="nkbkAiWelcomeTitle">วันนี้คุณคิดอะไรอยู่</p>
             </div>
           </div>
         </main>
 
         <footer class="nkbk-ai-composer-wrap" id="nkbkAiComposerWrap">
-          <p class="nkbk-ai-composer-hint hidden" id="nkbkAiComposerHint">เลือกบทสนทนาจากเมนูด้านซ้าย หรือกด + แชทใหม่</p>
           <div id="nkbkAiDropOverlay" class="nkbk-ai-drop-overlay hidden" aria-hidden="true">
             <div class="nkbk-ai-drop-overlay-inner">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-              <span>วางรูปที่นี่</span>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <span>วางไฟล์ที่นี่</span>
             </div>
           </div>
-          <div id="nkbkAiAttachPreview" class="nkbk-ai-attach-preview hidden"></div>
+          <div id="nkbkAiPromptSuggest" class="nkbk-ai-prompt-suggest hidden" aria-hidden="true">
+            <div class="nkbk-ai-prompt-suggest-inner">
+              <div class="nkbk-ai-prompt-suggest-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              </div>
+              <div class="nkbk-ai-prompt-suggest-text">
+                <p class="nkbk-ai-prompt-suggest-title">พรอมต์นี้ใช้บ่อย — บันทึกไว้ใช้ซ้ำไหม?</p>
+                <p class="nkbk-ai-prompt-suggest-preview" id="nkbkAiPromptSuggestPreview"></p>
+                <p class="nkbk-ai-prompt-suggest-count" id="nkbkAiPromptSuggestCount"></p>
+              </div>
+              <div class="nkbk-ai-prompt-suggest-actions">
+                <button type="button" class="nkbk-ai-btn-ghost nkbk-ai-btn-sm" id="nkbkAiPromptSuggestDismiss">ไม่ตอนนี้</button>
+                <button type="button" class="nkbk-ai-btn-primary nkbk-ai-btn-sm" id="nkbkAiPromptSuggestSave">บันทึกพรอมต์</button>
+              </div>
+            </div>
+          </div>
+          <div class="nkbk-ai-prompt-picker hidden" id="nkbkAiPromptPicker" aria-hidden="true">
+            <div class="nkbk-ai-prompt-picker-head">
+              <h3>พรอมต์ที่บันทึก</h3>
+              <button type="button" class="nkbk-ai-modal-close" id="nkbkAiPromptPickerClose" aria-label="ปิด">×</button>
+            </div>
+            <div class="nkbk-ai-prompt-picker-toolbar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
+              <input type="search" id="nkbkAiPromptPickerSearch" class="nkbk-ai-prompt-picker-search" placeholder="ค้นหาพรอมต์..." autocomplete="off">
+            </div>
+            <div class="nkbk-ai-prompt-picker-list" id="nkbkAiPromptPickerList"></div>
+            <div class="nkbk-ai-prompt-picker-foot">
+              <button type="button" class="nkbk-ai-btn-ghost nkbk-ai-btn-sm" id="nkbkAiPromptPickerSettings">จัดการพรอมต์</button>
+            </div>
+          </div>
           <div class="nkbk-ai-composer-shell">
+            <div id="nkbkAiAttachPreview" class="nkbk-ai-attach-preview hidden"></div>
             <div class="nkbk-ai-composer">
-              <input type="file" id="nkbkAiFileInput" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
-              <button type="button" id="btnNkbkAiAttach" class="nkbk-ai-composer-plus" title="แนบรูป" aria-label="แนบรูป">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-              </button>
+              <input type="file" id="nkbkAiFileInput" accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.docx,.txt,.md,.pptx,.xlsx,image/*,application/pdf,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple hidden>
+              <div class="nkbk-ai-composer-plus-wrap">
+                <button type="button" id="btnNkbkAiAttach" class="nkbk-ai-composer-plus" title="เพิ่ม" aria-label="เพิ่ม" aria-expanded="false" aria-haspopup="true">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                </button>
+                <div class="nkbk-ai-composer-menu-host hidden" id="nkbkAiComposerMenuHost" aria-hidden="true">
+                  <div class="nkbk-ai-composer-menu" id="nkbkAiComposerMenu" role="menu">
+                    <div class="nkbk-ai-composer-menu-main">
+                    <button type="button" class="nkbk-ai-composer-menu-item" data-composer-menu="upload" role="menuitem">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                      <span>เพิ่มรูปภาพและไฟล์</span>
+                    </button>
+                    <button type="button" class="nkbk-ai-composer-menu-item has-submenu" data-composer-menu="recent" role="menuitem">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><circle cx="12" cy="14" r="3"/><path d="M12 11v1"/></svg>
+                      <span>ไฟล์ล่าสุด</span>
+                      <svg class="nkbk-ai-composer-menu-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
+                    </button>
+                    <button type="button" class="nkbk-ai-composer-menu-item has-submenu" data-composer-menu="prompts" role="menuitem">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h6"/></svg>
+                      <span>พรอมต์ที่บันทึก</span>
+                      <svg class="nkbk-ai-composer-menu-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
+                    </button>
+                    </div>
+                  </div>
+                  <div class="nkbk-ai-composer-flyout hidden" id="nkbkAiComposerSubmenu" aria-hidden="true">
+                    <div class="nkbk-ai-composer-submenu-head" id="nkbkAiComposerSubmenuTitle"></div>
+                    <div class="nkbk-ai-composer-submenu-list" id="nkbkAiComposerSubmenuList"></div>
+                  </div>
+                </div>
+              </div>
               <textarea id="nkbkAiInput" rows="1" placeholder="ถามอะไรก็ได้" aria-label="ข้อความ"></textarea>
               <button type="button" id="btnNkbkAiSend" class="nkbk-ai-composer-send" disabled aria-label="ส่ง">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
               </button>
             </div>
-            <div class="nkbk-ai-composer-modes">
-              <button type="button" id="btnNkbkAiGenerate" class="nkbk-ai-mode-pill" aria-pressed="false">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+            <div class="nkbk-ai-starter-actions" id="nkbkAiStarterActions">
+              <button type="button" class="nkbk-ai-starter-pill" data-starter="image">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
                 <span>สร้างรูปภาพ</span>
+              </button>
+              <button type="button" class="nkbk-ai-starter-pill" data-starter="write">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                <span>เขียนหรือแก้ไข</span>
+              </button>
+              <button type="button" class="nkbk-ai-starter-pill" data-starter="search">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                <span>ค้นหาอะไรบางอย่าง</span>
               </button>
             </div>
           </div>
         </footer>
+        </div>
+        </div>
+
+        <div class="nkbk-ai-library hidden" id="nkbkAiLibrary" aria-hidden="true">
+          <div class="nkbk-ai-library-inner">
+            <header class="nkbk-ai-library-head">
+              <h1>ไลบรารี</h1>
+              <div class="nkbk-ai-library-search-wrap">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
+                <input type="search" id="librarySearchInput" placeholder="ค้นหาในคลัง" aria-label="ค้นหาในคลัง">
+              </div>
+              <input type="file" id="libraryUploadInput" accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.docx,.txt,.md,.pptx,.xlsx,image/*" multiple hidden>
+              <button type="button" class="nkbk-ai-library-upload" id="btnLibraryUpload">อัปโหลด</button>
+            </header>
+
+            <div class="nkbk-ai-library-toolbar" id="libraryToolbar">
+              <div class="nkbk-ai-library-tabs" role="tablist">
+                <button type="button" class="nkbk-ai-library-tab is-active" data-filter="all" role="tab">ทั้งหมด</button>
+                <button type="button" class="nkbk-ai-library-tab" data-filter="images" role="tab">ภาพ</button>
+                <button type="button" class="nkbk-ai-library-tab" data-filter="files" role="tab">ไฟล์</button>
+              </div>
+              <div class="nkbk-ai-library-toolbar-right">
+                <button type="button" class="nkbk-ai-library-view-btn is-active" id="btnLibraryViewList" title="มุมมองรายการ" aria-label="มุมมองรายการ">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                </button>
+                <button type="button" class="nkbk-ai-library-view-btn" id="btnLibraryViewGrid" title="มุมมองตาราง" aria-label="มุมมองตาราง">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="nkbk-ai-library-selection-bar hidden" id="librarySelectionBar">
+              <div class="nkbk-ai-library-selection-actions">
+                <button type="button" class="nkbk-ai-library-action nkbk-ai-library-action--primary" id="btnLibraryStartChat">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  <span>เริ่มต้นแชต</span>
+                </button>
+                <button type="button" class="nkbk-ai-library-action" id="btnLibraryDownload">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  <span>ดาวน์โหลด</span>
+                </button>
+                <button type="button" class="nkbk-ai-library-action nkbk-ai-library-action--danger" id="btnLibraryDelete">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  <span>ลบ</span>
+                </button>
+              </div>
+              <span class="nkbk-ai-library-selection-count" id="librarySelectionCount">เลือกไว้ 0 รายการ</span>
+            </div>
+
+            <div class="nkbk-ai-library-list-view" id="libraryListView">
+              <div class="nkbk-ai-library-table-head">
+                <span class="col-name">ชื่อ</span>
+                <span class="col-date">แก้ไขแล้ว <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span>
+                <span class="col-size">ขนาด</span>
+                <span class="col-actions" aria-hidden="true"></span>
+              </div>
+              <div class="nkbk-ai-library-list" id="nkbkAiLibraryList"></div>
+            </div>
+
+            <div class="nkbk-ai-library-grid-view hidden" id="libraryGridView">
+              <div class="nkbk-ai-library-grid" id="nkbkAiLibraryGrid"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="nkbk-ai-viewer" id="nkbkAiViewer" aria-hidden="true">
+        <div class="nkbk-ai-viewer-shell">
+          <header class="nkbk-ai-viewer-top">
+            <div class="nkbk-ai-viewer-top-left">
+              <button type="button" class="nkbk-ai-viewer-close-btn" id="nkbkAiViewerClose" title="ปิด" aria-label="ปิด">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
+              <div class="nkbk-ai-viewer-title" id="nkbkAiViewerTitle"></div>
+            </div>
+            <div class="nkbk-ai-viewer-top-actions">
+              <div class="nkbk-ai-viewer-aspect-wrap">
+                <button type="button" class="nkbk-ai-viewer-aspect-btn" id="nkbkAiViewerAspectBtn" aria-haspopup="true" aria-expanded="false">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                  <span>อัตราส่วนภาพ</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
+                <div class="nkbk-ai-viewer-aspect-menu hidden" id="nkbkAiViewerAspectMenu" role="menu">
+                  <div class="nkbk-ai-viewer-aspect-menu-title">สร้างภาพนี้ด้วยอัตราส่วนภาพอื่น</div>
+                  <button type="button" data-aspect="1:1" role="menuitem"><span class="aspect-icon aspect-1-1"></span>สี่เหลี่ยมจัตุรัส 1:1</button>
+                  <button type="button" data-aspect="3:4" role="menuitem"><span class="aspect-icon aspect-3-4"></span>แนวตั้ง 3:4</button>
+                  <button type="button" data-aspect="9:16" role="menuitem"><span class="aspect-icon aspect-9-16"></span>สตอรี่ 9:16</button>
+                  <button type="button" data-aspect="4:3" role="menuitem"><span class="aspect-icon aspect-4-3"></span>แนวนอน 4:3</button>
+                  <button type="button" data-aspect="16:9" role="menuitem"><span class="aspect-icon aspect-16-9"></span>จอกว้าง 16:9</button>
+                </div>
+              </div>
+              <button type="button" class="nkbk-ai-viewer-share-btn" id="nkbkAiViewerShare">แบ่งปัน</button>
+              <button type="button" class="nkbk-ai-viewer-icon-btn" id="nkbkAiViewerDownload" title="ดาวน์โหลด" aria-label="ดาวน์โหลด">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+              </button>
+            </div>
+          </header>
+          <div class="nkbk-ai-viewer-main">
+            <nav class="nkbk-ai-viewer-rail" id="nkbkAiViewerRail" aria-label="เมนูหลัก">
+              <button type="button" class="nkbk-ai-viewer-rail-btn" id="nkbkAiViewerRailMenu" title="เมนู" aria-label="เปิดเมนู">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+              </button>
+              <button type="button" class="nkbk-ai-viewer-rail-btn" id="nkbkAiViewerRailNew" title="แชทใหม่" aria-label="แชทใหม่">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+              </button>
+              <button type="button" class="nkbk-ai-viewer-rail-btn" id="nkbkAiViewerRailSearch" title="ค้นหาแชต" aria-label="ค้นหาแชต">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
+              </button>
+              <button type="button" class="nkbk-ai-viewer-rail-btn" id="nkbkAiViewerRailLibrary" title="ไลบรารี" aria-label="ไลบรารี">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+              </button>
+            </nav>
+            <aside class="nkbk-ai-viewer-thumbs" id="nkbkAiViewerThumbs" aria-label="รูปในบทสนทนา"></aside>
+            <div class="nkbk-ai-viewer-center">
+              <div class="nkbk-ai-viewer-stage-wrap">
+                <img id="nkbkAiViewerImg" alt="">
+              </div>
+              <footer class="nkbk-ai-viewer-composer">
+                <div id="nkbkAiViewerAttachPreview" class="nkbk-ai-viewer-attach-preview hidden"></div>
+                <div class="nkbk-ai-viewer-composer-inner">
+                  <input type="file" id="nkbkAiViewerFileInput" accept=".png,.jpg,.jpeg,.webp,.gif,image/*" multiple hidden>
+                  <button type="button" class="nkbk-ai-viewer-composer-plus" id="nkbkAiViewerAttach" aria-label="แนบ" title="แนบ">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                  </button>
+                  <textarea id="nkbkAiViewerInput" rows="1" placeholder="อธิบายแก้ไข" aria-label="อธิบายแก้ไข"></textarea>
+                  <button type="button" id="nkbkAiViewerSend" class="nkbk-ai-viewer-composer-send" aria-label="ส่ง">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                  </button>
+                </div>
+              </footer>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="nkbk-ai-modal" id="nkbkAiMemoryModal" aria-hidden="true">
-    <div class="nkbk-ai-modal-backdrop" id="nkbkAiMemoryBackdrop"></div>
-    <div class="nkbk-ai-modal-box">
-      <div class="nkbk-ai-modal-head">
-        <h2>คำสั่งที่โมเน่จำ</h2>
-        <button type="button" class="nkbk-ai-modal-close" id="nkbkAiMemoryClose" aria-label="ปิด">×</button>
-      </div>
-      <div class="nkbk-ai-modal-body">
-        <label class="nkbk-ai-field-label" for="nkbkAiCallNameInput">ชื่อที่ AI เรียกคุณ <span class="muted">(sync LINE)</span></label>
-        <div class="nkbk-field-stack nkbk-field-stack--callname">
-          <input type="text" id="nkbkAiCallNameInput" class="nkbk-callname-input" placeholder="เช่น คุณผู้ชาย" maxlength="40">
-        </div>
-        <label class="nkbk-ai-field-label" for="nkbkAiStandingInstructions">คำสั่งที่ต้องการให้ AI จำ</label>
-        <div class="nkbk-field-stack">
-          <textarea id="nkbkAiStandingInstructions" rows="6" placeholder="เช่น ตอบสั้นๆ เป็นภาษาไทย"></textarea>
-        </div>
-      </div>
-      <div class="nkbk-ai-modal-foot">
-        <button type="button" class="nkbk-ai-btn-ghost" id="nkbkAiMemoryCancel">ยกเลิก</button>
-        <button type="button" class="nkbk-ai-btn-primary" id="nkbkAiMemorySave">บันทึก</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="nkbk-ai-viewer" id="nkbkAiViewer" aria-hidden="true">
-    <div class="nkbk-ai-viewer-shell">
-      <header class="nkbk-ai-viewer-top">
-        <div class="nkbk-ai-viewer-title" id="nkbkAiViewerTitle"></div>
-        <div class="nkbk-ai-viewer-top-actions">
-          <button type="button" class="nkbk-ai-viewer-text-btn hidden" id="nkbkAiViewerCaptionBtn" title="คำอธิบายประกอบ">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 5v14M5 12h14"/></svg>
-            <span>คำอธิบายประกอบ</span>
+  <div class="nkbk-ai-modal" id="nkbkAiSettingsModal" aria-hidden="true">
+    <div class="nkbk-ai-modal-backdrop" id="nkbkAiSettingsBackdrop"></div>
+    <div class="nkbk-ai-modal-box nkbk-ai-settings-box">
+      <div class="nkbk-ai-settings-shell">
+        <nav class="nkbk-ai-settings-nav" aria-label="เมนูการตั้งค่า">
+          <button type="button" class="nkbk-ai-settings-close" id="nkbkAiSettingsClose" aria-label="ปิด">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
           </button>
-          <div class="nkbk-ai-viewer-aspect-wrap">
-            <button type="button" class="nkbk-ai-viewer-aspect-btn" id="nkbkAiViewerAspectBtn" aria-haspopup="true" aria-expanded="false">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-              <span>อัตราส่วนภาพ</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          <div class="nkbk-ai-settings-nav-list">
+            <button type="button" class="nkbk-ai-settings-nav-item is-active" data-settings-nav="general">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              <span>ทั่วไป</span>
             </button>
-            <div class="nkbk-ai-viewer-aspect-menu hidden" id="nkbkAiViewerAspectMenu" role="menu">
-              <div class="nkbk-ai-viewer-aspect-menu-title">สร้างภาพนี้ด้วยอัตราส่วนภาพอื่น</div>
-              <button type="button" data-aspect="1:1" role="menuitem"><span class="aspect-icon aspect-1-1"></span>สี่เหลี่ยมจัตุรัส 1:1</button>
-              <button type="button" data-aspect="3:4" role="menuitem"><span class="aspect-icon aspect-3-4"></span>แนวตั้ง 3:4</button>
-              <button type="button" data-aspect="9:16" role="menuitem"><span class="aspect-icon aspect-9-16"></span>สตอรี่ 9:16</button>
-              <button type="button" data-aspect="4:3" role="menuitem"><span class="aspect-icon aspect-4-3"></span>แนวนอน 4:3</button>
-              <button type="button" data-aspect="16:9" role="menuitem"><span class="aspect-icon aspect-16-9"></span>จอกว้าง 16:9</button>
-            </div>
+            <button type="button" class="nkbk-ai-settings-nav-item" data-settings-nav="notifications">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              <span>การแจ้งเตือน</span>
+            </button>
+            <button type="button" class="nkbk-ai-settings-nav-item" data-settings-nav="personalize">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+              <span>การปรับแต่งเฉพาะบุคคล</span>
+            </button>
+            <button type="button" class="nkbk-ai-settings-nav-item" data-settings-nav="prompts">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h6"/></svg>
+              <span>ตั้งค่าพรอมต์</span>
+            </button>
+            <button type="button" class="nkbk-ai-settings-nav-item" data-settings-nav="data">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>
+              <span>การควบคุมข้อมูล</span>
+            </button>
+            <button type="button" class="nkbk-ai-settings-nav-item" data-settings-nav="storage">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M22 12H2"/><path d="M5 12V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>
+              <span>พื้นที่จัดเก็บข้อมูล</span>
+            </button>
+            <button type="button" class="nkbk-ai-settings-nav-item" data-settings-nav="account">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+              <span>บัญชี</span>
+            </button>
           </div>
-          <button type="button" class="nkbk-ai-viewer-share-btn" id="nkbkAiViewerShare">แบ่งปัน</button>
-          <button type="button" class="nkbk-ai-viewer-icon-btn" id="nkbkAiViewerDownload" title="ดาวน์โหลด" aria-label="ดาวน์โหลด">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
-          </button>
-          <button type="button" class="nkbk-ai-viewer-icon-btn" id="nkbkAiViewerClose" title="ปิด" aria-label="ปิด">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
-          </button>
-        </div>
-      </header>
-      <div class="nkbk-ai-viewer-main">
-        <aside class="nkbk-ai-viewer-thumbs" id="nkbkAiViewerThumbs" aria-label="รูปในบทสนทนา"></aside>
-        <div class="nkbk-ai-viewer-center">
-          <div class="nkbk-ai-viewer-stage-wrap">
-            <img id="nkbkAiViewerImg" alt="">
-          </div>
-          <footer class="nkbk-ai-viewer-composer">
-            <div class="nkbk-ai-viewer-composer-inner">
-              <button type="button" class="nkbk-ai-viewer-composer-plus" id="nkbkAiViewerAttach" aria-label="แนบ" title="แนบ">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-              </button>
-              <textarea id="nkbkAiViewerInput" rows="1" placeholder="อธิบายการแก้ไข" aria-label="อธิบายการแก้ไข"></textarea>
-              <button type="button" id="nkbkAiViewerSend" class="nkbk-ai-viewer-composer-send" aria-label="ส่ง">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
-              </button>
+        </nav>
+        <div class="nkbk-ai-settings-main">
+          <section class="nkbk-ai-settings-panel" data-settings-panel="general">
+            <h2 class="nkbk-ai-settings-panel-title">ทั่วไป</h2>
+            <div class="nkbk-ai-settings-group nkbk-ai-settings-group--theme">
+              <div class="nkbk-ai-settings-group-head">
+                <div>
+                  <span class="nkbk-ai-settings-group-title">ธีม</span>
+                  <p class="nkbk-ai-settings-group-desc">เลือกรูปลักษณ์ที่เหมาะกับคุณ — โหมดระบบจะเปลี่ยนตามอุปกรณ์</p>
+                </div>
+                <span class="nkbk-ai-settings-row-value" id="settingsThemeLabel">ระบบ</span>
+              </div>
+              <div class="nkbk-ai-theme-picker" id="settingsThemePicker"></div>
             </div>
-          </footer>
+          </section>
+          <section class="nkbk-ai-settings-panel hidden" data-settings-panel="notifications">
+            <h2 class="nkbk-ai-settings-panel-title">การแจ้งเตือน</h2>
+            <div id="settingsNotificationsBody"></div>
+            <div id="settingsNotifySoundPanel" class="nkbk-ai-notify-sound-panel" aria-live="polite"></div>
+          </section>
+          <section class="nkbk-ai-settings-panel hidden" data-settings-panel="personalize">
+            <h2 class="nkbk-ai-settings-panel-title">การปรับแต่งเฉพาะบุคคล</h2>
+            <h3 class="nkbk-ai-settings-subtitle">เกี่ยวกับคุณ</h3>
+            <label class="nkbk-ai-field-label" for="nkbkAiCallNameInput" id="labelCallName">ชื่อที่ โมเน่ เรียกคุณ</label>
+            <div class="nkbk-field-stack nkbk-field-stack--callname">
+              <input type="text" id="nkbkAiCallNameInput" class="nkbk-callname-input" placeholder="เช่น คุณผู้ชาย" maxlength="40">
+            </div>
+            <label class="nkbk-ai-field-label" for="nkbkAiUserLocationInput">ตำแหน่งของคุณ</label>
+            <div class="nkbk-field-stack">
+              <input type="text" id="nkbkAiUserLocationInput" class="nkbk-callname-input" placeholder="เช่น หนองคาย, ประเทศไทย" maxlength="120">
+            </div>
+            <label class="nkbk-ai-field-label" for="nkbkAiAboutYouInput">เพิ่มเติมเกี่ยวกับคุณ</label>
+            <div class="nkbk-field-stack">
+              <textarea id="nkbkAiAboutYouInput" rows="3" placeholder="บอกโมเน่เกี่ยวกับงาน ความสนใจ หรือสิ่งที่ควรรู้"></textarea>
+            </div>
+            <label class="nkbk-ai-field-label" for="nkbkAiStandingInstructions" id="labelStandingInstructions">คำสั่งที่ต้องการให้ โมเน่ จำ</label>
+            <div class="nkbk-field-stack">
+              <textarea id="nkbkAiStandingInstructions" rows="4" placeholder="เช่น ตอบสั้นๆ เป็นภาษาไทย"></textarea>
+            </div>
+            <h3 class="nkbk-ai-settings-subtitle" id="settingsMemoryFilesTitle">ไฟล์ที่ต้องการให้ โมเน่ จำ</h3>
+            <p class="nkbk-ai-settings-panel-desc" id="settingsMemoryFilesDesc">อัปโหลดหรือเลือกจากไลบรารี — ตั้งชื่อเรียกแต่ละไฟล์เพื่อให้โมเน่เรียกใช้ได้ เช่น "โลโก้สหกรรม"</p>
+            <div class="nkbk-ai-memory-files-section">
+              <div id="settingsMemoryFilesList" class="nkbk-ai-memory-files-list"></div>
+              <div class="nkbk-ai-memory-files-actions">
+                <input type="file" id="settingsMemoryFileInput" accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.docx,.txt,.md,.pptx,.xlsx,image/*" multiple hidden>
+                <button type="button" class="nkbk-ai-memory-action nkbk-ai-memory-action--upload" id="settingsMemoryFileUpload">
+                  <span class="nkbk-ai-memory-action-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 16V4m0 0L8 8m4-4 4 4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+                  </span>
+                  <span class="nkbk-ai-memory-action-text">
+                    <span class="nkbk-ai-memory-action-label">อัปโหลดใหม่</span>
+                    <span class="nkbk-ai-memory-action-desc">PDF, รูปภาพ, เอกสาร</span>
+                  </span>
+                </button>
+                <button type="button" class="nkbk-ai-memory-action nkbk-ai-memory-action--library" id="settingsMemoryFilePick">
+                  <span class="nkbk-ai-memory-action-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+                  </span>
+                  <span class="nkbk-ai-memory-action-text">
+                    <span class="nkbk-ai-memory-action-label">เลือกจากไลบรารี</span>
+                    <span class="nkbk-ai-memory-action-desc">เลือกจากไฟล์ที่มีอยู่แล้ว</span>
+                  </span>
+                </button>
+              </div>
+            </div>
+            <h3 class="nkbk-ai-settings-subtitle">หน่วยความจำ</h3>
+            <div id="settingsMemoryToggles"></div>
+            <div class="nkbk-ai-settings-panel-foot">
+              <button type="button" class="nkbk-ai-btn-primary" id="nkbkAiMemorySave">บันทึก</button>
+            </div>
+          </section>
+          <section class="nkbk-ai-settings-panel hidden" data-settings-panel="prompts">
+            <h2 class="nkbk-ai-settings-panel-title">ตั้งค่าพรอมต์</h2>
+            <div class="nkbk-ai-prompts-compose">
+              <label class="nkbk-ai-field-label" for="settingsPromptTitle">ชื่อพรอมต์</label>
+              <input type="text" id="settingsPromptTitle" class="nkbk-callname-input" placeholder="เช่น สรุปรายงานประจำวัน" maxlength="80" autocomplete="off">
+              <label class="nkbk-ai-field-label" for="settingsPromptText">เนื้อหาพรอมต์</label>
+              <textarea id="settingsPromptText" class="nkbk-ai-prompts-textarea" rows="4" placeholder="พิมพ์ข้อความที่ต้องการบันทึกไว้ใช้ซ้ำ..." maxlength="4000"></textarea>
+              <div class="nkbk-ai-prompts-compose-foot">
+                <button type="button" class="nkbk-ai-btn-ghost hidden" id="settingsPromptCancelBtn">ยกเลิก</button>
+                <button type="button" class="nkbk-ai-btn-primary" id="settingsPromptAddBtn">เพิ่มพรอมต์</button>
+              </div>
+            </div>
+            <div class="nkbk-ai-prompts-list-head">
+              <h3 class="nkbk-ai-settings-subtitle">พรอมต์ของคุณ</h3>
+              <input type="search" id="settingsPromptSearch" class="nkbk-ai-prompts-search" placeholder="ค้นหา..." autocomplete="off">
+            </div>
+            <div id="settingsPromptsList" class="nkbk-ai-prompts-list"></div>
+          </section>
+          <section class="nkbk-ai-settings-panel hidden" data-settings-panel="data">
+            <h2 class="nkbk-ai-settings-panel-title">การควบคุมข้อมูล</h2>
+            <div class="nkbk-ai-settings-rows nkbk-ai-settings-rows--data">
+              <div id="settingsDataLocation"></div>
+              <div class="nkbk-ai-settings-row nkbk-ai-settings-row--static">
+                <span class="nkbk-ai-settings-row-label">ลิงก์ที่แบ่งปัน</span>
+                <button type="button" class="nkbk-ai-btn-ghost nkbk-ai-btn-sm" id="settingsOpenSharedLinks">
+                  ดูรายการ <span class="nkbk-ai-data-badge" id="settingsSharedLinksCount">0</span>
+                </button>
+              </div>
+              <div class="nkbk-ai-settings-row nkbk-ai-settings-row--static">
+                <span class="nkbk-ai-settings-row-label">แชตที่เก็บถาวร</span>
+                <button type="button" class="nkbk-ai-btn-ghost nkbk-ai-btn-sm" id="settingsOpenArchived">
+                  ดูรายการ <span class="nkbk-ai-data-badge" id="settingsArchivedCount">0</span>
+                </button>
+              </div>
+              <div class="nkbk-ai-settings-row nkbk-ai-settings-row--static nkbk-ai-settings-row--danger-action">
+                <span class="nkbk-ai-settings-row-label nkbk-ai-settings-row-label--danger">ลบแชตทั้งหมด</span>
+                <button type="button" class="nkbk-ai-btn-danger nkbk-ai-btn-sm" id="settingsDeleteAllChats">ลบแชตทั้งหมด</button>
+              </div>
+            </div>
+          </section>
+          <section class="nkbk-ai-settings-panel hidden" data-settings-panel="storage">
+            <h2 class="nkbk-ai-settings-panel-title">พื้นที่จัดเก็บข้อมูล</h2>
+            <div class="nkbk-ai-storage-overview">
+              <div class="nkbk-ai-storage-head">
+                <span class="nkbk-ai-storage-used" id="settingsStorageUsed">0 MB</span>
+                <span class="nkbk-ai-storage-quota">จาก <span id="settingsStorageQuota">5 GB</span></span>
+              </div>
+              <div class="nkbk-ai-storage-bar-wrap">
+                <div class="nkbk-ai-storage-bar">
+                  <div class="nkbk-ai-storage-bar-fill" id="settingsStorageBar"></div>
+                </div>
+              </div>
+              <div class="nkbk-ai-storage-meta">
+                <span>เหลือ <strong id="settingsStorageRemain">5 GB</strong></span>
+                <span id="settingsStoragePct">0%</span>
+              </div>
+            </div>
+            <h3 class="nkbk-ai-settings-subtitle">จัดการพื้นที่จัดเก็บ</h3>
+            <div class="nkbk-ai-settings-rows">
+              <div class="nkbk-ai-settings-row nkbk-ai-settings-row--static">
+                <span class="nkbk-ai-settings-row-label">รูปภาพ</span>
+                <span class="nkbk-ai-settings-row-value" id="settingsStorageImages">0 รูป</span>
+              </div>
+              <div class="nkbk-ai-settings-row nkbk-ai-settings-row--static">
+                <span class="nkbk-ai-settings-row-label">ไฟล์</span>
+                <span class="nkbk-ai-settings-row-value" id="settingsStorageFiles">0 ไฟล์</span>
+              </div>
+            </div>
+          </section>
+          <section class="nkbk-ai-settings-panel hidden" data-settings-panel="account">
+            <h2 class="nkbk-ai-settings-panel-title">บัญชี</h2>
+            <div class="nkbk-ai-account-card">
+              <div class="nkbk-ai-account-avatar" id="settingsAccountAvatar"></div>
+              <div class="nkbk-ai-settings-rows nkbk-ai-account-rows">
+                <div class="nkbk-ai-settings-row nkbk-ai-settings-row--static">
+                  <span class="nkbk-ai-settings-row-label">ชื่อ-สกุล</span>
+                  <span class="nkbk-ai-settings-row-value" id="settingsAccountName">-</span>
+                </div>
+                <div class="nkbk-ai-settings-row nkbk-ai-settings-row--static">
+                  <span class="nkbk-ai-settings-row-label">อีเมล</span>
+                  <span class="nkbk-ai-settings-row-value" id="settingsAccountEmail">-</span>
+                </div>
+                <div class="nkbk-ai-settings-row nkbk-ai-settings-row--static">
+                  <span class="nkbk-ai-settings-row-label">ชื่อผู้ใช้</span>
+                  <span class="nkbk-ai-settings-row-value" id="settingsAccountUsername">-</span>
+                </div>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     </div>
@@ -254,11 +635,103 @@
     </div>
   </div>
 
+  <div class="sidebar-search-modal hidden" id="searchChatModal" aria-hidden="true">
+    <div class="sidebar-search-backdrop" id="searchChatBackdrop"></div>
+    <div class="sidebar-search-panel" role="dialog" aria-label="ค้นหาแชต">
+      <div class="sidebar-search-input-wrap">
+        <input type="search" id="searchChatInput" placeholder="ค้นหาแชต..." autocomplete="off" aria-label="ค้นหาแชต">
+        <button type="button" class="sidebar-search-close" id="searchChatClose" aria-label="ปิด">×</button>
+      </div>
+      <button type="button" class="sidebar-search-new" id="searchChatNew">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+        <span>แชตใหม่</span>
+      </button>
+      <div class="sidebar-search-results" id="searchChatResults"></div>
+    </div>
+  </div>
+
+  <div class="sidebar-thread-menu hidden" id="sidebarThreadMenu" role="menu">
+    <button type="button" class="sidebar-thread-menu-item" data-action="share" role="menuitem">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+      <span>แบ่งปัน</span>
+    </button>
+    <button type="button" class="sidebar-thread-menu-item" data-action="group" role="menuitem">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span>เริ่มแชตกลุ่ม</span>
+    </button>
+    <button type="button" class="sidebar-thread-menu-item" data-action="rename" role="menuitem">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+      <span>เปลี่ยนชื่อ</span>
+    </button>
+    <div class="sidebar-thread-menu-divider"></div>
+    <button type="button" class="sidebar-thread-menu-item" data-action="pin" role="menuitem">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-5"/><path d="M5 10.6c0-3.5 3.1-6.6 7-6.6s7 3.1 7 6.6c0 2.3-1.2 4.2-3 5.5l-1 5.4H9l-1-5.4C6.2 14.8 5 12.9 5 10.6z"/></svg>
+      <span id="sidebarThreadMenuPinLabel">ปักหมุดแชต</span>
+    </button>
+    <button type="button" class="sidebar-thread-menu-item" data-action="archive" role="menuitem">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="2" y="4" width="20" height="5" rx="1"/><path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9"/><path d="M10 13h4"/></svg>
+      <span>เก็บถาวร</span>
+    </button>
+    <button type="button" class="sidebar-thread-menu-item sidebar-thread-menu-item--danger" data-action="delete" role="menuitem">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      <span>ลบ</span>
+    </button>
+  </div>
+
   <!-- legacy id kept for compatibility -->
   <div class="hidden" id="nkbkAiLightbox" aria-hidden="true"><img id="nkbkAiLightboxImg" alt=""></div>
 
+  <div class="nkbk-ai-modal hidden" id="nkbkAiSharedLinksModal" aria-hidden="true">
+    <div class="nkbk-ai-modal-backdrop" id="nkbkAiSharedLinksBackdrop"></div>
+    <div class="nkbk-ai-modal-panel nkbk-ai-data-table-modal" role="dialog" aria-label="ลิงก์ที่แบ่งปัน">
+      <div class="nkbk-ai-data-table-head">
+        <h3>ลิงก์ที่แบ่งปัน</h3>
+        <button type="button" class="nkbk-ai-modal-close" id="nkbkAiSharedLinksClose" aria-label="ปิด">×</button>
+      </div>
+      <div class="nkbk-ai-data-table-wrap" id="settingsSharedLinksTable"></div>
+    </div>
+  </div>
+
+  <div class="nkbk-ai-modal hidden" id="nkbkAiArchivedModal" aria-hidden="true">
+    <div class="nkbk-ai-modal-backdrop" id="nkbkAiArchivedBackdrop"></div>
+    <div class="nkbk-ai-modal-panel nkbk-ai-data-table-modal" role="dialog" aria-label="แชตที่เก็บถาวร">
+      <div class="nkbk-ai-data-table-head">
+        <h3>แชตที่เก็บถาวร</h3>
+        <button type="button" class="nkbk-ai-modal-close" id="nkbkAiArchivedClose" aria-label="ปิด">×</button>
+      </div>
+      <div class="nkbk-ai-data-table-wrap" id="settingsArchivedTable"></div>
+    </div>
+  </div>
+
+  <div class="nkbk-ai-modal hidden" id="nkbkAiLibraryPickerModal" aria-hidden="true">
+    <div class="nkbk-ai-modal-backdrop" id="nkbkAiLibraryPickerBackdrop"></div>
+    <div class="nkbk-ai-modal-panel nkbk-ai-library-picker-panel" role="dialog" aria-label="เลือกจากไลบรารี">
+      <div class="nkbk-ai-library-picker-head">
+        <div>
+          <h3>เลือกจากไลบรารี</h3>
+          <p class="nkbk-ai-library-picker-sub" id="libraryPickerSub">เลือกไฟล์ที่ต้องการให้โมเน่จำไว้</p>
+        </div>
+        <button type="button" class="nkbk-ai-modal-close" id="nkbkAiLibraryPickerClose" aria-label="ปิด">×</button>
+      </div>
+      <div class="nkbk-ai-library-picker-toolbar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
+        <input type="search" id="libraryPickerSearch" class="nkbk-ai-library-picker-search" placeholder="ค้นหาไฟล์..." autocomplete="off">
+      </div>
+      <div class="nkbk-ai-library-picker-list" id="libraryPickerList"></div>
+      <div class="nkbk-ai-library-picker-foot">
+        <span class="nkbk-ai-library-picker-count" id="libraryPickerCount">เลือกแล้ว 0 รายการ</span>
+        <div class="nkbk-ai-library-picker-foot-actions">
+          <button type="button" class="nkbk-ai-btn-ghost" id="libraryPickerCancel">ยกเลิก</button>
+          <button type="button" class="nkbk-ai-btn-primary" id="libraryPickerConfirm">เพิ่มที่เลือก</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script src="auth.js"></script>
-  <script src="chat.js"></script>
+  <script src="chat.js?v=20260522chatui24"></script>
+  <script src="prompts.js?v=20260522chatui3"></script>
+  <script src="settings.js?v=20260522chatui7"></script>
 </body>
 </html>

@@ -32,6 +32,10 @@ function getPageIdFromLocation() {
   if (path === '/management') return '8929';
   if (path === '/contact') return '354';
   if (path === '/infrom-payment' || path === '/infrom-payment-line') return '9304';
+  if (path === '/app') return '9208';
+  if (path === '/faq') return '294';
+  if (path === '/terms') return '525';
+  if (path === '/privacy-policy' || path === '/pdpa') return '3';
   const pathKey = path === '/' ? '/' : `${path}/`;
   const pages = (window.CMS_SITE && window.CMS_SITE.cmsPages) || {};
   if (pages[pathKey]) return String(pages[pathKey]);
@@ -129,7 +133,11 @@ function rewriteContentLinks(root) {
           '420': '/team',
           '8929': '/management',
           '354': '/contact',
-          '9304': '/infrom-payment'
+          '9304': '/infrom-payment',
+          '9208': '/app',
+          '294': '/faq',
+          '525': '/terms',
+          '3': '/privacy-policy'
         };
         a.setAttribute('href', pretty[pageId] || `/page/${pageId}`);
         return;
@@ -145,6 +153,12 @@ function rewriteContentLinks(root) {
 
 function siteTabTitle() {
   return (window.CMS_SITE && CMS_SITE.tabTitle) || 'NKBKCOOP';
+}
+
+function bindPageAnchors(root) {
+  window.CmsLayout?.bindHeaderAwareAnchors?.(
+    root || document.getElementById('cms-page-content')
+  );
 }
 
 async function loadSiteName() {
@@ -492,17 +506,26 @@ const TEAM_PAGE_ID = '420';
 const MANAGEMENT_PAGE_ID = '8929';
 const CONTACT_PAGE_ID = '354';
 const PAYMENT_PAGE_ID = '9304';
+const APP_PAGE_ID = '9208';
+const FAQ_PAGE_ID = '294';
+const TERMS_PAGE_ID = '525';
+const PRIVACY_PAGE_ID = '3';
+
+function stripTagsPlain(s) {
+  return String(s || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 async function initPaymentPage(main) {
   main.innerHTML = CmsLayout.renderLoading();
   try {
     const page = await fetchPageHtml(PAYMENT_PAGE_ID);
-    const title = page.title || t('nav.payment') || 'แจ้งโอนเงิน';
-    document.title = title + ' — ' + siteTabTitle();
-    const titleWrap = document.getElementById('cms-page-title');
-    if (titleWrap) {
-      titleWrap.innerHTML = CmsLayout.renderPageTitle(escapeHtml(title), '');
-    }
+    const headTitle = t('nav.payment') || 'แจ้งโอนเงิน';
+    const docTitle = stripTagsPlain(page.title) || headTitle;
+    document.title = docTitle + ' — ' + siteTabTitle();
+    CmsLayout.setPageTitle(escapeHtml(headTitle), '');
     main.innerHTML = window.CmsPaymentPage
       ? CmsPaymentPage.renderPaymentPage()
       : page.html;
@@ -511,9 +534,10 @@ async function initPaymentPage(main) {
     }
     CmsI18n?.applyTranslations();
     window.CmsPaymentPage?.bindPaymentForm(main);
+    bindPageAnchors(main);
     applyPageSocial({
-      title: page.title || t('nav.payment'),
-      documentTitle: title + ' — ' + siteTabTitle(),
+      title: docTitle,
+      documentTitle: docTitle + ' — ' + siteTabTitle(),
       description: t('payment.intro') || (window.CMS_SITE && CMS_SITE.og && CMS_SITE.og.description),
       image: window.CmsSocial && CmsSocial.defaultImage(),
       url: location.href
@@ -529,10 +553,7 @@ async function initContactPage(main) {
     const page = await fetchPageHtml(CONTACT_PAGE_ID);
     const title = page.title || t('nav.contact') || 'ติดต่อเรา';
     document.title = title + ' — ' + siteTabTitle();
-    const titleWrap = document.getElementById('cms-page-title');
-    if (titleWrap) {
-      titleWrap.innerHTML = CmsLayout.renderPageTitle(escapeHtml(title), '');
-    }
+    CmsLayout.setPageTitle(escapeHtml(title), '');
     main.innerHTML = window.CmsContactPage
       ? CmsContactPage.renderContactPage()
       : page.html;
@@ -541,6 +562,8 @@ async function initContactPage(main) {
     }
     CmsI18n?.applyTranslations();
     window.CmsContactPage?.bindContactForm(main);
+    window.CmsContactPage?.bindContactLang(main);
+    bindPageAnchors(main);
     applyPageSocial({
       title: page.title || t('nav.contact'),
       documentTitle: title + ' — ' + siteTabTitle(),
@@ -559,10 +582,7 @@ async function initDownloadPage(main) {
     const page = await fetchPageHtml(DOWNLOAD_PAGE_ID);
     const title = page.title || t('nav.download') || 'ดาวน์โหลด';
     document.title = title + ' — ' + siteTabTitle();
-    const titleWrap = document.getElementById('cms-page-title');
-    if (titleWrap) {
-      titleWrap.innerHTML = CmsLayout.renderPageTitle(escapeHtml(title), '');
-    }
+    CmsLayout.setPageTitle(escapeHtml(title), '');
     const sections = window.CmsDownloadPage
       ? CmsDownloadPage.parseDownloadSections(page.html)
       : [];
@@ -578,6 +598,7 @@ async function initDownloadPage(main) {
     }
     CmsI18n?.applyTranslations();
     window.CmsDownloadPage?.bindDownloadButtons(main);
+    bindPageAnchors(main);
     socialFromPage(page, location.pathname);
   } catch (e) {
     main.innerHTML = `<p class="error text-center">${escapeHtml(e.message)}</p>`;
@@ -590,10 +611,7 @@ async function initAboutPage(main) {
     const page = await fetchPageHtml(ABOUT_PAGE_ID);
     const title = page.title || t('nav.aboutUs') || 'เกี่ยวกับสหกรณ์';
     document.title = title + ' — ' + siteTabTitle();
-    const titleWrap = document.getElementById('cms-page-title');
-    if (titleWrap) {
-      titleWrap.innerHTML = CmsLayout.renderPageTitle(escapeHtml(title), '');
-    }
+    CmsLayout.setPageTitle(escapeHtml(title), '');
     const data = window.CmsAboutPage
       ? CmsAboutPage.parseAboutPage(page.html)
       : { hero: null, tables: [] };
@@ -605,6 +623,7 @@ async function initAboutPage(main) {
     }
     CmsI18n?.applyTranslations();
     window.CmsAboutPage?.bindAboutPage(main);
+    bindPageAnchors(main);
     socialFromPage(page, '/about-us');
   } catch (e) {
     main.innerHTML = `<p class="error text-center">${escapeHtml(e.message)}</p>`;
@@ -617,10 +636,7 @@ async function initTeamPage(main) {
     const page = await fetchPageHtml(TEAM_PAGE_ID);
     const title = t('nav.team') || 'คณะกรรมการสหกรณ์';
     document.title = title + ' — ' + siteTabTitle();
-    const titleWrap = document.getElementById('cms-page-title');
-    if (titleWrap) {
-      titleWrap.innerHTML = CmsLayout.renderPageTitle(escapeHtml(title), '');
-    }
+    CmsLayout.setPageTitle(escapeHtml(title), '');
     if (window.CmsTeamPage) {
       await CmsTeamPage.initTeamPage(main);
     } else {
@@ -630,6 +646,7 @@ async function initTeamPage(main) {
       history.replaceState(null, '', '/team');
     }
     CmsI18n?.applyTranslations();
+    bindPageAnchors(main);
   } catch (e) {
     main.innerHTML = `<p class="error text-center">${escapeHtml(e.message)}</p>`;
   }
@@ -640,10 +657,7 @@ async function initManagementPage(main) {
   try {
     const title = t('nav.management') || 'ทำเนียบฝ่ายจัดการ';
     document.title = title + ' — ' + siteTabTitle();
-    const titleWrap = document.getElementById('cms-page-title');
-    if (titleWrap) {
-      titleWrap.innerHTML = CmsLayout.renderPageTitle(escapeHtml(title), '');
-    }
+    CmsLayout.setPageTitle(escapeHtml(title), '');
     if (window.CmsManagementPage) {
       await CmsManagementPage.initManagementPage(main);
     } else {
@@ -653,9 +667,151 @@ async function initManagementPage(main) {
       history.replaceState(null, '', '/management');
     }
     CmsI18n?.applyTranslations();
+    bindPageAnchors(main);
   } catch (e) {
     main.innerHTML = `<p class="error text-center">${escapeHtml(e.message)}</p>`;
   }
+}
+
+function legalT(key) {
+  return window.CmsI18n ? CmsI18n.t(`legal.${key}`) : key;
+}
+
+function loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) {
+      resolve();
+      return;
+    }
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error(`Failed to load ${src}`));
+    document.head.appendChild(s);
+  });
+}
+
+async function ensureLegalScripts() {
+  if (window.CmsLegalPage) return;
+  await loadScriptOnce('/legal-content.js?v=3');
+  await loadScriptOnce('/legal-pages.js?v=6');
+}
+
+async function initFaqPage(main) {
+  main.innerHTML = CmsLayout.renderLoading();
+  try {
+    const title = legalT('faqTitle') || t('nav.faq') || 'คำถามที่พบบ่อย';
+    const subtitle = legalT('faqSubtitle') || '';
+    document.title = title + ' — ' + siteTabTitle();
+    CmsLayout.setPageTitle(escapeHtml(title), escapeHtml(subtitle));
+    main.innerHTML = window.CmsLegalPage
+      ? CmsLegalPage.renderFaqPage()
+      : '';
+    if (location.pathname.match(/^\/page\/294\/?$/i)) {
+      history.replaceState(null, '', '/faq');
+    }
+    CmsI18n?.applyTranslations();
+    window.CmsLegalPage?.bindLegalPage(main, 'faq');
+    applyPageSocial({
+      title,
+      documentTitle: title + ' — ' + siteTabTitle(),
+      description: legalPackIntro('faq') || (window.CMS_SITE && CMS_SITE.og && CMS_SITE.og.description),
+      image: window.CmsSocial && CmsSocial.defaultImage(),
+      url: location.origin.replace(/\/$/, '') + '/faq'
+    });
+  } catch (e) {
+    main.innerHTML = `<p class="error text-center">${escapeHtml(e.message)}</p>`;
+  }
+}
+
+function legalPackIntro(type) {
+  const lang = window.CmsI18n?.getLang() || 'th';
+  const pack = window.CMS_LEGAL_CONTENT?.[type]?.[lang] || window.CMS_LEGAL_CONTENT?.[type]?.th;
+  return pack?.intro || '';
+}
+
+async function initTermsPage(main) {
+  main.innerHTML = CmsLayout.renderLoading();
+  try {
+    const title = legalT('termsTitle') || t('nav.terms') || 'ข้อกำหนดและเงื่อนไข';
+    const subtitle = legalT('termsSubtitle') || '';
+    document.title = title + ' — ' + siteTabTitle();
+    CmsLayout.setPageTitle(escapeHtml(title), escapeHtml(subtitle));
+    main.innerHTML = window.CmsLegalPage ? CmsLegalPage.renderTermsPage() : '';
+    if (location.pathname.match(/^\/page\/525\/?$/i)) {
+      history.replaceState(null, '', '/terms');
+    }
+    CmsI18n?.applyTranslations();
+    window.CmsLegalPage?.bindLegalPage(main, 'terms');
+    applyPageSocial({
+      title,
+      documentTitle: title + ' — ' + siteTabTitle(),
+      description: legalPackIntro('terms') || (window.CMS_SITE && CMS_SITE.og && CMS_SITE.og.description),
+      image: window.CmsSocial && CmsSocial.defaultImage(),
+      url: location.origin.replace(/\/$/, '') + '/terms'
+    });
+  } catch (e) {
+    main.innerHTML = `<p class="error text-center">${escapeHtml(e.message)}</p>`;
+  }
+}
+
+async function initPrivacyPage(main) {
+  main.innerHTML = CmsLayout.renderLoading();
+  try {
+    const title = legalT('privacyTitle') || t('nav.privacy') || 'นโยบายความเป็นส่วนตัว';
+    const subtitle = legalT('privacySubtitle') || '';
+    document.title = title + ' — ' + siteTabTitle();
+    CmsLayout.setPageTitle(escapeHtml(title), escapeHtml(subtitle));
+    main.innerHTML = window.CmsLegalPage ? CmsLegalPage.renderPrivacyPage() : '';
+    if (location.pathname.match(/^\/page\/3\/?$/i) || location.pathname === '/pdpa') {
+      history.replaceState(null, '', '/privacy-policy');
+    }
+    CmsI18n?.applyTranslations();
+    window.CmsLegalPage?.bindLegalPage(main, 'privacy');
+    applyPageSocial({
+      title,
+      documentTitle: title + ' — ' + siteTabTitle(),
+      description: legalPackIntro('privacy') || (window.CMS_SITE && CMS_SITE.og && CMS_SITE.og.description),
+      image: window.CmsSocial && CmsSocial.defaultImage(),
+      url: location.origin.replace(/\/$/, '') + '/privacy-policy'
+    });
+  } catch (e) {
+    main.innerHTML = `<p class="error text-center">${escapeHtml(e.message)}</p>`;
+  }
+}
+
+async function initAppPage(main) {
+  main.innerHTML = CmsLayout.renderLoading();
+  try {
+    const page = await fetchPageHtml(APP_PAGE_ID);
+    const title = appT('pageTitle') || page.title || 'NKBKConnect';
+    const subtitle = appT('pageSubtitle') || '';
+    const docTitle = stripTagsPlain(page.title) || title;
+    document.title = docTitle + ' — ' + siteTabTitle();
+    CmsLayout.setPageTitle(escapeHtml(title), escapeHtml(subtitle));
+    main.innerHTML = window.CmsAppPage
+      ? CmsAppPage.renderAppGuidePage()
+      : page.html;
+    if (location.pathname.match(/^\/page\/9208\/?$/i)) {
+      history.replaceState(null, '', '/app');
+    }
+    CmsI18n?.applyTranslations();
+    window.CmsAppPage?.bindAppGuidePage(main);
+    bindPageAnchors(main);
+    applyPageSocial({
+      title: stripTagsPlain(page.title) || title,
+      documentTitle: (stripTagsPlain(page.title) || title) + ' — ' + siteTabTitle(),
+      description: subtitle || t('home.appDesc') || (window.CMS_SITE && CMS_SITE.og && CMS_SITE.og.description),
+      image: window.CmsSocial && CmsSocial.defaultImage(),
+      url: location.origin.replace(/\/$/, '') + '/app'
+    });
+  } catch (e) {
+    main.innerHTML = `<p class="error text-center">${escapeHtml(e.message)}</p>`;
+  }
+}
+
+function appT(key) {
+  return window.CmsI18n ? CmsI18n.t(`appPage.${key}`) : key;
 }
 
 async function initAgendaPage(main) {
@@ -665,10 +821,7 @@ async function initAgendaPage(main) {
     const title =
       page.title || t('nav.agenda') || 'วาระและรายงานการประชุม';
     document.title = title + ' — ' + siteTabTitle();
-    const titleWrap = document.getElementById('cms-page-title');
-    if (titleWrap) {
-      titleWrap.innerHTML = CmsLayout.renderPageTitle(escapeHtml(title), '');
-    }
+    CmsLayout.setPageTitle(escapeHtml(title), '');
     const meetings = window.CmsAgendaPage
       ? CmsAgendaPage.parseAgendaMeetings(page.html)
       : [];
@@ -677,6 +830,7 @@ async function initAgendaPage(main) {
       : page.html;
     CmsI18n?.applyTranslations();
     window.CmsAgendaPage?.bindAgendaDownloadButtons(main);
+    bindPageAnchors(main);
   } catch (e) {
     main.innerHTML = `<p class="error text-center">${escapeHtml(e.message)}</p>`;
   }
@@ -692,6 +846,10 @@ async function initStaticPage() {
   const isManagement = String(pageId) === MANAGEMENT_PAGE_ID;
   const isContact = String(pageId) === CONTACT_PAGE_ID;
   const isPayment = String(pageId) === PAYMENT_PAGE_ID;
+  const isApp = String(pageId) === APP_PAGE_ID;
+  const isFaq = String(pageId) === '294';
+  const isTerms = String(pageId) === '525';
+  const isPrivacy = String(pageId) === '3';
   CmsLayout.initCmsShell({
     activeNav,
     bodyClass: isAgenda
@@ -708,7 +866,15 @@ async function initStaticPage() {
                 ? 'kb-site kb-page kb-page--contact'
                 : isPayment
                   ? 'kb-site kb-page kb-page--payment'
-                  : 'kb-site kb-page'
+                  : isApp
+                    ? 'kb-site kb-page kb-page--app'
+                    : isFaq
+                      ? 'kb-site kb-page kb-page--faq'
+                      : isTerms
+                        ? 'kb-site kb-page kb-page--terms'
+                        : isPrivacy
+                          ? 'kb-site kb-page kb-page--privacy'
+                          : 'kb-site kb-page'
   });
   await loadSiteName();
 
@@ -753,14 +919,42 @@ async function initStaticPage() {
     return;
   }
 
+  if (isApp && window.CmsAppPage) {
+    await initAppPage(main);
+    return;
+  }
+
+  if (isFaq || isTerms || isPrivacy) {
+    try {
+      await ensureLegalScripts();
+    } catch (e) {
+      console.warn('legal scripts', e);
+    }
+    if (window.CmsLegalPage) {
+      if (isFaq) {
+        await initFaqPage(main);
+        return;
+      }
+      if (isTerms) {
+        await initTermsPage(main);
+        return;
+      }
+      if (isPrivacy) {
+        await initPrivacyPage(main);
+        return;
+      }
+    }
+    main.innerHTML = `<p class="error text-center">${escapeHtml(t('misc.loading'))}</p>`;
+    return;
+  }
+
   main.innerHTML = CmsLayout.renderLoading();
   loadElementorPageCss(pageId);
   try {
     const page = await fetchPageHtml(pageId);
     if (page.title) {
       document.title = page.title + ' — ' + siteTabTitle();
-      const titleWrap = document.getElementById('cms-page-title');
-      if (titleWrap) titleWrap.innerHTML = CmsLayout.renderPageTitle(escapeHtml(page.title), '');
+      CmsLayout.setPageTitle(escapeHtml(page.title), '');
     }
     main.innerHTML = `
 <div class="kb-page-body">
@@ -770,6 +964,7 @@ async function initStaticPage() {
 </div>`;
     rewriteContentLinks(main);
     enhancePostContent(main);
+    bindPageAnchors(main);
     socialFromPage(page, location.pathname);
   } catch (e) {
     main.innerHTML = `<p class="error text-center">${escapeHtml(e.message)}</p>`;

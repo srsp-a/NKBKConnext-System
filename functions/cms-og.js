@@ -21,7 +21,12 @@ const STATIC_SHELL = {
   '/management': '/management.html',
   '/contact': '/contact.html',
   '/infrom-payment': '/payment.html',
-  '/infrom-payment-line': '/payment.html'
+  '/infrom-payment-line': '/payment.html',
+  '/app': '/app.html',
+  '/faq': '/faq.html',
+  '/terms': '/terms.html',
+  '/privacy-policy': '/privacy-policy.html',
+  '/pdpa': '/privacy-policy.html'
 };
 
 /** หน้า CMS ที่มี rewrite เป็น path สั้น */
@@ -32,7 +37,12 @@ const STATIC_PAGE_IDS = {
   '/download': '7934',
   '/contact': '354',
   '/infrom-payment': '9304',
-  '/infrom-payment-line': '9304'
+  '/infrom-payment-line': '9304',
+  '/app': '9208',
+  '/faq': '294',
+  '/terms': '525',
+  '/privacy-policy': '3',
+  '/pdpa': '3'
 };
 
 function isBot(ua) {

@@ -137,7 +137,7 @@ function renderHomeHero() {
         ? `<figcaption class="kb-hero-v2-stack-caption">
         <span class="kb-hero-v2-stack-live" aria-hidden="true"></span>
         <span class="kb-hero-v2-stack-caption-title">${escapeHtml(CMS_SITE.brandTitle || 'NKBKCOOP')}</span>
-        <span class="kb-hero-v2-stack-caption-sub" data-i18n="hero.stackCaption">สำนักงานใหญ่ หนองคาย</span>
+        <span class="kb-hero-v2-stack-caption-sub" data-i18n="hero.stackCaption">สหกรณ์ฯ หนองคาย</span>
         <span class="kb-hero-v2-stack-caption-meta" data-i18n="hero.stackMeta">บริการครบ • โปร่งใส</span>
       </figcaption>`
         : '';

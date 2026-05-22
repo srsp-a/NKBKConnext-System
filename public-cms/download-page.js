@@ -145,10 +145,23 @@ function formatDownloadCount(n) {
   return num.toLocaleString(lang === 'en' ? 'en-US' : 'th-TH');
 }
 
+function downloadT(key) {
+  return window.CmsI18n ? CmsI18n.t(`download.${key}`) : key;
+}
+
+function renderDownloadSearch() {
+  return `
+<div class="kb-download-search-wrap">
+  <label class="kb-download-search-label" for="kb-download-search" data-i18n="download.searchLabel">${escapeDownloadHtml(downloadT('searchLabel'))}</label>
+  <input type="search" id="kb-download-search" class="kb-download-search" placeholder="${escapeDownloadHtml(downloadT('searchPlaceholder'))}" autocomplete="off">
+  <p class="kb-download-search-empty" id="kb-download-search-empty" hidden data-i18n="download.searchEmpty">${escapeDownloadHtml(downloadT('searchEmpty'))}</p>
+</div>`;
+}
+
 function renderDownloadTable(sections, countMap) {
   const counts = countMap || {};
-  const colDoc = window.CmsI18n ? CmsI18n.t('download.colDoc') : 'เอกสาร';
-  const colAction = window.CmsI18n ? CmsI18n.t('download.colAction') : 'ดาวน์โหลด';
+  const colDoc = downloadT('colDoc');
+  const colAction = downloadT('colAction');
 
   const blocks = (sections || [])
     .map((sec) => {
@@ -159,8 +172,11 @@ function renderDownloadTable(sections, countMap) {
               ? `<div class="kb-download-desc">${escapeDownloadHtml(it.description)}</div>`
               : '';
           const dlCount = counts[it.id] != null ? counts[it.id] : 0;
+          const searchText = [sec.title, it.title, it.description, it.updatedAt]
+            .filter(Boolean)
+            .join(' ');
           return `
-<tr data-download-id="${escapeDownloadHtml(it.id)}">
+<tr data-download-id="${escapeDownloadHtml(it.id)}" data-search="${escapeDownloadHtml(searchText)}">
   <td class="kb-download-col-doc">
     <div class="kb-download-title">${escapeDownloadHtml(it.title)}</div>
     ${note}
@@ -171,7 +187,7 @@ function renderDownloadTable(sections, countMap) {
         .join('');
 
       return `
-<section class="kb-download-section">
+<section class="kb-download-section" data-section-title="${escapeDownloadHtml(sec.title)}">
   <h2 class="kb-download-section-title">${escapeDownloadHtml(sec.title)}</h2>
   <div class="kb-download-table-wrap">
     <table class="kb-download-table">
@@ -191,8 +207,8 @@ function renderDownloadTable(sections, countMap) {
   return `
 <div class="kb-page-body kb-page-body--download">
   <div class="kb-container">
-    <p class="kb-download-intro" data-i18n="download.intro">ดาวน์โหลดแบบฟอร์มและเอกสารสำคัญของสหกรณ์ — รายการที่ยังไม่มีไฟล์จะแสดงปุ่มไม่พร้อมใช้งาน</p>
-    ${blocks}
+    <div class="kb-download-toolbar">${renderDownloadSearch()}</div>
+    <div class="kb-download-sections">${blocks}</div>
   </div>
 </div>`;
 }
@@ -206,8 +222,37 @@ async function trackDownload(id) {
   }
 }
 
+function bindDownloadSearch(root) {
+  const input = root?.querySelector('#kb-download-search');
+  const emptyEl = root?.querySelector('#kb-download-search-empty');
+  if (!input) return;
+
+  const run = () => {
+    const q = input.value.trim().toLowerCase();
+    let any = false;
+    root.querySelectorAll('.kb-download-section').forEach((sec) => {
+      let secAny = false;
+      sec.querySelectorAll('tr[data-search]').forEach((row) => {
+        const text = (row.getAttribute('data-search') || '').toLowerCase();
+        const title = (sec.getAttribute('data-section-title') || '').toLowerCase();
+        const show = !q || text.includes(q) || title.includes(q);
+        row.classList.toggle('is-hidden', !show);
+        if (show) {
+          secAny = true;
+          any = true;
+        }
+      });
+      sec.classList.toggle('is-hidden', !secAny);
+    });
+    if (emptyEl) emptyEl.hidden = !q || any;
+  };
+
+  input.addEventListener('input', run);
+}
+
 function bindDownloadButtons(root) {
   if (!root) return;
+  bindDownloadSearch(root);
   root.querySelectorAll('a.kb-download-btn[data-download-id]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const id = btn.getAttribute('data-download-id');
@@ -232,5 +277,6 @@ window.CmsDownloadPage = {
   PAGE_ID: CMS_DOWNLOAD_PAGE_ID,
   parseDownloadSections,
   renderDownloadTable,
-  bindDownloadButtons
+  bindDownloadButtons,
+  bindDownloadSearch
 };

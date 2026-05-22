@@ -22,6 +22,10 @@
     if (withSlash === '/contact/' || p === '/contact') return '/contact';
     if (withSlash === '/infrom-payment/' || p === '/infrom-payment') return '/infrom-payment';
     if (withSlash === '/infrom-payment-line/' || p === '/infrom-payment-line') return '/infrom-payment-line';
+    if (withSlash === '/app/' || p === '/app') return '/app';
+    if (withSlash === '/faq/' || p === '/faq') return '/faq';
+    if (withSlash === '/terms/' || p === '/terms' || withSlash === '/terms-conditions/' || p === '/terms-conditions') return '/terms';
+    if (withSlash === '/privacy-policy/' || p === '/privacy-policy' || withSlash === '/pdpa/' || p === '/pdpa') return '/privacy-policy';
     const id = pages[withSlash] || pages[p];
     return id ? pageUrl(id) : legacyUrl(p);
   }
@@ -201,14 +205,15 @@
         <h4 data-i18n="footer.support">ช่วยเหลือ</h4>
         <ul>
           <li><a href="${menuUrl('/faq/')}" data-i18n="nav.faq">คำถามที่พบบ่อย</a></li>
-          <li><a href="${menuUrl('/terms-conditions/')}">Terms</a></li>
+          <li><a href="${menuUrl('/terms/')}" data-i18n="nav.terms">ข้อกำหนดและเงื่อนไข</a></li>
+          <li><a href="${menuUrl('/privacy-policy/')}" data-i18n="nav.privacy">นโยบายความเป็นส่วนตัว</a></li>
           <li><a href="${menuUrl('/contact/')}" data-i18n="nav.contact">ติดต่อเรา</a></li>
         </ul>
       </div>
       <div>
         <h4 data-i18n="footer.address">ที่ตั้ง</h4>
         <ul class="kb-footer-contact">
-          <li>${addr}</li>
+          <li id="kb-footer-address">${addr}</li>
           <li><a href="mailto:${c.email}">${c.email}</a></li>
         </ul>
       </div>
@@ -260,6 +265,146 @@
   }
 
   const NAV_MOBILE_BP = 992;
+  const PILL_LAYOUT_MIN_H = 56;
+  let headerOffsetRetryTimer = null;
+
+  function readPageHeadGapPx() {
+    const desktop = window.innerWidth >= NAV_MOBILE_BP;
+    const varName = desktop ? '--kb-page-head-gap' : '--kb-page-head-gap-mobile';
+    const fallback = desktop ? 10 : 4;
+    return Math.round(
+      parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue(varName)
+      ) || fallback
+    );
+  }
+
+  /** จัดระดับแถบชมพูให้เท่าทุกหน้า — อ้างอิงหน้าติดต่อเรา (ช่องว่างเล็กน้อยใต้แท็บเมนู ไม่ทับ) */
+  function syncHeaderOffset() {
+    const wrap = document.querySelector('.kb-header-wrap');
+    const pill = wrap?.querySelector('.kb-header-pill');
+    if (!wrap || document.body.classList.contains('kb-home')) return;
+
+    const gapPx = readPageHeadGapPx();
+    let offset = 0;
+
+    if (pill) {
+      const pr = pill.getBoundingClientRect();
+      if (pr.height >= PILL_LAYOUT_MIN_H) {
+        offset = Math.ceil(pr.bottom + gapPx);
+      } else {
+        return;
+      }
+    } else {
+      const wr = wrap.getBoundingClientRect();
+      offset = Math.ceil(wr.bottom + gapPx);
+    }
+    if (offset > 0) {
+      document.documentElement.style.setProperty('--kb-header-offset', offset + 'px');
+    }
+  }
+
+  let headerOffsetObserver = null;
+  function attachHeaderOffsetObserver() {
+    const wrap = document.querySelector('.kb-header-wrap');
+    if (!wrap || headerOffsetObserver) return;
+    headerOffsetObserver = new ResizeObserver(() => syncHeaderOffset());
+    headerOffsetObserver.observe(wrap);
+    const pill = wrap.querySelector('.kb-header-pill');
+    if (pill) headerOffsetObserver.observe(pill);
+  }
+
+  function scheduleHeaderOffsetSync() {
+    syncHeaderNavPlacement();
+    const run = () => syncHeaderOffset();
+    requestAnimationFrame(() => {
+      run();
+      requestAnimationFrame(run);
+    });
+    if (headerOffsetRetryTimer) clearTimeout(headerOffsetRetryTimer);
+    [0, 50, 150, 400, 800].forEach((ms) => setTimeout(run, ms));
+    headerOffsetRetryTimer = setTimeout(run, 1200);
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(run).catch(() => {});
+    }
+  }
+
+  const ANCHOR_SCROLL_EXTRA = 20;
+
+  function headerScrollOffsetPx() {
+    const root = document.documentElement;
+    const synced = parseFloat(getComputedStyle(root).getPropertyValue('--kb-header-offset'));
+    if (synced > 0) return Math.ceil(synced + ANCHOR_SCROLL_EXTRA);
+
+    const wrap = document.querySelector('.kb-header-wrap');
+    const pill = wrap?.querySelector('.kb-header-pill');
+    const gap = readPageHeadGapPx();
+    if (pill) return Math.ceil(pill.getBoundingClientRect().bottom + gap + ANCHOR_SCROLL_EXTRA);
+    if (wrap) return Math.ceil(wrap.getBoundingClientRect().bottom + gap + ANCHOR_SCROLL_EXTRA);
+    return 122;
+  }
+
+  function anchorScrollTargetEl(target) {
+    if (!target) return null;
+    if (target.matches('.kb-faq-group, .kb-legal-section')) {
+      return (
+        target.querySelector('.kb-faq-group-title, .kb-legal-section-title') || target
+      );
+    }
+    const titled = target.querySelector(':scope > h1, :scope > h2, :scope > h3, :scope > h4');
+    return titled || target;
+  }
+
+  function scrollToAnchorTarget(target, { smooth = true } = {}) {
+    const el = anchorScrollTargetEl(target);
+    if (!el) return;
+    const y = el.getBoundingClientRect().top + window.scrollY - headerScrollOffsetPx();
+    window.scrollTo({ top: Math.max(0, y), behavior: smooth ? 'smooth' : 'auto' });
+  }
+
+  function resolveAnchorTarget(hash) {
+    if (!hash || hash.length < 2) return null;
+    let target = document.querySelector(hash);
+    if (target) return target;
+    try {
+      const id = decodeURIComponent(hash.slice(1));
+      target = document.getElementById(id);
+      if (target) return target;
+      if (typeof CSS !== 'undefined' && CSS.escape) {
+        return document.querySelector(`[id="${CSS.escape(id)}"]`);
+      }
+    } catch (_) {
+      /* ignore */
+    }
+    return null;
+  }
+
+  function jumpToLocationHash({ smooth = false } = {}) {
+    const target = resolveAnchorTarget(location.hash);
+    if (target) scrollToAnchorTarget(target, { smooth });
+  }
+
+  function bindHeaderAwareAnchors(root) {
+    const scope = root || document.getElementById('cms-page-content') || document;
+    scope.querySelectorAll('a[href^="#"]').forEach((link) => {
+      const href = link.getAttribute('href') || '';
+      if (href === '#' || href.length < 2) return;
+      if (link.dataset.kbAnchorBound === '1') return;
+      link.dataset.kbAnchorBound = '1';
+      link.addEventListener('click', (e) => {
+        const target = resolveAnchorTarget(href);
+        if (!target) return;
+        e.preventDefault();
+        scrollToAnchorTarget(target);
+        if (history.replaceState) history.replaceState(null, '', href);
+      });
+    });
+    if (location.hash && location.hash.length > 1) {
+      requestAnimationFrame(() => requestAnimationFrame(() => jumpToLocationHash({ smooth: false })));
+      setTimeout(() => jumpToLocationHash({ smooth: false }), 150);
+      setTimeout(() => jumpToLocationHash({ smooth: false }), 400);
+    }
+  }
 
   function syncHeaderNavPlacement() {
     const wrap = document.querySelector('.kb-header-wrap');
@@ -320,10 +465,12 @@
     });
     window.addEventListener('resize', () => {
       if (window.innerWidth > NAV_MOBILE_BP) setMobileNavOpen(false);
-      syncHeaderNavPlacement();
+      scheduleHeaderOffsetSync();
     });
 
-    syncHeaderNavPlacement();
+    scheduleHeaderOffsetSync();
+    attachHeaderOffsetObserver();
+    window.addEventListener('load', scheduleHeaderOffsetSync);
 
     root.querySelectorAll('.kb-has-drop .kb-nav-trigger').forEach((btn) => {
       btn.addEventListener('click', (e) => {
@@ -347,7 +494,18 @@
     window.addEventListener('cms:langchange', () => {
       CmsI18n.applyTranslations();
       updateBrandText();
+      refreshFooterLocale();
+      scheduleHeaderOffsetSync();
+      setTimeout(() => jumpToLocationHash({ smooth: false }), 200);
     });
+  }
+
+  function refreshFooterLocale() {
+    const c = cfg();
+    const lang = window.CmsI18n?.getLang() || 'th';
+    const addr = lang === 'en' ? c.addressEn || c.address : c.address;
+    const addrEl = document.getElementById('kb-footer-address');
+    if (addrEl) addrEl.textContent = addr;
   }
 
   function updateBrandText() {
@@ -386,9 +544,10 @@
     if (headerEl) {
       headerEl.innerHTML = renderHeader(options.activeNav || '');
       bindShellEvents(headerEl);
+      scheduleHeaderOffsetSync();
     }
     if (titleEl && options.pageTitle) {
-      titleEl.innerHTML = renderPageTitle(options.pageTitle, options.pageSubtitle || '');
+      setPageTitle(options.pageTitle, options.pageSubtitle || '');
     }
     if (footerEl) {
       footerEl.innerHTML = renderFooter();
@@ -404,23 +563,38 @@
       '9278': 'payment',
       '354': 'contact',
       '294': 'faq',
+      '525': 'faq',
+      '3': 'faq',
       '420': 'about',
       '8929': 'about',
       '241': 'about',
       '13575': 'about',
-      '1263': 'login'
+      '1263': 'login',
+      '9208': 'app'
     };
     return map[String(pageId)] || '';
+  }
+
+  function setPageTitle(title, subtitle) {
+    const titleEl = document.getElementById('cms-page-title');
+    if (!titleEl) return;
+    titleEl.innerHTML = renderPageTitle(title, subtitle || '');
+    scheduleHeaderOffsetSync();
   }
 
   window.CmsLayout = {
     initCmsShell,
     renderPageTitle,
+    setPageTitle,
+    scheduleHeaderOffsetSync,
+    bindHeaderAwareAnchors,
+    scrollToAnchorTarget,
     renderLoading,
     legacyUrl,
     menuUrl,
     pageUrl,
     catLabel,
-    activeNavForPageId
+    activeNavForPageId,
+    refreshFooterLocale
   };
 })();

@@ -40,17 +40,24 @@
     el('authScreen')?.classList.add('hidden');
     el('appRoot')?.classList.remove('hidden');
     if (profile) {
-      const chip = el('userChip');
-      const img = el('userChipImg');
-      const name = el('userChipName');
-      if (chip) chip.classList.remove('hidden');
-      if (name) name.textContent = profile.displayName || profile.username || '';
-      if (img && profile.pictureUrl) {
-        img.src = profile.pictureUrl;
-        img.hidden = false;
-      } else if (img) {
-        img.hidden = true;
-      }
+      const name = profile.displayName || profile.username || 'ผู้ใช้';
+      ['sidebarProfileName', 'sidebarProfileMenuName'].forEach((id) => {
+        const node = el(id);
+        if (node) node.textContent = name;
+      });
+      const initials =
+        name.trim().split(/\s+/).length > 1
+          ? (name.trim().split(/\s+/)[0][0] + name.trim().split(/\s+/)[1][0]).toUpperCase()
+          : name.slice(0, 2).toUpperCase();
+      ['sidebarProfileAvatar', 'sidebarProfileMenuAvatar'].forEach((id) => {
+        const av = el(id);
+        if (!av) return;
+        if (profile.pictureUrl) {
+          av.innerHTML = '<img src="' + profile.pictureUrl.replace(/"/g, '&quot;') + '" alt="">';
+        } else {
+          av.textContent = initials || 'U';
+        }
+      });
     }
     window.dispatchEvent(new CustomEvent('nkbk-ai-auth-ready'));
   }

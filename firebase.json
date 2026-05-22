@@ -98,6 +98,26 @@
         {
           "source": "/infrom-payment-line",
           "function": "cmsOg"
+        },
+        {
+          "source": "/app",
+          "function": "cmsOg"
+        },
+        {
+          "source": "/faq",
+          "function": "cmsOg"
+        },
+        {
+          "source": "/terms",
+          "function": "cmsOg"
+        },
+        {
+          "source": "/privacy-policy",
+          "function": "cmsOg"
+        },
+        {
+          "source": "/pdpa",
+          "function": "cmsOg"
         }
       ],
       "redirects": [
@@ -129,6 +149,36 @@
         {
           "source": "/page/9304",
           "destination": "/infrom-payment",
+          "type": 301
+        },
+        {
+          "source": "/page/9208",
+          "destination": "/app",
+          "type": 301
+        },
+        {
+          "source": "/page/294",
+          "destination": "/faq",
+          "type": 301
+        },
+        {
+          "source": "/page/525",
+          "destination": "/terms",
+          "type": 301
+        },
+        {
+          "source": "/page/3",
+          "destination": "/privacy-policy",
+          "type": 301
+        },
+        {
+          "source": "/terms-conditions",
+          "destination": "/terms",
+          "type": 301
+        },
+        {
+          "source": "/pdpa",
+          "destination": "/privacy-policy",
           "type": 301
         },
         {
@@ -209,6 +259,20 @@
               "value": "no-cache"
             }
           ]
+        }
+      ],
+      "rewrites": [
+        {
+          "source": "/line/**",
+          "destination": "/line/index.html"
+        },
+        {
+          "source": "/api/**",
+          "function": "monitorApi"
+        },
+        {
+          "source": "**",
+          "destination": "/index.html"
         }
       ]
     },
@@ -432,6 +496,10 @@
         }
       ],
       "rewrites": [
+        {
+          "source": "/library",
+          "destination": "/index.html"
+        },
         {
           "source": "/api/**",
           "function": "monitorApi"

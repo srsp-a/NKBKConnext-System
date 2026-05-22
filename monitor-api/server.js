@@ -46,7 +46,7 @@ const https = require('https');
 const crypto = require('crypto');
 
 const app = express();
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '50mb' }));
 
 /**
  * Plesk มักส่ง path เต็ม เช่น /monitor-api/workstations.html เข้า Node

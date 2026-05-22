@@ -83,12 +83,19 @@ function getPaymentConfig() {
   };
 }
 
+function renderBankIcon(b) {
+  if (b.logoUrl) {
+    return `<img src="${escapePaymentHtml(b.logoUrl)}" alt="" width="44" height="44" loading="lazy" decoding="async">`;
+  }
+  return paymentIcon(b.icon || 'bank', 22);
+}
+
 function renderBankCards(banks) {
   return banks
     .map(
       (b) => `
 <article class="kb-pay-bank-card" data-account="${escapePaymentHtml(b.value)}">
-  <div class="kb-pay-bank-icon" aria-hidden="true">${paymentIcon(b.icon || 'bank', 22)}</div>
+  <div class="kb-pay-bank-icon${b.logoUrl ? ' kb-pay-bank-icon--logo' : ''}" aria-hidden="true">${renderBankIcon(b)}</div>
   <div class="kb-pay-bank-body">
     <p class="kb-pay-bank-name">${escapePaymentHtml(b.label)}</p>
     <p class="kb-pay-bank-acct"><span class="kb-pay-bank-num">${escapePaymentHtml(b.account)}</span>

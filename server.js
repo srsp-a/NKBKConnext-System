@@ -13,6 +13,36 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3333;
 const isWin = process.platform === 'win32';
 
+function ignoreStreamEpipe(stream) {
+  if (stream && typeof stream.on === 'function') {
+    stream.on('error', (err) => {
+      if (err && err.code === 'EPIPE') return;
+    });
+  }
+}
+ignoreStreamEpipe(process.stdout);
+ignoreStreamEpipe(process.stderr);
+process.on('uncaughtException', (err) => {
+  if (err && err.code === 'EPIPE') return;
+  throw err;
+});
+
+function safeLog(...args) {
+  try {
+    console.log(...args);
+  } catch (e) {
+    if (!e || e.code !== 'EPIPE') throw e;
+  }
+}
+
+function safeWarn(...args) {
+  try {
+    console.warn(...args);
+  } catch (e) {
+    if (!e || e.code !== 'EPIPE') throw e;
+  }
+}
+
 function getElectronUserDataDir() {
   try {
     if (process.versions && process.versions.electron) {
@@ -1565,7 +1595,7 @@ async function syncConnextWorkstationToFirestoreProgram() {
     const nameCandidates = [...new Set([hostname, winComputerName, ...syncAliases].filter(Boolean))];
     const { docRef, docId, source: docResolveSource, matchedBy, preserveDisplayNames } = await resolveConnextProgramDocRef(db, nameCandidates);
     if (docResolveSource === 'matched_existing') {
-      console.log('[NKBKConnext] ซิงก์เข้าเอกสาร programs เดิม (จับคู่ชื่อ "' + (matchedBy || '') + '" → doc ' + docId + ')');
+      safeLog('[NKBKConnext] ซิงก์เข้าเอกสาร programs เดิม (จับคู่ชื่อ "' + (matchedBy || '') + '" → doc ' + docId + ')');
     } else if (syncAliases.length && docResolveSource === 'ws_slug') {
       console.warn(
         '[NKBKConnext] ไม่พบเอกสาร programs ที่ตรงชื่อ — ใช้',
