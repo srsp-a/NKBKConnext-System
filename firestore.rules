@@ -50,9 +50,9 @@ service cloud.firestore {
     }
     
     match /config/{docId} {
-      allow read: if docId == 'line_settings' || docId == 'leave_settings' || docId == 'org' || docId == 'line_attendance_notify' || docId == 'attendance_auto_fetch' || docId == 'ai_chat' || docId == 'desktop_ai' || docId == 'menu_permissions' || isAdmin();
+      allow read: if docId == 'backoffice_secrets' || docId == 'backoffice_session_cache' ? false : (docId == 'line_settings' || docId == 'leave_settings' || docId == 'org' || docId == 'line_attendance_notify' || docId == 'attendance_auto_fetch' || docId == 'ai_chat' || docId == 'desktop_ai' || docId == 'menu_permissions' || isAdmin());
       // menu_permissions เขียนได้เฉพาะ 'ผู้ดูแลระบบ' เท่านั้น (ไม่ให้แอดมินยกสิทธิ์ตัวเอง)
-      allow write: if (docId == 'menu_permissions' ? isSuperOnlyAdmin() : isAdmin());
+      allow write: if docId == 'backoffice_secrets' || docId == 'backoffice_session_cache' ? false : (docId == 'menu_permissions' ? isSuperOnlyAdmin() : isAdmin());
     }
     match /ai_memory/{docId} {
       allow read, write: if true;

@@ -656,6 +656,27 @@ async function firebaseSet(collection, docId, data) {
   });
 }
 
+function updateUserLastLogin(user, kind) {
+  const docId = user && (user.id || user.username);
+  if (!docId) return;
+  const now = new Date().toISOString();
+  const patch =
+    kind === 'ai'
+      ? {
+          lastAiLogin: now,
+          lastAiLoginAt: now,
+          lastLoginSource: 'ai'
+        }
+      : {
+          lastMonitorLogin: now,
+          lastMonitorLoginAt: now,
+          lastLoginSource: 'monitor'
+        };
+  firebaseSet('users', docId, patch).catch((e) => {
+    console.warn('[monitor-api] login track update failed:', (e && e.message) || e);
+  });
+}
+
 /**
  * Admin SDK — เขียน collection programs ได้แม้ rules เป็น allow write: if isAdmin()
  * (REST + API key ไม่มี request.auth → เขียน programs ไม่ผ่าน)
@@ -3119,6 +3140,7 @@ app.get('/api/line-login-callback', async (req, res) => {
       group: v2User.group != null ? String(v2User.group).trim() : '',
       role: v2User.role != null ? String(v2User.role).trim() : ''
     });
+    updateUserLastLogin(v2User);
     await setLineLoginPollState(state, { token, username: sessionName, expires: Date.now() + 120000 });
     const back = `${returnOrigin}/login.html?line_ok=1&token=${encodeURIComponent(token)}&username=${encodeURIComponent(sessionName)}`;
     return res.status(200).type('html').send(
@@ -3202,6 +3224,7 @@ app.post('/api/monitor-login', async (req, res) => {
       group: user.group != null ? String(user.group).trim() : '',
       role: user.role != null ? String(user.role).trim() : ''
     });
+    updateUserLastLogin(user);
 
     res.status(200).json({
       ok: true,
@@ -3403,6 +3426,7 @@ app.post('/api/ai-liff-login', async (req, res) => {
       }
     }
     const sess = createMonitorSessionFromUser(v2User);
+    updateUserLastLogin(v2User, 'ai');
     return res.json({
       ok: true,
       token: sess.token,
@@ -3473,6 +3497,9 @@ function passengerEnvLikely() {
     String(process.env.PASSENGER_USE_FEEDBACK || '').length > 0
   );
 }
+
+const { registerBackofficeRoutes } = require('./backoffice-routes');
+registerBackofficeRoutes(app, getMonitorAdminFirestore);
 
 function logRoutesHint(p) {
   if (getMonitorSystemUploadSecret()) {

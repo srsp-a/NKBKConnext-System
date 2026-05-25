@@ -1,10 +1,14 @@
 (function () {
   'use strict';
 
-  const TOKEN_KEY = 'nkbk_ai_token';
-  const PROFILE_KEY = 'nkbk_ai_profile';
+  const store = window.NkbkAiAuthStore;
+  const LOGIN_GUARD_KEY = 'nkbk_ai_login_guard';
+  const LOGIN_GUARD_MAX = 4;
+  const LOGIN_GUARD_WINDOW_MS = 120000;
+
   let liffId = '';
   let linkAccountUrl = 'https://liff.line.me/2008951184-870KgFSE';
+  let liffBootPromise = null;
 
   function el(id) {
     return document.getElementById(id);
@@ -79,19 +83,100 @@
     return payload.exp * 1000 < Date.now() + 30000;
   }
 
+  /** LIFF redirect URI ต้องตรงกับที่ลงทะเบียน — ห้ามมี query/hash */
+  function redirectUri() {
+    return window.location.origin + window.location.pathname;
+  }
+
+  function cleanAuthUrlParams() {
+    try {
+      const u = new URL(window.location.href);
+      const drop = [
+        'code',
+        'state',
+        'liffClientId',
+        'liff.state',
+        'liffState',
+        'friendship_status_changed',
+        'context_token'
+      ];
+      let changed = false;
+      drop.forEach((key) => {
+        if (u.searchParams.has(key)) {
+          u.searchParams.delete(key);
+          changed = true;
+        }
+      });
+      if (changed) {
+        const next = u.pathname + (u.searchParams.toString() ? '?' + u.searchParams.toString() : '');
+        history.replaceState(null, '', next);
+      }
+    } catch (_) {}
+  }
+
+  function readLoginGuard() {
+    try {
+      const raw = sessionStorage.getItem(LOGIN_GUARD_KEY);
+      if (!raw) return { count: 0, at: 0 };
+      const parsed = JSON.parse(raw);
+      const at = Number(parsed.at) || 0;
+      const count = Number(parsed.count) || 0;
+      if (Date.now() - at > LOGIN_GUARD_WINDOW_MS) return { count: 0, at: 0 };
+      return { count, at };
+    } catch (_) {
+      return { count: 0, at: 0 };
+    }
+  }
+
+  function resetLoginGuard() {
+    try {
+      sessionStorage.removeItem(LOGIN_GUARD_KEY);
+    } catch (_) {}
+  }
+
+  function markLoginRedirect() {
+    try {
+      const g = readLoginGuard();
+      sessionStorage.setItem(
+        LOGIN_GUARD_KEY,
+        JSON.stringify({ count: g.count + 1, at: g.at || Date.now() })
+      );
+    } catch (_) {}
+  }
+
+  function canAutoLineLogin() {
+    return readLoginGuard().count < LOGIN_GUARD_MAX;
+  }
+
   function clearLiffSession() {
     try {
       if (typeof liff !== 'undefined' && liff.isLoggedIn && liff.isLoggedIn()) liff.logout();
     } catch (_) {}
   }
 
-  function startLineLogin() {
+  function requestLineLogin() {
     if (typeof liff === 'undefined' || !liff.login) {
       showAuthError('LIFF SDK ยังไม่พร้อม');
-      return;
+      return false;
     }
-    liff.login({ redirectUri: window.location.href.split('#')[0] });
+    if (!canAutoLineLogin()) {
+      showAuthLoading(false);
+      showAuthError(
+        'เข้าสู่ระบบไม่สำเร็จหลายครั้ง — กรุณารอ 1–2 นาที แล้วกด "ลองใหม่" หรือปิดแท็บแล้วเปิดใหม่',
+        {}
+      );
+      return false;
+    }
+    markLoginRedirect();
+    showAuthLoading(true);
+    liff.login({ redirectUri: redirectUri() });
+    return true;
   }
+
+  function startLineLogin() {
+    requestLineLogin();
+  }
+
   async function fetchConfig() {
     const r = await fetch('/api/ai-web-config', { cache: 'no-store' });
     const data = await r.json().catch(() => ({}));
@@ -102,7 +187,21 @@
     return data;
   }
 
-  async function loginWithLiffToken(idToken) {
+  async function ensureLiffReady() {
+    if (liffBootPromise) return liffBootPromise;
+    liffBootPromise = (async () => {
+      await fetchConfig();
+      await liff.init({ liffId, withLoginOnExternalBrowser: true });
+    })();
+    return liffBootPromise;
+  }
+
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function loginWithLiffToken(idToken, opts) {
+    const options = opts && typeof opts === 'object' ? opts : {};
     const r = await fetch('/api/ai-liff-login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -111,56 +210,87 @@
     const data = await r.json().catch(() => ({}));
     if (!r.ok || !data.ok || !data.token) {
       const msg = data.message || 'เข้าสู่ระบบไม่สำเร็จ';
-      const tokenInvalid = r.status === 401 || /token|หมดอายุ|id_token/i.test(msg);
-      if (tokenInvalid) {
+      const tokenInvalid =
+        r.status === 401 || data.code === 'token_expired' || data.code === 'token_invalid';
+      if (tokenInvalid && options.allowAutoRelogin !== false) {
         clearLiffSession();
-        const err = new Error('เซสชัน LINE หมดอายุ — กด「เข้าสู่ระบบด้วย LINE」อีกครั้ง');
+        if (requestLineLogin()) {
+          const err = new Error('กำลังเชื่อมต่อ LINE ใหม่...');
+          err.tokenExpired = true;
+          throw err;
+        }
+        const err = new Error(msg);
         err.tokenExpired = true;
         throw err;
       }
       const needsLink =
         r.status === 403 &&
-        /ผูก|link|ไม่พบบัญชี|ยังไม่ได้ผูก/i.test(msg);
+        (data.needsLinkAccount || /ผูก|link|ไม่พบบัญชี|ยังไม่ได้ผูก/i.test(msg));
       const err = new Error(msg);
       err.needsLinkAccount = needsLink;
       err.linkAccountUrl = data.linkAccountUrl || linkAccountUrl;
       throw err;
     }
-    sessionStorage.setItem(TOKEN_KEY, data.token);
+    store.setToken(data.token);
     const profile = {
       username: data.username,
       displayName: data.displayName || '',
       pictureUrl: data.pictureUrl || ''
     };
-    sessionStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+    store.setProfile(profile);
+    resetLoginGuard();
+    cleanAuthUrlParams();
     return profile;
   }
 
-  async function tryExistingSession() {
-    const token = sessionStorage.getItem(TOKEN_KEY);
-    if (!token) return false;
+  async function verifyMonitorToken(token) {
     const r = await fetch('/api/nkbk-ai-status', {
       headers: { 'X-Monitor-Token': token },
       cache: 'no-store'
     });
     const data = await r.json().catch(() => ({}));
-    if (!data.ok) {
-      sessionStorage.removeItem(TOKEN_KEY);
-      sessionStorage.removeItem(PROFILE_KEY);
+    return { ok: !!(r.ok && data.ok), status: r.status, data };
+  }
+
+  async function tryExistingSession() {
+    const token = store.getToken();
+    if (!token) return false;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      if (attempt > 0) await sleep(350 * attempt);
+      const result = await verifyMonitorToken(token);
+      if (result.ok) {
+        resetLoginGuard();
+        cleanAuthUrlParams();
+        showApp(store.getProfile());
+        return true;
+      }
+      if (result.status !== 401 || result.data.reason !== 'no_session') break;
+    }
+    store.clear();
+    return false;
+  }
+
+  async function refreshLineSession() {
+    await ensureLiffReady();
+    if (!liff.isLoggedIn()) {
+      showAuthLoading(false);
+      el('authActions')?.classList.remove('hidden');
       return false;
     }
-    let profile = {};
-    try {
-      profile = JSON.parse(sessionStorage.getItem(PROFILE_KEY) || '{}');
-    } catch (_) {}
+    const idToken = liff.getIDToken();
+    if (!idToken || isIdTokenExpired(idToken)) {
+      clearLiffSession();
+      requestLineLogin();
+      return false;
+    }
+    const profile = await loginWithLiffToken(idToken);
     showApp(profile);
     return true;
   }
 
   async function initLiff() {
     showAuthLoading(true);
-    await fetchConfig();
-    await liff.init({ liffId, withLoginOnExternalBrowser: true });
+    await ensureLiffReady();
 
     if (!liff.isLoggedIn()) {
       showAuthLoading(false);
@@ -171,9 +301,7 @@
     const idToken = liff.getIDToken();
     if (!idToken || isIdTokenExpired(idToken)) {
       clearLiffSession();
-      showAuthLoading(false);
-      el('authActions')?.classList.remove('hidden');
-      showAuthError('เซสชัน LINE หมดอายุ — กด「เข้าสู่ระบบด้วย LINE」อีกครั้ง');
+      requestLineLogin();
       return;
     }
     const profile = await loginWithLiffToken(idToken);
@@ -185,7 +313,17 @@
       if (await tryExistingSession()) return;
       await initLiff();
     } catch (e) {
+      if (e && e.tokenExpired) return;
       console.error('[auth]', e);
+      if (store.getToken()) {
+        store.clear();
+        try {
+          if (await refreshLineSession()) return;
+        } catch (retryErr) {
+          if (retryErr && retryErr.tokenExpired) return;
+          console.error('[auth] retry', retryErr);
+        }
+      }
       showAuthError(e.message || 'เชื่อมต่อไม่สำเร็จ', {
         needsLinkAccount: !!e.needsLinkAccount,
         linkAccountUrl: e.linkAccountUrl || linkAccountUrl
@@ -194,16 +332,18 @@
   }
 
   el('btnLineLogin')?.addEventListener('click', () => {
+    resetLoginGuard();
     startLineLogin();
   });
 
   el('btnAuthRetry')?.addEventListener('click', () => {
+    resetLoginGuard();
     el('authError')?.classList.add('hidden');
     boot();
   });
 
   el('btnLogout')?.addEventListener('click', async () => {
-    const token = sessionStorage.getItem(TOKEN_KEY);
+    const token = store.getToken();
     try {
       if (token) {
         await fetch('/api/monitor-logout', {
@@ -213,12 +353,10 @@
         });
       }
     } catch (_) {}
-    sessionStorage.removeItem(TOKEN_KEY);
-    sessionStorage.removeItem(PROFILE_KEY);
-    try {
-      if (typeof liff !== 'undefined' && liff.isLoggedIn && liff.isLoggedIn()) liff.logout();
-    } catch (_) {}
-    location.reload();
+    store.clear();
+    resetLoginGuard();
+    clearLiffSession();
+    location.href = redirectUri();
   });
 
   boot();

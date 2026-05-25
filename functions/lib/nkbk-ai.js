@@ -267,11 +267,23 @@ async function getAiChatConfig(db) {
   return snap.data();
 }
 
-function lineRulesToPrompt(line) {
+function lineRulesToPrompt(line, audience) {
   if (!line) return '';
+  const aud = audience === 'member' ? 'member' : 'staff';
+  if (aud === 'member') {
+    if (Array.isArray(line.systemRulesMember) && line.systemRulesMember.length) {
+      return line.systemRulesMember.map((r) => (r && r.text) || '').filter(Boolean).join('\n');
+    }
+    if (typeof line.systemRulesMemberSummary === 'string') return line.systemRulesMemberSummary.trim();
+    return '';
+  }
+  if (Array.isArray(line.systemRulesStaff) && line.systemRulesStaff.length) {
+    return line.systemRulesStaff.map((r) => (r && r.text) || '').filter(Boolean).join('\n');
+  }
   if (Array.isArray(line.systemRules) && line.systemRules.length) {
     return line.systemRules.map((r) => (r && r.text) || '').filter(Boolean).join('\n');
   }
+  if (typeof line.systemRulesStaffSummary === 'string') return line.systemRulesStaffSummary.trim();
   if (typeof line.systemRulesSummary === 'string') return line.systemRulesSummary.trim();
   return '';
 }
@@ -315,7 +327,7 @@ function configFromAiChat(line) {
   const aiName = (line.name || DEFAULT_DISPLAY_NAME).trim();
   const genderNote =
     line.gender === 'female' ? 'ใช้คำลงท้าย คะ/ค่ะ' : line.gender === 'male' ? 'ใช้คำลงท้าย ครับ' : '';
-  let systemPrompt = lineRulesToPrompt(line);
+  let systemPrompt = lineRulesToPrompt(line, 'staff');
   if (genderNote) systemPrompt = (systemPrompt ? systemPrompt + '\n' : '') + genderNote;
   return normalizeDesktopConfig(
     {
@@ -467,6 +479,7 @@ function validateIncomingAttachments(config, images, files) {
   const maxImageBytes = limits.maxImageMb * 1024 * 1024;
   const maxDocBytes = limits.maxDocMb * 1024 * 1024;
   for (const img of imgs) {
+    if (img.imageId && !img.b64 && !img.dataUrl) continue;
     const b = estimateB64Bytes(img.b64) || estimateDataUrlBytes(img.dataUrl);
     if (b > maxImageBytes) {
       throw new Error(`รูปแต่ละไฟล์ต้องไม่เกิน ${limits.maxImageMb} MB`);
@@ -1110,12 +1123,25 @@ function historyImagesFromMessage(m) {
 
 function collectLibraryItems(threads, username, userLibrary) {
   const items = [];
+  const seenImageIds = new Set();
+  const seenFileIds = new Set();
+
+  normalizeUserLibrary(userLibrary).forEach((rec) => {
+    const mapped = libraryItemFromRecord(rec, username, 'library');
+    if (!mapped) return;
+    items.push(mapped);
+    if (mapped.imageId) seenImageIds.add(String(mapped.imageId));
+    if (mapped.fileId) seenFileIds.add(String(mapped.fileId));
+  });
+
   for (const t of Array.isArray(threads) ? threads : []) {
     if (!t || t.archived) continue;
     const hist = Array.isArray(t.chatHistory) ? t.chatHistory : [];
     hist.forEach((m, msgIdx) => {
       historyImagesFromMessage(m).forEach((img, imgIdx) => {
-        const imageId = img.imageId || img.id || '';
+        const imageId = String(img.imageId || img.id || '');
+        if ((img.fromLibrary || img.libraryId) && imageId) return;
+        if (imageId && seenImageIds.has(imageId)) return;
         const publicUrl = img.publicUrl || '';
         const url = img.url || '';
         const b64 = img.b64 || '';
@@ -1153,6 +1179,7 @@ function collectLibraryItems(threads, username, userLibrary) {
           updatedAt: m.ts || t.updatedAt || t.createdAt || 0,
           sizeBytes: approxSize
         });
+        if (imageId) seenImageIds.add(imageId);
       });
       if (Array.isArray(m.files)) {
         m.files.forEach((f, fileIdx) => {
@@ -1176,10 +1203,6 @@ function collectLibraryItems(threads, username, userLibrary) {
       }
     });
   }
-  normalizeUserLibrary(userLibrary).forEach((rec) => {
-    const mapped = libraryItemFromRecord(rec, username, 'library');
-    if (mapped) items.push(mapped);
-  });
   return items.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 }
 
@@ -1211,6 +1234,42 @@ async function deleteStorageObject(username, objectId, mime) {
   }
 }
 
+function scrubStorageRefsFromThreads(threads, imageIds, fileIds) {
+  const imageIdSet = new Set((imageIds || []).map(String).filter(Boolean));
+  const fileIdSet = new Set((fileIds || []).map(String).filter(Boolean));
+  if (!imageIdSet.size && !fileIdSet.size) return threads;
+  return (Array.isArray(threads) ? threads : []).map((t) => {
+    if (!t || !Array.isArray(t.chatHistory)) return t;
+    let changed = false;
+    const chatHistory = t.chatHistory.map((m) => {
+      if (!m || typeof m !== 'object') return m;
+      let next = m;
+      if (imageIdSet.size && Array.isArray(m.images) && m.images.length) {
+        const images = m.images.filter((img) => {
+          const id = String((img && (img.imageId || img.id)) || '');
+          return !id || !imageIdSet.has(id);
+        });
+        if (images.length !== m.images.length) {
+          changed = true;
+          next = images.length ? { ...next, images } : { ...next, images: undefined };
+        }
+      }
+      if (fileIdSet.size && Array.isArray(m.files) && m.files.length) {
+        const files = m.files.filter((f) => {
+          const id = String((f && (f.fileId || f.id)) || '');
+          return !id || !fileIdSet.has(id);
+        });
+        if (files.length !== m.files.length) {
+          changed = true;
+          next = files.length ? { ...next, files } : { ...next, files: undefined };
+        }
+      }
+      return next;
+    });
+    return changed ? { ...t, chatHistory, updatedAt: Date.now() } : t;
+  });
+}
+
 async function deleteLibraryItems(db, username, fullname, itemIds) {
   const ids = Array.isArray(itemIds) ? itemIds.map(String).filter(Boolean) : [];
   if (!ids.length) return saveUserMemory(db, username, fullname, {});
@@ -1219,13 +1278,21 @@ async function deleteLibraryItems(db, username, fullname, itemIds) {
   let threads = norm.threads;
   let userLibrary = normalizeUserLibrary(prev.userLibrary);
   let memoryFileIds = Array.isArray(prev.memoryFileIds) ? prev.memoryFileIds.map(String) : [];
+  const scrubImageIds = [];
+  const scrubFileIds = [];
 
   for (const itemId of ids) {
     if (itemId.startsWith('lib_')) {
       const rec = userLibrary.find((x) => x.id === itemId);
       if (rec) {
-        if (rec.imageId) await deleteStorageObject(username, rec.imageId, rec.mime);
-        if (rec.fileId) await deleteStorageObject(username, rec.fileId, rec.mime);
+        if (rec.imageId) {
+          scrubImageIds.push(String(rec.imageId));
+          await deleteStorageObject(username, rec.imageId, rec.mime);
+        }
+        if (rec.fileId) {
+          scrubFileIds.push(String(rec.fileId));
+          await deleteStorageObject(username, rec.fileId, rec.mime);
+        }
       }
       userLibrary = userLibrary.filter((x) => x.id !== itemId);
       memoryFileIds = memoryFileIds.filter((x) => x !== itemId);
@@ -1250,6 +1317,10 @@ async function deleteLibraryItems(db, username, fullname, itemIds) {
       return { ...t, chatHistory, updatedAt: Date.now() };
     });
     memoryFileIds = memoryFileIds.filter((x) => x !== itemId);
+  }
+
+  if (scrubImageIds.length || scrubFileIds.length) {
+    threads = scrubStorageRefsFromThreads(threads, scrubImageIds, scrubFileIds);
   }
 
   return saveUserMemory(db, username, fullname, { threads, userLibrary, memoryFileIds });
@@ -1706,16 +1777,26 @@ function normalizeIncomingImages(images, maxCount) {
   const max = Math.max(1, Number(maxCount) || 10);
   if (!Array.isArray(images)) return [];
   return images
-    .map((img) => {
+    .map((img, idx) => {
       if (!img) return null;
+      const base = { _source: 'attachment', _attachmentIndex: idx + 1 };
+      if (img.imageId && !img.dataUrl && !img.b64) {
+        return {
+          ...base,
+          _source: img._source || 'library',
+          mime: img.mime || 'image/png',
+          imageId: String(img.imageId),
+          ...(img.libraryId ? { libraryId: String(img.libraryId) } : {})
+        };
+      }
       if (img.dataUrl) {
         const p = parseDataUrl(img.dataUrl);
         if (!p) return null;
-        return { mime: p.mime, b64: p.b64, dataUrl: img.dataUrl };
+        return { ...base, mime: p.mime, b64: p.b64, dataUrl: img.dataUrl };
       }
       if (img.b64) {
         const mime = img.mime || 'image/png';
-        return { mime, b64: img.b64, dataUrl: `data:${mime};base64,${img.b64}` };
+        return { ...base, mime, b64: img.b64, dataUrl: `data:${mime};base64,${img.b64}` };
       }
       return null;
     })
@@ -1892,6 +1973,53 @@ function wantsImageGenFlow(text, hasImages, forceGenerate) {
   );
 }
 
+function buildImageGenPersonalizationContext(promptMemory, userCallName, userPrefs) {
+  const parts = [];
+  const callName = userCallName && String(userCallName).trim();
+  if (callName) parts.push('เรียกผู้ใช้ว่า "' + callName + '"');
+  const instr = promptMemory && promptMemory.standingInstructions;
+  if (instr && String(instr).trim()) {
+    parts.push('คำสั่งที่ผู้ใช้ต้องการให้จำ:\n' + String(instr).trim());
+  }
+  const prefs = userPrefs || (promptMemory && promptMemory.preferences) || {};
+  if (prefs.memorySaved !== false && prefs.aboutYou && String(prefs.aboutYou).trim()) {
+    parts.push('เกี่ยวกับผู้ใช้:\n' + String(prefs.aboutYou).trim());
+  }
+  if (prefs.dataLocationEnabled && prefs.userLocation && String(prefs.userLocation).trim()) {
+    parts.push('ตำแหน่งผู้ใช้: ' + String(prefs.userLocation).trim());
+  }
+  return parts.length ? parts.join('\n\n') : '';
+}
+
+function extractPosterFooterBlock(text) {
+  const t = String(text || '').trim();
+  if (!t) return '';
+  const footerMatch = t.match(/(?:ท้ายโปสเตอร์|ส่วนท้าย|footer|contact)[^\n]*\n([\s\S]+)/i);
+  if (footerMatch && footerMatch[0]) return footerMatch[0].trim().slice(0, 900);
+  const hasContact =
+    /(?:โทร|tel|phone|042[-\s]?\d+)/i.test(t) &&
+    (/(?:เมล|mail|@)/i.test(t) || /(?:ที่อยู่|address)/i.test(t));
+  if (!hasContact) return '';
+  const idx = t.search(/(?:โทร\s|tel\s|phone\s|042[-\s]?\d+|เมล\s|mail\s|ที่อยู่\s)/i);
+  return idx >= 0 ? t.slice(idx).trim().slice(0, 900) : '';
+}
+
+function finalizePosterImagePrompt(basePrompt, userText, personalizationCtx) {
+  let out = String(basePrompt || '').trim();
+  const footer = extractPosterFooterBlock(userText);
+  if (personalizationCtx) {
+    out +=
+      '\n\n--- Personalization / standing instructions (apply when relevant) ---\n' +
+      personalizationCtx;
+  }
+  if (footer) {
+    out +=
+      '\n\nMANDATORY POSTER FOOTER — render ALL of the following Thai text legibly at the bottom of the poster (exact phone, email, address):\n' +
+      footer;
+  }
+  return out.slice(0, 3900);
+}
+
 function buildDirectInfographicPrompt(text) {
   const t = String(text || '').trim();
   return (
@@ -1957,6 +2085,35 @@ async function loadLibraryItemAsIncomingImage(username, item) {
   return null;
 }
 
+async function resolveIncomingImagesForChat(username, images) {
+  const list = Array.isArray(images) ? images : [];
+  const out = [];
+  for (const img of list) {
+    if (!img) continue;
+    if (img.b64 || img.dataUrl) {
+      out.push(img);
+      continue;
+    }
+    if (img.imageId) {
+      const loaded = await loadLibraryItemAsIncomingImage(username, {
+        imageId: img.imageId,
+        mime: img.mime || 'image/png',
+        src: imagePublicUrl(username, img.imageId),
+        _source: img._source || 'library'
+      });
+      if (loaded) {
+        out.push({
+          ...loaded,
+          _source: img._source || loaded._source || 'library',
+          ...(img.libraryId ? { libraryId: img.libraryId } : {}),
+          _attachmentIndex: img._attachmentIndex
+        });
+      }
+    }
+  }
+  return out;
+}
+
 async function resolveMemoryImagesForPrompt(memoryRaw, username, userText) {
   const ids = Array.isArray(memoryRaw && memoryRaw.memoryFileIds)
     ? memoryRaw.memoryFileIds.map(String).filter(Boolean)
@@ -2006,6 +2163,58 @@ function mergeImageLists(primary, secondary, maxCount) {
   return out;
 }
 
+function posterImageRole(img) {
+  const label = String((img && img._label) || '').toLowerCase();
+  if (/โลโก|logo|ตรา|emblem/i.test(label)) return 'logo';
+  if (/ประธาน|chairman|chairperson|มะณู/i.test(label)) return 'chairman';
+  if (img && img._source === 'attachment') return 'event';
+  if (img && img._source === 'memory') return 'branding';
+  return 'other';
+}
+
+function posterRefImageCaption(img, idx) {
+  const role = posterImageRole(img);
+  const n = idx + 1;
+  if (role === 'logo') return `Reference image ${n} [cooperative logo]:`;
+  if (role === 'chairman') return `Reference image ${n} [chairman portrait]:`;
+  if (role === 'event') {
+    const i = img._attachmentIndex != null ? img._attachmentIndex : n;
+    return `Reference image ${n} [event/news photo ${i} — MUST embed in poster collage]:`;
+  }
+  if (img && img._label) return `Reference image ${n} [${img._label}]:`;
+  return `Reference image ${n}:`;
+}
+
+function pickPosterRefImagesForGeneration(allImages, maxRefs) {
+  const max = Math.max(1, Math.min(Number(maxRefs) || 8, 10));
+  if (!Array.isArray(allImages) || !allImages.length) return [];
+  const logo = [];
+  const chairman = [];
+  const event = [];
+  const other = [];
+  for (const img of allImages) {
+    const role = posterImageRole(img);
+    if (role === 'logo') logo.push(img);
+    else if (role === 'chairman') chairman.push(img);
+    else if (role === 'event') event.push(img);
+    else other.push(img);
+  }
+  const out = [];
+  const pushUnique = (img) => {
+    if (!img || out.length >= max) return;
+    const key = imageDedupeKey(img);
+    if (out.some((x) => imageDedupeKey(x) === key)) return;
+    out.push(img);
+  };
+  pushUnique(logo[0]);
+  pushUnique(chairman[0]);
+  event.forEach(pushUnique);
+  other.forEach(pushUnique);
+  logo.slice(1).forEach(pushUnique);
+  chairman.slice(1).forEach(pushUnique);
+  return out;
+}
+
 function pickRefImagesForGeneration(allImages, maxRefs) {
   const max = Math.max(1, Math.min(Number(maxRefs) || 3, 4));
   if (!Array.isArray(allImages) || !allImages.length) return [];
@@ -2017,28 +2226,41 @@ function pickRefImagesForGeneration(allImages, maxRefs) {
   return sorted.slice(0, max);
 }
 
-async function buildPosterGenerationPrompt(apiKey, config, userText, refImages, memoryFilesContext) {
+async function buildPosterGenerationPrompt(
+  apiKey,
+  config,
+  userText,
+  refImages,
+  memoryFilesContext,
+  personalizationCtx
+) {
   const refs = Array.isArray(refImages) ? refImages : [];
   const text = String(userText || '').trim();
   const memCtx = String(memoryFilesContext || '').trim();
-  if (!refs.length && !memCtx) return buildDirectInfographicPrompt(text);
+  if (!refs.length && !memCtx) {
+    return finalizePosterImagePrompt(buildDirectInfographicPrompt(text), text, personalizationCtx);
+  }
+  const eventCount = refs.filter((img) => posterImageRole(img) === 'event').length;
   const parts = [
     {
       type: 'text',
       text:
         `ผู้ใช้ขอออกแบบโปสเตอร์/ข่าว/กราฟิก\n\nคำขอ:\n${text.slice(0, 3500)}\n\n` +
+        (eventCount
+          ? `ผู้ใช้แนบภาพกิจกรรม/ข่าว ${eventCount} รูป — ต้องนำรูปเหล่านี้ไปใส่ในโปสเตอร์จริง (collage/grid) ห้ามแทนด้วยภาพประกอบทั่วไป\n\n`
+          : '') +
         (memCtx ? `ไฟล์ที่โมเน่จำไว้ (โลโก้/ประธาน ฯลฯ):\n${memCtx.slice(0, 2000)}\n\n` : '') +
-        'วิเคราะห์รูปที่แนบ (โลโก้ ประธาน ภาพกิจกรรม ฯลฯ) แล้วเขียน prompt ภาษาอังกฤษ ONE paragraph สำหรับสร้างโปสเตอร์ข่าวมืออาชีพ — ระบุ layout สี ฟอนต์ ตำแหน่งโลโก้ รูปประธาน ข้อความไทยหลัก และรูปประกอบ ตอบ prompt อย่างเดียว ไม่มี markdown'
+        (personalizationCtx ? `การปรับแต่งเฉพาะบุคคล:\n${personalizationCtx.slice(0, 1200)}\n\n` : '') +
+        'วิเคราะห์รูปที่แนบ (โลโก้ ประธาน ภาพกิจกรรม/ข่าวที่ผู้ใช้แนบ) แล้วเขียน prompt ภาษาอังกฤษ ONE paragraph สำหรับสร้างโปสเตอร์ข่าวมืออาชีพ — ระบุ layout สี ฟอนต์ ตำแหน่งโลโก้ รูปประธาน แกลเลอรี/คollage ของภาพกิจกรรมที่แนบมา ข้อความไทยหลัก และท้ายโปสเตอร์ (โทร เมล ที่อยู่) ห้ามละทิ้งส่วนท้ายและห้ามแทนภาพกิจกรรมด้วย stock art ตอบ prompt อย่างเดียว ไม่มี markdown'
     }
   ];
-  refs.slice(0, 6).forEach((img, idx) => {
-    const label = img._label ? ` [${img._label}]` : '';
-    parts.push({ type: 'text', text: `Reference image ${idx + 1}${label}:` });
+  refs.slice(0, 10).forEach((img, idx) => {
+    parts.push({ type: 'text', text: posterRefImageCaption(img, idx) });
     parts.push({
       type: 'image_url',
       image_url: {
         url: img.dataUrl || `data:${img.mime || 'image/png'};base64,${img.b64}`,
-        detail: idx < 4 ? 'high' : 'low'
+        detail: idx < 6 ? 'high' : 'low'
       }
     });
   });
@@ -2046,16 +2268,20 @@ async function buildPosterGenerationPrompt(apiKey, config, userText, refImages, 
     {
       role: 'system',
       content:
-        'You write detailed English image-generation prompts for Thai cooperative news posters. Include Thai headline text to render, layout, colors, logo placement, chairman photo, and event photos.'
+        'You write detailed English image-generation prompts for Thai cooperative news posters. Include Thai headline text to render, layout, colors, logo placement, chairman photo, a photo collage/grid of ALL attached event/news photos (never replace with generic illustrations), and footer contact block (phone, email, address in Thai) when provided — never omit footer details or user-attached event photos.'
     },
     { role: 'user', content: parts }
   ];
   try {
     const out = await callOpenAIChat(apiKey, pickVisionModel(config), messages, 1000);
     const cleaned = String(out || '').trim().slice(0, 1200);
-    return cleaned || buildDirectInfographicPrompt(text);
+    return finalizePosterImagePrompt(
+      cleaned || buildDirectInfographicPrompt(text),
+      text,
+      personalizationCtx
+    );
   } catch (_) {
-    return buildDirectInfographicPrompt(text);
+    return finalizePosterImagePrompt(buildDirectInfographicPrompt(text), text, personalizationCtx);
   }
 }
 
@@ -2627,17 +2853,24 @@ function pickImageModel(config) {
   return (config && config.imageModel) || 'gpt-image-2';
 }
 
-async function generateImageResponses(apiKey, config, prompt, refImages, timeoutMs) {
+async function generateImageResponses(apiKey, config, prompt, refImages, timeoutMs, opts) {
   const model = pickResponsesModel(config);
   const refs = Array.isArray(refImages) ? refImages : [];
+  const isPoster = !!(opts && opts.poster);
   let input;
   if (refs.length) {
+    const eventCount = refs.filter((img) => posterImageRole(img) === 'event').length;
+    const refIntro = isPoster
+      ? 'Create a professional Thai cooperative news poster. MUST embed ALL attached reference images into the final poster: use logo/chairman images for header branding, and place every attached event/news photo in a visible photo collage or grid section. Do NOT replace user event photos with generic stock illustrations, silhouettes, or clip art.\n\n'
+      : 'Use the attached reference image(s) as the primary visual source. Keep the same layout, composition, colors, branding, and style unless the user asks to change them.\n\n';
+    const eventNote =
+      isPoster && eventCount
+        ? `The user attached ${eventCount} event/news photo(s) — all must appear in the poster.\n\n`
+        : '';
     const content = [
       {
         type: 'input_text',
-        text:
-          'Use the attached reference image(s) as the primary visual source. Keep the same layout, composition, colors, branding, and style unless the user asks to change them.\n\n' +
-          (prompt || 'สร้างรูปจากภาพอ้างอิงนี้')
+        text: refIntro + eventNote + (prompt || 'สร้างรูปจากภาพอ้างอิงนี้')
       }
     ];
     refs.forEach((img) => {
@@ -2725,15 +2958,27 @@ function fetchImageUrlAsB64(url) {
   });
 }
 
-async function generateImages(apiKey, config, prompt, refImages) {
+async function generateImages(apiKey, config, prompt, refImages, opts) {
   const refs = Array.isArray(refImages) ? refImages : [];
-  const keyRefs = pickRefImagesForGeneration(refs, refs.length > 2 ? 2 : 3);
+  const isPoster = !!(opts && opts.poster);
+  const keyRefs = isPoster
+    ? pickPosterRefImagesForGeneration(refs, Math.min(refs.length, 10))
+    : pickRefImagesForGeneration(refs, refs.length > 2 ? 2 : 3);
   if (keyRefs.length) {
+    const genOpts = isPoster ? { poster: true } : null;
     try {
-      return await generateImageResponses(apiKey, config, prompt, keyRefs, 180000);
+      return await generateImageResponses(apiKey, config, prompt, keyRefs, 180000, genOpts);
     } catch (e) {
       console.error('[nkbk-ai] generateImageResponses failed:', e.message);
-      if (refs.length > 1 || String(prompt || '').length > 400) {
+      if (isPoster && keyRefs.length > 2) {
+        try {
+          const reduced = pickPosterRefImagesForGeneration(keyRefs, Math.max(2, Math.ceil(keyRefs.length / 2)));
+          return await generateImageResponses(apiKey, config, prompt, reduced, 180000, genOpts);
+        } catch (e2) {
+          console.error('[nkbk-ai] generateImageResponses retry failed:', e2.message);
+        }
+      }
+      if (!isPoster && (refs.length > 1 || String(prompt || '').length > 400)) {
         return await generateImageSimple(apiKey, config, prompt, 240000);
       }
       throw e;
@@ -2742,25 +2987,26 @@ async function generateImages(apiKey, config, prompt, refImages) {
   return await generateImageSimple(apiKey, config, prompt, 240000);
 }
 
-function buildChatCompletionBody(model, messages, maxTokens) {
+function buildChatCompletionBody(model, messages, maxTokens, options) {
   const m = model || 'gpt-4o-mini';
   const limit = Math.min(4000, Math.max(256, parseInt(maxTokens, 10) || 1500));
   const body = { model: m, messages };
+  const opts = options && typeof options === 'object' ? options : {};
   // gpt-5 / o-series ใช้ max_completion_tokens แทน max_tokens
   if (/^gpt-5|^o[0-9]/i.test(m)) {
     body.max_completion_tokens = limit;
   } else {
     body.max_tokens = limit;
-    body.temperature = 0.7;
+    body.temperature = opts.temperature != null ? opts.temperature : 0.7;
   }
   return body;
 }
 
-function callOpenAIChat(apiKey, model, messages, maxTokens) {
+function callOpenAIChat(apiKey, model, messages, maxTokens, options) {
   if (!apiKey || !String(apiKey).trim()) {
     return Promise.reject(new Error('OpenAI API Key not configured'));
   }
-  const body = JSON.stringify(buildChatCompletionBody(model, messages, maxTokens));
+  const body = JSON.stringify(buildChatCompletionBody(model, messages, maxTokens, options));
   return new Promise((resolve, reject) => {
     const options = {
       hostname: 'api.openai.com',
@@ -2821,12 +3067,369 @@ async function callOpenAIChatVision(apiKey, config, messages, maxTokens, userIma
   return callOpenAIChat(apiKey, model, visionMessages, maxTokens);
 }
 
+const WELCOME_THAI_DAYS = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
+const WELCOME_THAI_MONTHS = [
+  'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+];
+
+function getBangkokNowForWelcome() {
+  const now = new Date();
+  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+  return new Date(utc + 420 * 60000);
+}
+
+function formatBangkokWelcomeContext() {
+  const b = getBangkokNowForWelcome();
+  const day = b.getDate();
+  const month = WELCOME_THAI_MONTHS[b.getMonth()];
+  const year = b.getFullYear() + 543;
+  const dayOfWeek = WELCOME_THAI_DAYS[b.getDay()];
+  const h = b.getHours();
+  const m = b.getMinutes();
+  return `วันนี้วันที่ ${day} ${month} ${year} วัน${dayOfWeek} เวลา ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} น. (Bangkok)`;
+}
+
+function sanitizeWelcomeGreeting(raw) {
+  let s = String(raw || '').trim();
+  s = s.replace(/^["'«»""]+|["'«»""]+$/g, '');
+  s = s.replace(/\s+/g, ' ');
+  if (s.length > 120) s = s.slice(0, 117) + '…';
+  return s;
+}
+
+function fallbackWelcomeGreeting(userCallName) {
+  const cn = userCallName && String(userCallName).trim();
+  return cn ? `${cn} วันนี้คุณคิดอะไรอยู่` : 'วันนี้คุณคิดอะไรอยู่';
+}
+
+async function generateWelcomeGreeting(db, config, session) {
+  const userCallName = await resolveUserCallName(db, config, session.username);
+  const includeName = !!(userCallName && Math.random() < 0.9);
+  const fallback = fallbackWelcomeGreeting(userCallName);
+  const apiKey = config && config.openaiApiKey;
+  if (!apiKey || !String(apiKey).trim()) {
+    return { greeting: fallback, includeName, source: 'fallback' };
+  }
+
+  const assistantName = (config && config.displayName) || DEFAULT_DISPLAY_NAME;
+  const bangkokCtx = formatBangkokWelcomeContext();
+  const varietySeed = Math.random().toString(36).slice(2, 10);
+  const systemPrompt = [
+    `คุณสร้างข้อความต้อนรับสั้นๆ บนหน้าแรกของแชท AI "${assistantName}" สำหรับพนักงานสหกรณ์ออมทรัพย์สาธารณสุขจังหวัดหนองคาย`,
+    'กติกา:',
+    '- ตอบเพียง 1 ประโยคสั้น ไม่เกิน 80 ตัวอักษร',
+    '- ภาษาไทย โทนเป็นกันเอง อบอุ่น กระชับ',
+    '- เปลี่ยนสไตล์ทุกครั้ง เช่น ทักทาย ถามไถ่ ชวนคุย แนะนำฟีเจอร์ หรืออ้างอิงวัน/เวลา/ช่วงของวัน',
+    '- ห้ามใส่ emoji หรือเครื่องหมายคำพูด',
+    '- ห้ามพูดว่าเป็น AI หรือ model',
+    '- ตอบเป็นข้อความล้วนๆ ไม่มีคำอธิบายเพิ่ม'
+  ].join('\n');
+
+  const userPrompt = [
+    bangkokCtx,
+    includeName
+      ? `ให้ใส่ชื่อเรียกผู้ใช้ "${userCallName}" ในประโยค`
+      : 'ครั้งนี้ไม่ต้องใส่ชื่อผู้ใช้',
+    `seed: ${varietySeed}`,
+    'สร้างข้อความต้อนรับ 1 ประโยค'
+  ].join('\n');
+
+  try {
+    const model = (config && config.model) || 'gpt-4o-mini';
+    const raw = await callOpenAIChat(
+      apiKey,
+      model,
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      120,
+      { temperature: 1.0 }
+    );
+    const greeting = sanitizeWelcomeGreeting(raw);
+    if (!greeting) return { greeting: fallback, includeName, source: 'fallback' };
+    void recordApiUsage(db, 'chat');
+    void recordUserApiUsage(db, session.username, session.fullname, 'chat', {
+      label: 'welcome greeting',
+      kind: 'welcome'
+    });
+    return { greeting, includeName, source: 'ai' };
+  } catch (e) {
+    console.error('[nkbk-ai] welcome greeting:', e.message);
+    return { greeting: fallback, includeName, source: 'fallback' };
+  }
+}
+
+const COOP_THAI_MONTHS = [
+  'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+];
+
+/** วันหยุดราชการ/วันหยุดสหกรณ์ (static) ตรงกับ Admin — ปี 2025–2026 */
+const STATIC_THAI_HOLIDAYS_2025 = [
+  { date: '2025-01-01', name: 'วันขึ้นปีใหม่' },
+  { date: '2025-01-29', name: 'วันตรุษจีน' },
+  { date: '2025-02-12', name: 'วันมาฆบูชา' },
+  { date: '2025-03-30', name: 'สิ้นสุดรอมฎอน' },
+  { date: '2025-04-06', name: 'วันจักรี' },
+  { date: '2025-04-07', name: 'ชดเชยวันจักรี' },
+  { date: '2025-04-13', name: 'เทศกาลสงกรานต์' },
+  { date: '2025-04-14', name: 'เทศกาลสงกรานต์' },
+  { date: '2025-04-15', name: 'เทศกาลสงกรานต์' },
+  { date: '2025-05-01', name: 'วันแรงงาน' },
+  { date: '2025-05-04', name: 'วันฉัตรมงคล' },
+  { date: '2025-05-05', name: 'ชดเชยวันฉัตรมงคล' },
+  { date: '2025-05-09', name: 'วันพืชมงคล' },
+  { date: '2025-05-11', name: 'วันวิสาขบูชา' },
+  { date: '2025-05-12', name: 'ชดเชยวันวิสาขบูชา' },
+  { date: '2025-06-02', name: 'ชดเชยวันเฉลิมพระชนมพรรษาสมเด็จพระราชินี' },
+  { date: '2025-06-03', name: 'วันเฉลิมพระชนมพรรษาสมเด็จพระราชินี' },
+  { date: '2025-07-10', name: 'วันอาสาฬหบูชา' },
+  { date: '2025-07-11', name: 'วันเข้าพรรษา' },
+  { date: '2025-07-28', name: 'วันเฉลิมพระชนมพรรษาพระบาทสมเด็จพระเจ้าอยู่หัว' },
+  { date: '2025-08-11', name: 'ชดเชยวันแม่แห่งชาติ' },
+  { date: '2025-08-12', name: 'วันแม่แห่งชาติ' },
+  { date: '2025-10-13', name: 'วันคล้ายวันสวรรคต ร.9' },
+  { date: '2025-10-23', name: 'วันปิยมหาราช' },
+  { date: '2025-12-05', name: 'วันคล้ายวันพระบรมราชสมภพ ร.9' },
+  { date: '2025-12-10', name: 'วันรัฐธรรมนูญ' },
+  { date: '2025-12-25', name: 'วันคริสต์มาส' },
+  { date: '2025-12-31', name: 'วันสิ้นปี' }
+];
+
+const STATIC_THAI_HOLIDAYS_2026 = [
+  { date: '2026-01-01', name: 'วันขึ้นปีใหม่' },
+  { date: '2026-01-02', name: 'วันหยุดปีใหม่' },
+  { date: '2026-02-17', name: 'วันตรุษจีน' },
+  { date: '2026-03-03', name: 'วันมาฆบูชา' },
+  { date: '2026-03-20', name: 'สิ้นสุดรอมฎอน' },
+  { date: '2026-04-06', name: 'วันจักรี' },
+  { date: '2026-04-13', name: 'เทศกาลสงกรานต์' },
+  { date: '2026-04-14', name: 'เทศกาลสงกรานต์' },
+  { date: '2026-04-15', name: 'เทศกาลสงกรานต์' },
+  { date: '2026-05-01', name: 'วันแรงงาน' },
+  { date: '2026-05-04', name: 'วันฉัตรมงคล' },
+  { date: '2026-05-11', name: 'วันพืชมงคล' },
+  { date: '2026-05-31', name: 'วันวิสาขบูชา' },
+  { date: '2026-06-01', name: 'ชดเชยวันวิสาขบูชา' },
+  { date: '2026-06-03', name: 'วันเฉลิมพระชนมพรรษาสมเด็จพระราชินี' },
+  { date: '2026-07-28', name: 'วันเฉลิมพระชนมพรรษาพระบาทสมเด็จพระเจ้าอยู่หัว' },
+  { date: '2026-07-29', name: 'วันอาสาฬหบูชา' },
+  { date: '2026-07-30', name: 'วันเข้าพรรษา' },
+  { date: '2026-08-12', name: 'วันแม่แห่งชาติ' },
+  { date: '2026-10-13', name: 'วันคล้ายวันสวรรคต ร.9' },
+  { date: '2026-10-23', name: 'วันปิยมหาราช' },
+  { date: '2026-12-05', name: 'วันคล้ายวันพระบรมราชสมภพ ร.9' },
+  { date: '2026-12-07', name: 'ชดเชยวันคล้ายวันพระบรมราชสมภพ ร.9' },
+  { date: '2026-12-10', name: 'วันรัฐธรรมนูญ' },
+  { date: '2026-12-25', name: 'วันคริสต์มาส' },
+  { date: '2026-12-31', name: 'วันสิ้นปี' }
+];
+
+function getStaticThaiHolidaysForYear(gregorianYear) {
+  if (gregorianYear === 2025) return STATIC_THAI_HOLIDAYS_2025;
+  if (gregorianYear === 2026) return STATIC_THAI_HOLIDAYS_2026;
+  return [];
+}
+
+function parseCoopHolidayDate(dateStr) {
+  const date = String(dateStr || '').trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const dateObj = new Date(date + 'T12:00:00');
+  return Number.isNaN(dateObj.getTime()) ? null : dateObj;
+}
+
+function formatCoopHolidayDateBE(dateObj) {
+  const day = dateObj.getDate();
+  const month = COOP_THAI_MONTHS[dateObj.getMonth()];
+  const yearBE = dateObj.getFullYear() + 543;
+  return `${day} ${month} ${yearBE}`;
+}
+
+/**
+ * สร้างบรรทัด context วันหยุดสหกรณ์ (static + Firestore) ตรงกับ Admin
+ * @param {Array<object>} holidaysDocs - เอกสารจาก collection holidays
+ * @param {object} [options]
+ * @param {Date} [options.now] - วันที่อ้างอิง (default: วันนี้)
+ * @param {number} [options.gregorianYear] - ปี ค.ศ. ที่ต้องการ (default: จาก now)
+ * @param {boolean} [options.futureOnly=false] - true = เฉพาะวันหยุดที่ยังไม่ผ่าน
+ * @param {number} [options.maxItems] - จำกัดจำนวนรายการ (เช่น staff brain)
+ */
+function buildCoopHolidayContextLines(holidaysDocs, options) {
+  const opts = options && typeof options === 'object' ? options : {};
+  const now = opts.now instanceof Date ? opts.now : new Date();
+  const gregorianYear = opts.gregorianYear != null ? Number(opts.gregorianYear) : now.getFullYear();
+  const beYear = gregorianYear + 543;
+  const futureOnly = opts.futureOnly === true;
+  const maxItems = opts.maxItems != null ? Number(opts.maxItems) : null;
+
+  const holidays = Array.isArray(holidaysDocs) ? holidaysDocs : [];
+  const datesCoopOpen = new Set(
+    holidays
+      .filter((h) => h && h.hidden === true && h.date)
+      .map((h) => String(h.date).trim().slice(0, 10))
+  );
+
+  const byDate = new Map();
+  const staticForYear = getStaticThaiHolidaysForYear(gregorianYear);
+
+  staticForYear.forEach((h) => {
+    const date = String(h.date).trim().slice(0, 10);
+    const dateObj = parseCoopHolidayDate(date);
+    if (!dateObj || dateObj.getFullYear() !== gregorianYear) return;
+    if (futureOnly && dateObj < startOfDay(now)) return;
+    if (!byDate.has(date)) {
+      byDate.set(date, { date, name: (h.name || '').trim() || '-', dateObj, source: 'static' });
+    }
+  });
+
+  holidays.forEach((h) => {
+    if (!h || !h.date || h.hidden === true) return;
+    const date = String(h.date).trim().slice(0, 10);
+    const dateObj = parseCoopHolidayDate(date);
+    if (!dateObj || dateObj.getFullYear() !== gregorianYear) return;
+    if (futureOnly && dateObj < startOfDay(now)) return;
+    const name = (h.nameTH || h.name || '').trim() || '-';
+    byDate.set(date, { date, name, dateObj, source: 'firestore' });
+  });
+
+  let sortedHolidays = Array.from(byDate.values()).sort((a, b) => a.dateObj - b.dateObj);
+  if (maxItems != null && maxItems > 0) sortedHolidays = sortedHolidays.slice(0, maxItems);
+
+  const lines = [
+    'สหกรณ์หยุดทุกวันเสาร์-อาทิตย์',
+    `อ้างอิงปี พ.ศ. ${beYear} (ปีปัจจุบัน)`
+  ];
+
+  if (sortedHolidays.length === 0) {
+    lines.push('ไม่มีรายการวันหยุดนักขัตฤกษ์/พิเศษในปีนี้ (นอกจากเสาร์-อาทิตย์)');
+  } else {
+    sortedHolidays.forEach((h) => {
+      const dateStr = formatCoopHolidayDateBE(h.dateObj);
+      const isCoopOpen = datesCoopOpen.has(h.date);
+      lines.push(
+        isCoopOpen
+          ? `${h.name}: ${dateStr} (สหกรณ์ไม่หยุด — เปิดทำการ)`
+          : `${h.name}: ${dateStr}`
+      );
+    });
+  }
+
+  if (datesCoopOpen.size > 0) {
+    lines.push('หมายเหตุ: (สหกรณ์ไม่หยุด) = วันที่สหกรณ์เปิดทำการตามที่แอดมินตั้งค่า');
+  }
+
+  return lines;
+}
+
+function startOfDay(d) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+async function buildPublicMemberDataContext(db) {
+  const sections = [];
+  try {
+    const orgSnap = await db.collection('config').doc('org').get();
+    const org = orgSnap.exists ? orgSnap.data() || {} : {};
+    const workStart = org.attendanceWorkStart ? String(org.attendanceWorkStart).trim() : '';
+    if (workStart) sections.push('[เวลาทำการสหกรณ์] เปิด ' + workStart + ' น.');
+    const contact = [];
+    if (org.phone || org.contactPhone) contact.push('โทร: ' + String(org.phone || org.contactPhone).trim());
+    if (org.email || org.contactEmail) contact.push('อีเมล: ' + String(org.email || org.contactEmail).trim());
+    if (org.address) contact.push('ที่อยู่: ' + String(org.address).trim());
+    if (contact.length) sections.push('[ติดต่อสหกรณ์]\n' + contact.join('\n'));
+  } catch (e) {
+    console.warn('[public-member-chat] org context:', e.message);
+  }
+  try {
+    const holSnap = await db.collection('holidays').limit(80).get();
+    const holidaysDocs = holSnap.docs.map((doc) => ({ id: doc.id, ...(doc.data() || {}) }));
+    const holidayLines = buildCoopHolidayContextLines(holidaysDocs, { futureOnly: false });
+    sections.push('[วันหยุด/วันหยุดสหกรณ์]\n' + holidayLines.join('\n'));
+  } catch (e) {
+    console.warn('[public-member-chat] holidays context:', e.message);
+  }
+  return sections.length ? sections.join('\n\n') : '(ไม่มีข้อมูลเพิ่มเติมจากระบบ — ตอบจากกฎสมาชิกและความรู้ทั่วไปเกี่ยวกับสหกรณ์)';
+}
+
+function buildPublicMemberSystemPrompt(lineCfg, dataContextStr) {
+  const name = (lineCfg.name || 'โมเน่').trim();
+  const gender = String(lineCfg.gender || 'female').toLowerCase();
+  const particle = gender === 'male' ? 'ครับ' : 'คะ/ค่ะ';
+  const rules = lineRulesToPrompt(lineCfg, 'member') || 'ให้บริการสมาชิกสหกรณ์อย่างสุภาพ ไม่เปิดเผยข้อมูลภายใน';
+  const parts = [
+    `คุณคือ ${name} — ผู้ช่วยบริการสมาชิกสหกรณ์ออมทรัพย์สาธารณสุขหนองคาย จำกัด`,
+    'ผู้ใช้เป็นสมาชิกหรือผู้สนใจบริการสหกรณ์ — **ไม่จำเป็นต้องผูกบัญชีหรือเข้าสู่ระบบ**',
+    `ใช้คำลงท้าย ${particle} พูดสั้น กระชับ เหมาะกับแชทบนเว็บไซต์`,
+    'ห้ามเปิดเผยข้อมูลภายใน เช่น รายชื่อเจ้าหน้าที่ วันลา เข้างาน ระบบ IT',
+    'ห้ามบอกยอดเงินฝาก/เงินกู้จริงถ้าไม่มีใน context — แนะนำติดต่อสหกรณ์',
+    '## สมองสมาชิกสหกรณ์\n' + rules
+  ];
+  if (dataContextStr) parts.push('## ข้อมูลจากระบบ\n' + dataContextStr);
+  return parts.filter(Boolean).join('\n\n');
+}
+
+async function runPublicMemberChat(db, payload) {
+  const lineRaw = await getAiChatConfig(db);
+  if (!lineRaw || lineRaw.enabled !== true) throw new Error('บริการแชทยังไม่เปิดใช้งาน');
+  if (!(lineRaw.openaiApiKey && String(lineRaw.openaiApiKey).trim())) {
+    throw new Error('ยังไม่ได้ตั้งค่า OpenAI API Key');
+  }
+  const body = payload && typeof payload === 'object' ? payload : {};
+  const message = String(body.message || '').trim();
+  if (!message) throw new Error('กรุณาพิมพ์ข้อความ');
+  if (message.length > 2000) throw new Error('ข้อความยาวเกินไป');
+  const history = Array.isArray(body.history)
+    ? body.history
+        .filter((h) => h && (h.role === 'user' || h.role === 'assistant') && h.content)
+        .slice(-8)
+        .map((h) => ({
+          role: h.role,
+          content: String(h.content).slice(0, 3000)
+        }))
+    : [];
+  const dataContextStr = await buildPublicMemberDataContext(db);
+  const systemContent = buildPublicMemberSystemPrompt(lineRaw, dataContextStr);
+  const messages = [
+    { role: 'system', content: systemContent },
+    ...history,
+    { role: 'user', content: message }
+  ];
+  const reply = await callOpenAIChat(
+    lineRaw.openaiApiKey,
+    lineRaw.model || 'gpt-4o-mini',
+    messages,
+    800,
+    { temperature: 0.65 }
+  );
+  return {
+    reply: reply.length > 4000 ? reply.slice(0, 3997) + '...' : reply,
+    name: (lineRaw.name || 'โมเน่').trim()
+  };
+}
+
+async function getPublicMemberChatStatus(db) {
+  const lineRaw = await getAiChatConfig(db);
+  const enabled = !!(lineRaw && lineRaw.enabled === true && lineRaw.openaiApiKey && String(lineRaw.openaiApiKey).trim());
+  const name = (lineRaw && lineRaw.name) ? String(lineRaw.name).trim() : 'โมเน่';
+  const gender = lineRaw && lineRaw.gender ? String(lineRaw.gender) : 'female';
+  const greeting =
+    gender === 'male'
+      ? `สวัสดีครับ ผม${name} ยินดีให้บริการสมาชิกสหกรณ์ครับ มีอะไรให้ช่วยไหมครับ?`
+      : `สวัสดีค่ะ ดิฉัน${name} ยินดีให้บริการสมาชิกสหกรณ์ค่ะ มีอะไรให้ช่วยไหมคะ?`;
+  return { enabled, name, gender, greeting };
+}
+
 async function runChat(db, config, session, payload) {
   const body = payload && typeof payload === 'object' ? payload : { message: payload };
   const text = String(body.message || '').trim();
   const mode = body.mode || 'auto';
   const attachLimits = getAttachLimits(config);
-  const incomingImages = normalizeIncomingImages(body.images, attachLimits.maxAttachCount);
+  let incomingImages = normalizeIncomingImages(body.images, attachLimits.maxAttachCount);
+  incomingImages = await resolveIncomingImagesForChat(session.username, incomingImages);
   const incomingFiles = normalizeIncomingFiles(
     body.files,
     Math.max(0, attachLimits.maxAttachCount - incomingImages.length)
@@ -2880,6 +3483,11 @@ async function runChat(db, config, session, payload) {
   const userPrefs = normalizeUserPrefs(memoryRaw.preferences);
   const memoryFilesContext = buildMemoryFilesContext(memoryRaw, session.username);
   const promptMemory = { standingInstructions, memoryFilesContext, preferences: userPrefs };
+  const imageGenPersonalizationCtx = buildImageGenPersonalizationContext(
+    promptMemory,
+    userCallName,
+    userPrefs
+  );
 
   const remember = text ? extractRememberInstruction(text) : null;
   let memoryUpdated = false;
@@ -2916,7 +3524,8 @@ async function runChat(db, config, session, payload) {
           config,
           rawPrompt,
           combinedImages,
-          memoryFilesContext
+          memoryFilesContext,
+          imageGenPersonalizationCtx
         );
       } else if (hasCombinedImages) {
         refVisionUsed = true;
@@ -2931,7 +3540,8 @@ async function runChat(db, config, session, payload) {
         config.openaiApiKey,
         config,
         prompt,
-        hasCombinedImages ? combinedImages : []
+        hasCombinedImages ? combinedImages : [],
+        { poster: isPoster }
       );
       reply = images.length ? '' : 'สร้างรูปไม่สำเร็จ';
     } else if (hasImages) {
@@ -3010,6 +3620,15 @@ async function runChat(db, config, session, payload) {
   if (hasImages) {
     savedUserImages = await Promise.all(
       incomingImages.map(async (img) => {
+        if (img.imageId && (img._source === 'library' || img.libraryId)) {
+          return {
+            mime: img.mime || 'image/png',
+            imageId: img.imageId,
+            publicUrl: img.publicUrl || imagePublicUrl(session.username, img.imageId),
+            fromLibrary: true,
+            ...(img.libraryId ? { libraryId: img.libraryId } : {})
+          };
+        }
         const saved = await persistHistoryImageAsync(session.username, img);
         if (saved && saved.publicUrl) {
           return { mime: saved.mime || img.mime || 'image/png', imageId: saved.imageId, publicUrl: saved.publicUrl };
@@ -3183,6 +3802,7 @@ module.exports = {
   buildMemoryFilesContext,
   findThreadByRef,
   buildSystemPrompt,
+  generateWelcomeGreeting,
   extractRememberInstruction,
   callOpenAIChat,
   callOpenAIChatVision,
@@ -3191,6 +3811,11 @@ module.exports = {
   normalizeIncomingImages,
   normalizeIncomingFiles,
   runChat,
+  runPublicMemberChat,
+  getPublicMemberChatStatus,
+  buildPublicMemberSystemPrompt,
+  buildPublicMemberDataContext,
+  buildCoopHolidayContextLines,
   persistHistoryImageAsync,
   expandHistoryForClient,
   readPersistedImage,

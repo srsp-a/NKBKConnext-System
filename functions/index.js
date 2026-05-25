@@ -54,7 +54,7 @@ exports.monitorApi = onRequest(
 
     cors: true,
 
-    memory: '512MiB',
+    memory: '1GiB',
 
     timeoutSeconds: 300,
 

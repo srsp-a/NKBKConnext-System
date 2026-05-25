@@ -48,12 +48,74 @@ function getNewsCategoryFilter() {
   return new URLSearchParams(location.search).get('c') || '';
 }
 
+function getNewsSearchQuery() {
+  return (new URLSearchParams(location.search).get('q') || '').trim();
+}
+
+const NEWS_PAGE_SIZE = 15;
+
+function getNewsPage() {
+  const p = parseInt(new URLSearchParams(location.search).get('page') || '1', 10);
+  return Number.isFinite(p) && p >= 1 ? p : 1;
+}
+
+function buildNewsListUrl(page, cat, q) {
+  const params = new URLSearchParams();
+  if (cat) params.set('c', cat);
+  const query = q != null ? q : getNewsSearchQuery();
+  if (query) params.set('q', query);
+  if (page > 1) params.set('page', String(page));
+  const qs = params.toString();
+  return '/news' + (qs ? '?' + qs : '');
+}
+
+function filterPostsBySearch(docs, q) {
+  if (!q) return docs;
+  const needle = q.toLowerCase();
+  return docs.filter((doc) => {
+    const d = doc.data();
+    const title = decodeHtmlEntities(d.title || '').toLowerCase();
+    const excerpt = decodeHtmlEntities(d.excerpt || '').toLowerCase();
+    return title.includes(needle) || excerpt.includes(needle);
+  });
+}
+
+function renderNewsPagination(page, totalPages, cat, q) {
+  if (totalPages <= 1) return '';
+  const searchQ = q != null ? q : getNewsSearchQuery();
+  const prevHref = page > 1 ? buildNewsListUrl(page - 1, cat, searchQ) : '';
+  const nextHref = page < totalPages ? buildNewsListUrl(page + 1, cat, searchQ) : '';
+  const pageLabel = t('news.pageOf')
+    .replace('{page}', String(page))
+    .replace('{total}', String(totalPages));
+  return `<nav class="kb-news-pagination" aria-label="${escapeHtml(t('news.pagination'))}">
+    ${
+      prevHref
+        ? `<a href="${prevHref}" class="kb-btn kb-btn-secondary kb-btn-sm">${escapeHtml(t('news.prev'))}</a>`
+        : '<span class="kb-news-pagination-spacer" aria-hidden="true"></span>'
+    }
+    <span class="kb-news-pagination-info">${escapeHtml(pageLabel)}</span>
+    ${
+      nextHref
+        ? `<a href="${nextHref}" class="kb-btn kb-btn-primary kb-btn-sm">${escapeHtml(t('news.next'))}</a>`
+        : '<span class="kb-news-pagination-spacer" aria-hidden="true"></span>'
+    }
+  </nav>`;
+}
+
 function escapeHtml(s) {
   return String(s)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function decodeHtmlEntities(s) {
+  if (s == null || s === '') return '';
+  const el = document.createElement('textarea');
+  el.innerHTML = String(s);
+  return el.value;
 }
 
 function isPdfUrl(url) {
@@ -155,6 +217,15 @@ function siteTabTitle() {
   return (window.CMS_SITE && CMS_SITE.tabTitle) || 'NKBKCOOP';
 }
 
+function homeTabTitle() {
+  const c = window.CMS_SITE || {};
+  const lang = window.CmsI18n?.getLang?.() || 'th';
+  if (lang === 'en') {
+    return c.nameEn || c.brandSubEn || c.name || siteTabTitle();
+  }
+  return c.name || c.brandSubTh || siteTabTitle();
+}
+
 function bindPageAnchors(root) {
   window.CmsLayout?.bindHeaderAwareAnchors?.(
     root || document.getElementById('cms-page-content')
@@ -162,7 +233,9 @@ function bindPageAnchors(root) {
 }
 
 async function loadSiteName() {
-  document.title = siteTabTitle();
+  const path = (location.pathname || '').replace(/\/+$/, '') || '/';
+  document.title =
+    path === '/' || path === '/index.html' ? homeTabTitle() : siteTabTitle();
 }
 
 function applyPageSocial(opts) {
@@ -281,7 +354,7 @@ function renderNewsCard(post, opts) {
   const compact = opts && opts.compact;
   const list = opts && opts.list;
   const viewCount = opts && opts.viewCount != null ? opts.viewCount : 0;
-  const title = escapeHtml(d.title || '');
+  const title = escapeHtml(decodeHtmlEntities(d.title || ''));
   const catLabel = postCategoryLabel(d, opts && opts.categoryMap);
   const mediaInner = d.featuredImageUrl
     ? `<img src="${escapeHtml(d.featuredImageUrl)}" alt="" loading="lazy">`
@@ -316,7 +389,7 @@ function renderNewsCard(post, opts) {
 </article>`;
 }
 
-function renderNewsSidebar(activeSlug) {
+function renderNewsSidebar(activeSlug, searchQ) {
   const cats = (window.CMS_SITE && window.CMS_SITE.newsCategories) || [];
   const items = cats
     .map((c) => {
@@ -325,11 +398,20 @@ function renderNewsSidebar(activeSlug) {
       return `<li${active}><a href="/news?c=${encodeURIComponent(c.slug)}">${label}</a></li>`;
     })
     .join('');
+  const qVal = searchQ != null ? searchQ : getNewsSearchQuery();
   return `
-<aside class="kb-sidebar">
-  <h3 data-i18n="news.categories">เธซเธกเธงเธ”เธเนเธฒเธง</h3>
+<aside id="newsSidebar" class="kb-sidebar">
+  <form class="kb-news-search" action="/news" method="get" role="search">
+    ${activeSlug ? `<input type="hidden" name="c" value="${escapeHtml(activeSlug)}">` : ''}
+    <label class="kb-news-search-label" for="newsSearchInput">${escapeHtml(t('news.searchLabel'))}</label>
+    <div class="kb-news-search-row">
+      <input id="newsSearchInput" class="kb-news-search-input" type="search" name="q" value="${escapeHtml(qVal)}" placeholder="${escapeHtml(t('news.searchPlaceholder'))}" autocomplete="off">
+      <button type="submit" class="kb-btn kb-btn-primary kb-btn-sm">${escapeHtml(t('news.searchBtn'))}</button>
+    </div>
+  </form>
+  <h3 data-i18n="news.categories">หมวดข่าว</h3>
   <ul>
-    <li${activeSlug ? '' : ' class="active"'}><a href="/news" data-i18n="nav.newsAll">เธเนเธฒเธงเธ—เธฑเนเธเธซเธกเธ”</a></li>
+    <li${activeSlug ? '' : ' class="active"'}><a href="/news" data-i18n="nav.newsAll">ข่าวทั้งหมด</a></li>
     ${items}
   </ul>
 </aside>`;
@@ -360,6 +442,29 @@ function categoryLabel(slug) {
   return found ? CmsLayout.catLabel(found) : '';
 }
 
+async function getPostNewsCategorySlug(categoryIds) {
+  if (!categoryIds || !categoryIds.length) return '';
+  const knownSlugs = new Set(
+    ((window.CMS_SITE && window.CMS_SITE.newsCategories) || []).map((c) => c.slug)
+  );
+  const snap = await db.collection('cms_categories').get();
+  const idToSlug = {};
+  snap.docs.forEach((doc) => {
+    const slug = String((doc.data().slug || '')).trim();
+    if (slug) idToSlug[String(doc.id)] = slug;
+  });
+  for (const id of categoryIds.map(String)) {
+    const slug = idToSlug[id];
+    if (slug && knownSlugs.has(slug)) return slug;
+  }
+  return '';
+}
+
+async function getPostNewsCategoryLabel(categoryIds) {
+  const slug = await getPostNewsCategorySlug(categoryIds);
+  return slug ? categoryLabel(slug) : '';
+}
+
 function kbIcon(name, size, mod) {
   return window.KbIcon ? KbIcon.wrap(name, mod, size) : '';
 }
@@ -387,9 +492,10 @@ async function initHome() {
     if (grid) grid.innerHTML = `<p class="error">${escapeHtml(e.message)}</p>`;
   }
   const c = window.CMS_SITE || {};
+  const homeTitle = homeTabTitle();
   applyPageSocial({
-    title: c.brandTitle || 'NKBKCOOP',
-    documentTitle: siteTabTitle(),
+    title: homeTitle,
+    documentTitle: homeTitle,
     description: (c.og && c.og.description) || c.brandSubTh || '',
     image: (c.og && c.og.image) || c.heroImage || c.logos?.header,
     url: location.origin.replace(/\/$/, '') + '/'
@@ -398,9 +504,11 @@ async function initHome() {
 
 async function initNewsList() {
   const cat = getNewsCategoryFilter();
+  const searchQ = getNewsSearchQuery();
   const catTitle = cat ? categoryLabel(cat) : t('news.title');
   CmsLayout.initCmsShell({
     activeNav: 'news',
+    navNewsLabel: cat ? categoryLabel(cat) : '',
     bodyClass: 'kb-site',
     pageTitle: escapeHtml(catTitle),
     pageSubtitle: cat ? '' : t('news.subtitle')
@@ -409,21 +517,34 @@ async function initNewsList() {
 
   const sidebar = document.getElementById('newsSidebar');
   if (sidebar) {
-    sidebar.outerHTML = renderNewsSidebar(cat);
+    sidebar.outerHTML = renderNewsSidebar(cat, searchQ);
     CmsI18n.applyTranslations();
   }
 
   const list = document.getElementById('newsList');
   if (!list) return;
   list.innerHTML = CmsLayout.renderLoading();
+  let pager = document.getElementById('newsPagination');
+  if (pager) {
+    pager.innerHTML = '';
+    pager.classList.add('kb-news-pagination--empty');
+    pager.setAttribute('aria-hidden', 'true');
+  }
   try {
-    const docs = await fetchPosts(300, cat);
+    let docs = await fetchPosts(300, cat);
+    docs = filterPostsBySearch(docs, searchQ);
+    const page = getNewsPage();
+    const totalPages = Math.max(1, Math.ceil(docs.length / NEWS_PAGE_SIZE));
+    const safePage = Math.min(page, totalPages);
+    const start = (safePage - 1) * NEWS_PAGE_SIZE;
+    const pageDocs = docs.slice(start, start + NEWS_PAGE_SIZE);
     const [viewMap, categoryMap] = await Promise.all([
-      fetchPostViewCounts(docs.map((p) => p.id)),
+      fetchPostViewCounts(pageDocs.map((p) => p.id)),
       loadCategoryNameMap()
     ]);
-    list.innerHTML = docs.length
-      ? docs
+    const emptyMsg = searchQ ? t('news.searchEmpty') : t('news.empty');
+    list.innerHTML = pageDocs.length
+      ? pageDocs
           .map((p) =>
             renderNewsCard(p, {
               list: true,
@@ -432,19 +553,38 @@ async function initNewsList() {
             })
           )
           .join('')
-      : `<p class="muted">${t('news.empty')}</p>`;
+      : `<p class="muted">${escapeHtml(emptyMsg)}</p>`;
     list.classList.add('kb-news-list', 'kb-news-list--grid');
+    const paginationHtml = renderNewsPagination(safePage, totalPages, cat, searchQ);
+    if (paginationHtml) {
+      if (!pager) {
+        pager = document.createElement('nav');
+        pager.id = 'newsPagination';
+        pager.className = 'kb-news-pagination';
+        list.insertAdjacentElement('afterend', pager);
+      }
+      pager.outerHTML = paginationHtml;
+      pager = document.getElementById('newsPagination');
+      if (pager) pager.removeAttribute('aria-hidden');
+    } else if (pager) {
+      pager.innerHTML = '';
+      pager.classList.add('kb-news-pagination--empty');
+      pager.setAttribute('aria-hidden', 'true');
+    }
+    if (safePage !== page) {
+      history.replaceState(null, '', buildNewsListUrl(safePage, cat, searchQ));
+    }
   } catch (e) {
     list.innerHTML = `<p class="error">${escapeHtml(e.message)}</p>`;
+    if (pager) {
+      pager.innerHTML = '';
+      pager.classList.add('kb-news-pagination--empty');
+      pager.setAttribute('aria-hidden', 'true');
+    }
   }
 }
 
 async function initPost() {
-  CmsLayout.initCmsShell({
-    activeNav: 'news',
-    bodyClass: 'kb-site',
-    pageTitle: t('nav.news')
-  });
   await loadSiteName();
 
   const id = getPostIdFromLocation();
@@ -454,6 +594,11 @@ async function initPost() {
   const heroEl = document.getElementById('postHero');
 
   if (!id) {
+    CmsLayout.initCmsShell({
+      activeNav: 'news',
+      bodyClass: 'kb-site',
+      pageTitle: escapeHtml(t('misc.notFound'))
+    });
     bodyEl.innerHTML = `<p class="muted">${t('misc.notFound')}</p>`;
     titleEl.textContent = t('misc.notFound');
     return;
@@ -462,13 +607,28 @@ async function initPost() {
   try {
     const doc = await db.collection('cms_posts').doc(String(id)).get();
     if (!doc.exists) {
+      CmsLayout.initCmsShell({
+        activeNav: 'news',
+        bodyClass: 'kb-site',
+        pageTitle: escapeHtml(t('misc.notFound'))
+      });
       bodyEl.innerHTML = `<p class="muted">${t('misc.notFound')}</p>`;
       titleEl.textContent = t('misc.notFound');
       return;
     }
     const d = doc.data();
-    titleEl.textContent = d.title || '';
-    document.title = (d.title || '') + ' — ' + siteTabTitle();
+    const catLabel = await getPostNewsCategoryLabel(d.categoryIds);
+    const bannerTitle = catLabel || t('nav.news');
+    CmsLayout.initCmsShell({
+      activeNav: 'news',
+      navNewsLabel: catLabel || '',
+      bodyClass: 'kb-site',
+      pageTitle: escapeHtml(bannerTitle)
+    });
+
+    const titleText = decodeHtmlEntities(d.title || '');
+    titleEl.textContent = titleText;
+    document.title = titleText + ' — ' + siteTabTitle();
     const views = await trackPostView(doc.id);
     metaEl.innerHTML = `<span class="kb-article-meta-date">${formatDate(d.publishedAt)}</span>${renderViewBadge(views)}`;
     if (history.replaceState) history.replaceState(null, '', postUrl(doc.id));
@@ -484,8 +644,8 @@ async function initPost() {
       (window.CMS_SITE && CMS_SITE.og && CMS_SITE.og.description) ||
       '';
     applyPageSocial({
-      title: d.title || siteTabTitle(),
-      documentTitle: (d.title || '') + ' — ' + siteTabTitle(),
+      title: titleText || siteTabTitle(),
+      documentTitle: titleText + ' — ' + siteTabTitle(),
       description: desc,
       image:
         d.featuredImageUrl ||
@@ -495,6 +655,11 @@ async function initPost() {
       type: 'article'
     });
   } catch (e) {
+    CmsLayout.initCmsShell({
+      activeNav: 'news',
+      bodyClass: 'kb-site',
+      pageTitle: escapeHtml(t('nav.news'))
+    });
     bodyEl.innerHTML = `<p class="error">${escapeHtml(e.message)}</p>`;
   }
 }
@@ -693,7 +858,7 @@ function loadScriptOnce(src) {
 
 async function ensureLegalScripts() {
   if (window.CmsLegalPage) return;
-  await loadScriptOnce('/legal-content.js?v=3');
+  await loadScriptOnce('/legal-content.js?v=4');
   await loadScriptOnce('/legal-pages.js?v=6');
 }
 
@@ -784,7 +949,7 @@ async function initAppPage(main) {
   main.innerHTML = CmsLayout.renderLoading();
   try {
     const page = await fetchPageHtml(APP_PAGE_ID);
-    const title = appT('pageTitle') || page.title || 'NKBKConnect';
+    const title = appT('pageTitle') || page.title || 'NKBKConnext';
     const subtitle = appT('pageSubtitle') || '';
     const docTitle = stripTagsPlain(page.title) || title;
     document.title = docTitle + ' — ' + siteTabTitle();

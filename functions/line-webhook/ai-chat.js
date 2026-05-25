@@ -4,6 +4,7 @@
  */
 const https = require('https');
 const aiImageGen = require('./ai-image-gen.js');
+const { buildCoopHolidayContextLines } = require('./coop-holidays.js');
 
 const pendingImageJobs = new Set();
 
@@ -130,6 +131,9 @@ const SYSTEM_PROMPT_TEMPLATE = `คุณคือ {{name}} — {{gender_instruc
 ## วันที่และเวลา (อ้างอิง Bangkok — ใช้ตอบเมื่อถามว่าวันนี้วันอะไร/วันที่เท่าไหร่)
 {{bangkok_date}}
 
+## สมองที่ใช้ตอบ (เลือกตามประเภทผู้ใช้ที่ผูก LINE แล้ว)
+{{brain_label}}
+
 ## สิ่งที่ระบบตอบอัตโนมัติอยู่แล้ว (อย่าตอบซ้ำหรือขัดแย้ง)
 {{systemRulesSummary}}
 
@@ -173,36 +177,6 @@ function hasTriggerWord(text, words) {
 
 const THAI_DAYS = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
 const THAI_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
-
-/** วันหยุดราชการ/วันหยุดสหกรณ์ (static) ตรงกับ Admin — ปี 2026 = พ.ศ. 2569 */
-const STATIC_THAI_HOLIDAYS_2026 = [
-  { date: '2026-01-01', name: 'วันขึ้นปีใหม่' },
-  { date: '2026-01-02', name: 'วันหยุดปีใหม่' },
-  { date: '2026-02-17', name: 'วันตรุษจีน' },
-  { date: '2026-03-03', name: 'วันมาฆบูชา' },
-  { date: '2026-03-20', name: 'สิ้นสุดรอมฎอน' },
-  { date: '2026-04-06', name: 'วันจักรี' },
-  { date: '2026-04-13', name: 'เทศกาลสงกรานต์' },
-  { date: '2026-04-14', name: 'เทศกาลสงกรานต์' },
-  { date: '2026-04-15', name: 'เทศกาลสงกรานต์' },
-  { date: '2026-05-01', name: 'วันแรงงาน' },
-  { date: '2026-05-04', name: 'วันฉัตรมงคล' },
-  { date: '2026-05-11', name: 'วันพืชมงคล' },
-  { date: '2026-05-31', name: 'วันวิสาขบูชา' },
-  { date: '2026-06-01', name: 'ชดเชยวันวิสาขบูชา' },
-  { date: '2026-06-03', name: 'วันเฉลิมพระชนมพรรษาสมเด็จพระราชินี' },
-  { date: '2026-07-28', name: 'วันเฉลิมพระชนมพรรษาพระบาทสมเด็จพระเจ้าอยู่หัว' },
-  { date: '2026-07-29', name: 'วันอาสาฬหบูชา' },
-  { date: '2026-07-30', name: 'วันเข้าพรรษา' },
-  { date: '2026-08-12', name: 'วันแม่แห่งชาติ' },
-  { date: '2026-10-13', name: 'วันคล้ายวันสวรรคต ร.9' },
-  { date: '2026-10-23', name: 'วันปิยมหาราช' },
-  { date: '2026-12-05', name: 'วันคล้ายวันพระบรมราชสมภพ ร.9' },
-  { date: '2026-12-07', name: 'ชดเชยวันคล้ายวันพระบรมราชสมภพ ร.9' },
-  { date: '2026-12-10', name: 'วันรัฐธรรมนูญ' },
-  { date: '2026-12-25', name: 'วันคริสต์มาส' },
-  { date: '2026-12-31', name: 'วันสิ้นปี' }
-];
 
 function getBangkokNow() {
   const now = new Date();
@@ -335,12 +309,67 @@ async function getAttendanceContextMultiDay(firebaseGet, firebaseQuery, lineUser
   return 'เข้า-ออกงานย้อนหลัง:\n' + lines.join('\n');
 }
 
+function rulesArrayToSummary(rules) {
+  if (!Array.isArray(rules) || !rules.length) return '';
+  return rules.map((r) => (r && r.text != null ? String(r.text).trim() : '')).filter(Boolean).join('\n');
+}
+
+/**
+ * ตรวจประเภทผู้ใช้จากบัญชีที่ผูก LINE → เลือกสมอง (staff | member)
+ */
+async function resolveAiBrainAudience(firebaseGet, firebaseQuery, lineUserId) {
+  try {
+    const follower = firebaseGet ? await firebaseGet('line_followers', lineUserId).catch(() => null) : null;
+    const memberId = follower && (follower.memberId || follower.linkedUserId);
+    let userData = null;
+    if (memberId && firebaseGet) userData = await firebaseGet('users', memberId).catch(() => null);
+    if (!userData && firebaseQuery && lineUserId) {
+      userData = await firebaseQuery('users', 'lineUserId', lineUserId).catch(() => null);
+    }
+    if (!userData) {
+      return { audience: 'member', label: 'สมองสมาชิกสหกรณ์ (บริการสมาชิก — ไม่ต้องผูกบัญชี)' };
+    }
+    const group = String(userData.group || userData.userGroup || '').trim();
+    const role = String(userData.role || '').trim();
+    if (group === 'สมาชิก') {
+      return { audience: 'member', label: 'สมองสมาชิกสหกรณ์ (ผู้ใช้: สมาชิก)', user: userData };
+    }
+    if (group === 'เจ้าหน้าที่' || group === 'staff') {
+      return { audience: 'staff', label: 'สมองเจ้าหน้าที่ & กรรมการ (ผู้ใช้: เจ้าหน้าที่)', user: userData };
+    }
+    if (group === 'กรรมการ') {
+      return { audience: 'staff', label: 'สมองเจ้าหน้าที่ & กรรมการ (ผู้ใช้: กรรมการ)', user: userData };
+    }
+    if (role === 'ผู้ดูแลระบบ' || role.indexOf('ผู้ดูแล') >= 0) {
+      return { audience: 'staff', label: 'สมองเจ้าหน้าที่ & กรรมการ (ผู้ใช้: ผู้ดูแลระบบ)', user: userData };
+    }
+    return { audience: 'member', label: 'สมองสมาชิกสหกรณ์ (กลุ่ม: ' + (group || 'ไม่ระบุ') + ')', user: userData };
+  } catch (e) {
+    return { audience: 'member', label: 'สมองสมาชิกสหกรณ์ (ตรวจสอบผู้ใช้ไม่ได้ — ใช้กรอบสมาชิก)' };
+  }
+}
+
+function pickSystemRulesSummary(cfg, audience) {
+  const staffRules = Array.isArray(cfg.systemRulesStaff) && cfg.systemRulesStaff.length
+    ? cfg.systemRulesStaff
+    : (Array.isArray(cfg.systemRules) ? cfg.systemRules : []);
+  const memberRules = Array.isArray(cfg.systemRulesMember) ? cfg.systemRulesMember : [];
+  if (audience === 'staff') {
+    const summary = rulesArrayToSummary(staffRules);
+    return summary || String(cfg.systemRulesStaffSummary || cfg.systemRulesSummary || 'ไม่มีกฎพิเศษ').trim() || 'ไม่มีกฎพิเศษ';
+  }
+  const summary = rulesArrayToSummary(memberRules);
+  return summary || String(cfg.systemRulesMemberSummary || 'ไม่มีกฎสำหรับสมาชิก').trim() || 'ไม่มีกฎสำหรับสมาชิก';
+}
+
 /**
  * สร้างบล็อกข้อมูลจาก DB สำหรับใส่ใน system prompt (วันหยุด, การลา, โครงสร้าง, เจ้าหน้าที่, โปรแกรม, ระบบ, เข้า-ออกงานย้อนหลัง)
  * @param {object} deps - { firebaseGet, firebaseGetCollection, firebaseQuery }
  * @param {string} lineUserId - LINE user ID ของผู้ส่ง (ใช้ดึง user จาก users และเข้า-ออกงาน)
+ * @param {string} audience - 'staff' | 'member'
  */
-async function buildDataContext(deps, lineUserId) {
+async function buildDataContext(deps, lineUserId, audience) {
+  const isMemberBrain = audience === 'member';
   const { firebaseGet, firebaseGetCollection, firebaseQuery } = deps;
   if (!firebaseGet || !firebaseGetCollection) return '';
   const sections = [];
@@ -351,6 +380,13 @@ async function buildDataContext(deps, lineUserId) {
   if (firebaseQuery && lineUserId) {
     try {
       user = await firebaseQuery('users', 'lineUserId', lineUserId);
+    } catch (e) {}
+  }
+  if (!user && firebaseGet && lineUserId) {
+    try {
+      const follower = await firebaseGet('line_followers', lineUserId);
+      const memberId = follower && (follower.memberId || follower.linkedUserId);
+      if (memberId) user = await firebaseGet('users', memberId);
     } catch (e) {}
   }
 
@@ -378,37 +414,41 @@ async function buildDataContext(deps, lineUserId) {
   const leaves = Array.isArray(leavesList) ? leavesList : [];
 
   // ---- วันหยุด (รวม static + Firestore, ตั้งค่า "สหกรณ์ไม่หยุด" จาก Firestore hidden) ----
-  const datesCoopOpen = new Set(
-    (holidays || []).filter((h) => h.hidden === true && h.date).map((h) => String(h.date).trim())
-  );
-  const currentGregorianYear = b.getFullYear();
-  const currentBEYear = currentGregorianYear + 543;
-  const staticForYear = currentGregorianYear === 2026 ? STATIC_THAI_HOLIDAYS_2026 : [];
-  const fromFirestore = (holidays || []).filter((h) => h.date && h.hidden !== true).map((h) => ({ date: String(h.date).trim(), name: (h.nameTH || h.name || '').trim() || '-', dateObj: new Date(h.date) }));
-  const fromStatic = staticForYear.map((h) => ({ date: String(h.date).trim(), name: (h.name || '').trim(), dateObj: new Date(h.date) }));
-  const byDate = new Map();
-  fromStatic.forEach((h) => { if (h.dateObj >= b && !byDate.has(h.date)) byDate.set(h.date, { ...h, source: 'static' }); });
-  fromFirestore.forEach((h) => { if (h.dateObj >= b) byDate.set(h.date, { ...h, source: 'firestore' }); });
-  const sortedHolidays = Array.from(byDate.values()).sort((a, b) => a.dateObj - b.dateObj).slice(0, 25);
-  const formatDateBE = (d) => {
-    const day = d.getDate();
-    const month = THAI_MONTHS[d.getMonth()];
-    const yearBE = d.getFullYear() + 543;
-    return `${day} ${month} ${yearBE}`;
-  };
-  const holidayLines = sortedHolidays.length > 0
-    ? `อ้างอิงปี พ.ศ. ${currentBEYear} (ปีปัจจุบัน)\n` + sortedHolidays.map((h) => {
-        const name = h.name || '-';
-        const dateStr = formatDateBE(h.dateObj);
-        const isCoopOpen = datesCoopOpen.has(String(h.date).trim());
-        return isCoopOpen ? `${name}: ${dateStr} (สหกรณ์ไม่หยุด — เปิดทำการ)` : `${name}: ${dateStr}`;
-      }).join('\n') + (datesCoopOpen.size > 0 ? '\nหมายเหตุ: (สหกรณ์ไม่หยุด) = วันที่สหกรณ์เปิดทำการตามที่แอดมินตั้งค่า' : '')
-    : `อ้างอิงปี พ.ศ. ${currentBEYear}\nไม่มีรายการวันหยุดล่าสุด`;
-  sections.push('[วันหยุด/วันหยุดสหกรณ์]\n' + holidayLines);
+  const holidayLines = buildCoopHolidayContextLines(holidays, {
+    now: b,
+    futureOnly: !isMemberBrain,
+    maxItems: isMemberBrain ? null : 25
+  });
+  sections.push('[วันหยุด/วันหยุดสหกรณ์]\n' + holidayLines.join('\n'));
 
   // ---- เวลาทำการ (จาก config/org) ----
   const workStart = (orgCfg && orgCfg.attendanceWorkStart) ? String(orgCfg.attendanceWorkStart).trim() : '';
-  if (workStart) sections.push('[เวลาทำการเข้างาน] เริ่ม ' + workStart + ' น. (อ้างอิงจากระบบเข้า-ออกงาน)');
+  if (workStart) {
+    sections.push(isMemberBrain
+      ? '[เวลาทำการสหกรณ์] เปิด ' + workStart + ' น. (อ้างอิงจากระบบ)'
+      : '[เวลาทำการเข้างาน] เริ่ม ' + workStart + ' น. (อ้างอิงจากระบบเข้า-ออกงาน)');
+  }
+
+  if (isMemberBrain) {
+    if (orgCfg) {
+      const contactLines = [];
+      if (orgCfg.phone || orgCfg.contactPhone) contactLines.push('โทร: ' + String(orgCfg.phone || orgCfg.contactPhone).trim());
+      if (orgCfg.email || orgCfg.contactEmail) contactLines.push('อีเมล: ' + String(orgCfg.email || orgCfg.contactEmail).trim());
+      if (orgCfg.address) contactLines.push('ที่อยู่: ' + String(orgCfg.address).trim());
+      if (contactLines.length) sections.push('[ติดต่อสหกรณ์]\n' + contactLines.join('\n'));
+    }
+    if (user) {
+      const nm = (user.fullname || user.nameTH || user.displayName || user.name || '').trim();
+      const mno = (user.username || user.memberId || '').trim();
+      if (nm || mno) {
+        sections.push('[สมาชิกที่ผูก LINE]\n' + [nm && 'ชื่อ: ' + nm, mno && 'เลขสมาชิก: ' + mno].filter(Boolean).join('\n'));
+      }
+    }
+    const userCallName = (user && user.aiChatCallName != null && String(user.aiChatCallName).trim() !== '')
+      ? String(user.aiChatCallName).trim()
+      : null;
+    return { dataContextStr: sections.join('\n\n'), userCallName };
+  }
 
   // ---- ประเภทการลา + โควต้า ----
   if (leaveTypes.length > 0) {
@@ -575,7 +615,7 @@ async function buildDataContext(deps, lineUserId) {
   return { dataContextStr: sections.join('\n\n'), userCallName };
 }
 
-function buildSystemPrompt(cfg, memoryLines, todayContext, bangkokDateStr, dataContextStr, userCallNameOverride) {
+function buildSystemPrompt(cfg, memoryLines, todayContext, bangkokDateStr, dataContextStr, userCallNameOverride, audience, brainLabel) {
   const name = (cfg.name || 'โมเน่').trim();
   const gender = (cfg.gender || 'female').toString().toLowerCase();
   const userCallName = (userCallNameOverride != null && String(userCallNameOverride).trim() !== '')
@@ -587,9 +627,9 @@ function buildSystemPrompt(cfg, memoryLines, todayContext, bangkokDateStr, dataC
   const particleRule = gender === 'male'
     ? 'ใช้ "ครับ" ทุกครั้ง'
     : 'ใช้ "คะ/ค่ะ" ทุกครั้ง';
-  const systemRulesSummary = (Array.isArray(cfg.systemRules) && cfg.systemRules.length > 0)
-    ? cfg.systemRules.map((r) => (r && r.text != null ? String(r.text).trim() : '')).filter(Boolean).join('\n') || 'ไม่มีกฎพิเศษ'
-    : ((cfg.systemRulesSummary || 'ไม่มีกฎพิเศษ').trim() || 'ไม่มีกฎพิเศษ');
+  const aud = audience === 'staff' ? 'staff' : 'member';
+  const systemRulesSummary = pickSystemRulesSummary(cfg, aud);
+  const brain_label = (brainLabel && String(brainLabel).trim()) || (aud === 'staff' ? 'สมองเจ้าหน้าที่ & กรรมการ' : 'สมองสมาชิกสหกรณ์');
   const today_context = (todayContext && todayContext.trim())
     ? todayContext.trim()
     : '(ไม่มีข้อมูลเข้างานวันนี้จากระบบ — ถ้าผู้ใช้ถาม ให้บอกตามนี้และเสนอให้เช็คตารางหรือติดต่อเจ้าหน้าที่)';
@@ -604,6 +644,7 @@ function buildSystemPrompt(cfg, memoryLines, todayContext, bangkokDateStr, dataC
     .replace(/\{\{gender_instruction\}\}/g, genderInstruction)
     .replace(/\{\{userCallName\}\}/g, userCallName)
     .replace(/\{\{particle_rule\}\}/g, particleRule)
+    .replace(/\{\{brain_label\}\}/g, brain_label)
     .replace(/\{\{systemRulesSummary\}\}/g, systemRulesSummary)
     .replace(/\{\{bangkok_date\}\}/g, bangkok_date)
     .replace(/\{\{today_context\}\}/g, today_context)
@@ -821,17 +862,23 @@ async function tryAiChat(deps, replyToken, text, userId, source, userProfile) {
     }
 
     // โหลด context พร้อมกันเพื่อให้เร็ว ลดโอกาส reply token หมดอายุ
+    const brainInfo = await resolveAiBrainAudience(firebaseGet, firebaseQuery, userId).catch(() => ({
+      audience: 'member',
+      label: 'สมองสมาชิกสหกรณ์'
+    }));
     const [memoryLines, todayContext, dataContextResult] = await Promise.all([
       getAiMemory(firebaseGetCollection, userId, groupId, cfg.memoryMaxPerScope).catch(() => []),
-      firebaseQuery ? getTodayAttendanceContext(firebaseGet, firebaseQuery, userId).catch(() => '') : Promise.resolve(''),
-      buildDataContext({ firebaseGet, firebaseGetCollection, firebaseQuery }, userId).catch(() => ({ dataContextStr: '', userCallName: null }))
+      brainInfo.audience === 'staff' && firebaseQuery
+        ? getTodayAttendanceContext(firebaseGet, firebaseQuery, userId).catch(() => '')
+        : Promise.resolve(''),
+      buildDataContext({ firebaseGet, firebaseGetCollection, firebaseQuery }, userId, brainInfo.audience).catch(() => ({ dataContextStr: '', userCallName: null }))
     ]);
     const dataContextStr = dataContextResult && typeof dataContextResult === 'object' && dataContextResult.dataContextStr != null
       ? dataContextResult.dataContextStr
       : (typeof dataContextResult === 'string' ? dataContextResult : '');
     const userCallNameOverride = dataContextResult && typeof dataContextResult === 'object' ? dataContextResult.userCallName : null;
     const bangkokDateStr = formatBangkokDateThai();
-    const systemContent = buildSystemPrompt(cfg, memoryLines, todayContext, bangkokDateStr, dataContextStr, userCallNameOverride);
+    const systemContent = buildSystemPrompt(cfg, memoryLines, todayContext, bangkokDateStr, dataContextStr, userCallNameOverride, brainInfo.audience, brainInfo.label);
 
     let replyText;
     try {
@@ -888,11 +935,11 @@ async function tryAiChat(deps, replyToken, text, userId, source, userProfile) {
         await firebaseSet('ai_chat_state', groupId, { groupId, lastMessageAt: new Date().toISOString() });
       } catch (e) {}
     }
-    console.log('✅ AI chat replied to', groupId ? 'group ' + groupId.substring(0, 8) + '...' : 'user ' + userId.substring(0, 8) + '...');
+    console.log('✅ AI chat replied to', groupId ? 'group ' + groupId.substring(0, 8) + '...' : 'user ' + userId.substring(0, 8) + '...', 'brain=' + brainInfo.audience);
   } catch (e) {
     console.warn('AI chat error:', e.message);
     await sendFallback();
   }
 }
 
-module.exports = { tryAiChat, buildSystemPrompt, getAiMemory, getTodayAttendanceContext, callOpenAI, hasTriggerWord, drainPendingImageJobs };
+module.exports = { tryAiChat, buildSystemPrompt, getAiMemory, getTodayAttendanceContext, callOpenAI, hasTriggerWord, drainPendingImageJobs, resolveAiBrainAudience, pickSystemRulesSummary };

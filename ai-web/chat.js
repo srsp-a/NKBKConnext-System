@@ -23,7 +23,7 @@
   let initialThreadParam = String(params.get('thread') || '').trim();
   let token = '';
   try {
-    token = sessionStorage.getItem('nkbk_ai_token') || '';
+    token = (window.NkbkAiAuthStore && window.NkbkAiAuthStore.getToken()) || '' || '';
   } catch (_) {}
   if (params.get('t')) {
     const keep = initialThreadParam ? '?thread=' + encodeURIComponent(initialThreadParam) : '';
@@ -92,20 +92,263 @@
   let lightboxDataUrl = '';
   let viewerImages = [];
   let viewerIndex = 0;
+  let viewerRenderGen = 0;
+  let viewerEditRefIndex = -1;
   let viewerSidebarWasCollapsed = null;
   let currentChatHistory = [];
   let threadEngaged = false;
   const blobUrlCache = new Map();
 
   let sending = false;
+  /** แชตที่กำลังรอ AI ตอบ (อนุญาตสลับแชตได้ — งานยังทำงานบนเซิร์ฟเวอร์ต่อ) */
+  const inflightByThread = new Map();
+  /** ข้อความที่ส่งจาก UI แต่เซิร์ฟเวอร์ยังไม่บันทึก (รอ generate เสร็จก่อน) */
+  const pendingOutboundByThread = new Map();
+  let composerMenuPortalEl = null;
+  const threadsNeedRefresh = new Set();
   let statusOk = false;
   let userCallName = '';
+  let welcomeGreetingSeq = 0;
+  const WELCOME_LOAD_TIMEOUT_MS = 10000;
   let userPictureUrl = '';
   let activeThreadId = '';
   let threads = [];
   let landingMode = true;
   let bootStartedAt = 0;
   const BOOT_MIN_MS = 560;
+
+  function isThreadSending(threadId) {
+    return !!(threadId && inflightByThread.has(threadId));
+  }
+
+  function isActiveThreadSending() {
+    return isThreadSending(activeThreadId);
+  }
+
+  function markInflightSend(threadId, meta) {
+    if (!threadId) return;
+    inflightByThread.set(threadId, {
+      kind: 'chat',
+      expectImage: false,
+      beforeTs: 0,
+      text: '',
+      ...(meta || {})
+    });
+    sending = inflightByThread.size > 0;
+  }
+
+  function clearInflightSend(threadId) {
+    if (threadId) inflightByThread.delete(threadId);
+    sending = inflightByThread.size > 0;
+  }
+
+  function clearPendingOutbound(threadId) {
+    if (threadId) pendingOutboundByThread.delete(threadId);
+  }
+
+  function mergePendingHistory(threadId, baseHistory) {
+    const pending = pendingOutboundByThread.get(threadId);
+    const base = Array.isArray(baseHistory) ? baseHistory.slice() : [];
+    if (!pending || !pending.messages || !pending.messages.length) return base;
+    const out = base.slice();
+    pending.messages.forEach((pm) => {
+      const exists = out.some(
+        (m) =>
+          m &&
+          m.role === 'user' &&
+          String(m.content || '') === String(pm.content || '') &&
+          Math.abs((Number(m.ts) || 0) - (Number(pm.ts) || 0)) < 120000
+      );
+      if (!exists) out.push({ ...pm });
+    });
+    return out;
+  }
+
+  function reconcilePendingOutbound(threadId, serverHistory) {
+    const pending = pendingOutboundByThread.get(threadId);
+    const server = Array.isArray(serverHistory) ? serverHistory.slice() : [];
+    if (!pending || !pending.messages || !pending.messages.length) return server;
+    const pendingMsg = pending.messages[pending.messages.length - 1];
+    const matched = server.some(
+      (m) =>
+        m &&
+        m.role === 'user' &&
+        String(m.content || '') === String(pendingMsg.content || '') &&
+        Math.abs((Number(m.ts) || 0) - (Number(pendingMsg.ts) || 0)) < 300000
+    );
+    if (matched) {
+      clearPendingOutbound(threadId);
+      return server;
+    }
+    return mergePendingHistory(threadId, server);
+  }
+
+  function trackPendingUserSend(threadId, displayText, images, documents, opts) {
+    if (!threadId) return;
+    const options = opts && typeof opts === 'object' ? opts : {};
+    const entry = {
+      role: 'user',
+      content: displayText,
+      ts: Date.now(),
+      _optimistic: true
+    };
+    const imageList = Array.isArray(images) ? images : [];
+    const docList = Array.isArray(documents) ? documents : [];
+    if (options.editRef && options.editRef.previewUrl) {
+      entry.isImageEdit = true;
+      entry.editRef = {
+        mime: options.editRef.mime || 'image/png',
+        dataUrl: options.editRef.previewUrl
+      };
+      const extras = Array.isArray(options.editExtras) ? options.editExtras : [];
+      if (extras.length) {
+        entry.editExtras = extras.map((x) => ({
+          mime: x.mime || 'image/png',
+          dataUrl: x.previewUrl
+        }));
+      }
+    } else if (imageList.length) {
+      entry.images = imageList.map((i) => ({
+        mime: i.mime || 'image/png',
+        dataUrl: i.dataUrl
+      }));
+    }
+    if (docList.length) {
+      entry.files = docList.map((f) => ({
+        name: f.name || 'file',
+        mime: f.mime || 'application/octet-stream'
+      }));
+    }
+    pendingOutboundByThread.set(threadId, { messages: [entry] });
+    const merged = mergePendingHistory(threadId, currentChatHistory);
+    currentChatHistory = merged;
+    rememberThreadHistory(threadId, merged);
+  }
+
+  function shouldShowInflightTyping(inflight) {
+    if (!inflight) return false;
+    const lastAsst = getLastAssistantMeta(currentChatHistory);
+    if (inflight.beforeTs && lastAsst.ts > inflight.beforeTs) return false;
+    return true;
+  }
+
+  function mapClientImagesForHistory(images) {
+    return (images || [])
+      .filter(Boolean)
+      .map((img) => ({
+        mime: img.mime || 'image/png',
+        b64: img.b64,
+        url: img.url || img.publicUrl,
+        publicUrl: img.publicUrl || img.url,
+        imageId: img.imageId,
+        dataUrl: img.dataUrl
+      }));
+  }
+
+  function stashBackgroundThreadResult(threadId, data, beforeLastAsstTs) {
+    if (!threadId || !data || !data.ok) return;
+    let hist = mergePendingHistory(threadId, threadHistoryCache.get(threadId) || []);
+    const lastAsst = getLastAssistantMeta(hist);
+    if (beforeLastAsstTs && lastAsst.ts > beforeLastAsstTs) {
+      clearPendingOutbound(threadId);
+      rememberThreadHistory(threadId, hist);
+      return;
+    }
+    const replyImages = mapClientImagesForHistory(data.images);
+    const imageOnly = !!data.generated && replyImages.length > 0;
+    hist = hist.concat([
+      {
+        role: 'assistant',
+        content: imageOnly ? '' : data.reply || '—',
+        ts: Date.now(),
+        ...(replyImages.length ? { images: replyImages } : {})
+      }
+    ]);
+    rememberThreadHistory(threadId, hist);
+    clearPendingOutbound(threadId);
+  }
+
+  function syncTypingForActiveThread() {
+    removeTyping();
+    const inflight = activeThreadId ? inflightByThread.get(activeThreadId) : null;
+    if (!shouldShowInflightTyping(inflight)) {
+      if (inflight && activeThreadId) clearInflightSend(activeThreadId);
+      return;
+    }
+    if (inflight) appendTyping(inflight.kind || 'chat');
+  }
+
+  async function applyAssistantResultToUi(result, text, opts) {
+    const replyImages = (result.images || []).map((img) => ({
+      mime: img.mime || 'image/png',
+      b64: img.b64,
+      url: img.url,
+      publicUrl: img.publicUrl,
+      imageId: img.imageId,
+      dataUrl: img.dataUrl
+    }));
+    const imageOnly = !!result.generated && replyImages.length > 0;
+    appendMessage('assistant', imageOnly ? '' : result.reply || '—', replyImages, { imageOnly });
+    notifyPromptCompletion(text, { generated: !!result.generated, images: replyImages });
+    maybePlayResponseNotification(opts || {});
+  }
+
+  async function refreshActiveThreadFromServer() {
+    try {
+      const mem = await apiGet('/api/nkbk-ai-memory');
+      if (!mem.ok) return;
+      threads = mem.threads || threads;
+      renderThreadList();
+      if (Array.isArray(mem.chatHistory)) {
+        const reconciled = reconcilePendingOutbound(
+          activeThreadId,
+          mergePendingHistory(activeThreadId, mem.chatHistory)
+        );
+        currentChatHistory = reconciled;
+        rememberThreadHistory(activeThreadId, currentChatHistory);
+        if (activeThreadId === (mem.activeThreadId || activeThreadId)) {
+          renderMessagesFromHistory(currentChatHistory);
+          syncTypingForActiveThread();
+        }
+      }
+    } catch (_) {}
+  }
+
+  async function continueBackgroundRecovery(threadId, beforeLastAsstTs, expectImage, text, startedAt) {
+    const recovered = await tryRecoverAssistantReply(beforeLastAsstTs, expectImage, {
+      maxWaitMs: expectImage ? 240000 : 60000,
+      silent: true
+    });
+    clearInflightSend(threadId);
+    threadsNeedRefresh.add(threadId);
+    if (!recovered) return;
+    if (threadId === activeThreadId) {
+      removeTyping();
+      const lastAsst = getLastAssistantMeta(currentChatHistory);
+      if (!beforeLastAsstTs || lastAsst.ts <= beforeLastAsstTs) {
+        await applyAssistantResultToUi(recovered, text, {
+          expectImageReply: expectImage,
+          isGenerate: expectImage,
+          startedAt
+        });
+      }
+      await refreshActiveThreadFromServer();
+      clearPendingOutbound(threadId);
+      syncAppUrl();
+    } else {
+      stashBackgroundThreadResult(
+        threadId,
+        {
+          ok: true,
+          reply: recovered.reply,
+          images: recovered.images,
+          generated: recovered.generated
+        },
+        beforeLastAsstTs
+      );
+    }
+    refreshSendState();
+  }
 
   function setBootStatus(text) {
     if (bootStatusEl) bootStatusEl.textContent = text;
@@ -236,6 +479,16 @@
     const outImages = [];
     let totalBytes = 0;
     for (const img of images) {
+      if (img.librarySource && img.imageId) {
+        outImages.push({
+          mime: img.mime || 'image/png',
+          name: img.name,
+          imageId: img.imageId,
+          libraryId: img.libraryId || '',
+          _source: 'library'
+        });
+        continue;
+      }
       let dataUrl = await compressImageDataUrl(img.dataUrl, maxImageBytes());
       const bytes = dataUrlByteSize(dataUrl);
       if (bytes > maxImageBytes()) {
@@ -369,7 +622,7 @@
   }
 
   function headers() {
-    token = sessionStorage.getItem('nkbk_ai_token') || token;
+    token = (window.NkbkAiAuthStore && window.NkbkAiAuthStore.getToken()) || '' || token;
     return {
       'Content-Type': 'application/json',
       'X-Monitor-Token': token
@@ -433,7 +686,7 @@
         const xhr = new XMLHttpRequest();
         xhr.open('GET', url, true);
         xhr.responseType = 'blob';
-        const t = sessionStorage.getItem('nkbk_ai_token') || token || '';
+        const t = (window.NkbkAiAuthStore && window.NkbkAiAuthStore.getToken()) || '' || token || '';
         if (
           t &&
           (url.startsWith('/') || url.includes('/api/nkbk-ai-image/') || url.includes(location.host))
@@ -639,13 +892,44 @@
     return out;
   }
 
+  function findViewerImageIndex(dataUrl, imgMeta) {
+    if (!viewerImages.length) return -1;
+    if (imgMeta && typeof imgMeta === 'object') {
+      const key = imageDedupeKey(imgMeta);
+      if (key) {
+        const byKey = viewerImages.findIndex((x) => x.img && imageDedupeKey(x.img) === key);
+        if (byKey >= 0) return byKey;
+      }
+      const imageId = String(imgMeta.imageId || '').trim();
+      if (imageId) {
+        const byId = viewerImages.findIndex((x) => x.img && String(x.img.imageId || '') === imageId);
+        if (byId >= 0) return byId;
+      }
+    }
+    const src = String(dataUrl || '').trim();
+    if (src) {
+      const bySrc = viewerImages.findIndex((x) => x.src === src);
+      if (bySrc >= 0) return bySrc;
+      if (imgMeta) {
+        const alt = imageSrc(imgMeta);
+        if (alt) {
+          const byAlt = viewerImages.findIndex((x) => x.src === alt);
+          if (byAlt >= 0) return byAlt;
+        }
+      }
+    }
+    return -1;
+  }
+
   async function renderImageViewer() {
     if (!viewer || !viewerImg) return;
     const item = viewerImages[viewerIndex];
     if (!item) return;
+    const gen = ++viewerRenderGen;
     const simple = viewer.classList.contains('is-simple-view');
     lightboxDataUrl = item.src;
     const mainDisplay = await resolveImageDisplayUrl(item.src);
+    if (gen !== viewerRenderGen) return;
     viewerImg.onerror = null;
     viewerImg.src = mainDisplay || item.src;
     if (viewerTitle) {
@@ -684,6 +968,13 @@
       viewerInput.style.height = 'auto';
     }
     if (viewerSendBtn) viewerSendBtn.disabled = true;
+    if (isViewerEditMode()) {
+      void ensureViewerEditRef().then((ok) => {
+        if (!ok || gen !== viewerRenderGen) return;
+        syncAttachPreviews();
+        refreshViewerSendState();
+      });
+    }
   }
 
   function navigateViewer(delta) {
@@ -691,7 +982,7 @@
     const next = viewerIndex + delta;
     if (next < 0 || next >= viewerImages.length) return false;
     viewerIndex = next;
-    renderImageViewer();
+    void renderImageViewer();
     return true;
   }
 
@@ -706,10 +997,12 @@
   function openImageViewer(dataUrl, opts) {
     if (!viewer) return;
     const options = opts && typeof opts === 'object' ? opts : {};
-    const editMode = !!(options.editMode || editImageMode);
-    const simple = !editMode && options.simple === true;
+    const single = options.single === true;
+    const simple = single || options.simple === true;
+    const editMode = !!(options.editMode || editImageMode || (!simple && !single));
     if (!editMode) cancelPendingImageEdit();
-    if (options.single === true || simple) {
+    viewerEditRefIndex = -1;
+    if (single || simple) {
       viewerImages = [
         {
           src: dataUrl,
@@ -732,9 +1025,10 @@
         ];
       }
       viewerIndex = 0;
-      if (typeof options.index === 'number') viewerIndex = options.index;
-      else if (dataUrl) {
-        const found = viewerImages.findIndex((x) => x.src === dataUrl);
+      if (typeof options.index === 'number' && options.index >= 0 && options.index < viewerImages.length) {
+        viewerIndex = options.index;
+      } else {
+        const found = findViewerImageIndex(dataUrl, options.imgMeta);
         if (found >= 0) viewerIndex = found;
       }
     }
@@ -765,6 +1059,7 @@
   function closeImageViewer(opts) {
     if (!viewer) return;
     const keepEdit = opts && opts.keepEdit;
+    viewerEditRefIndex = -1;
     document.body.classList.remove('is-viewer-open');
     if (viewerSidebarWasCollapsed !== null) {
       document.body.classList.toggle('sidebar-collapsed', viewerSidebarWasCollapsed);
@@ -895,11 +1190,12 @@
     updateThreadChrome();
     updateThreadListActiveState();
     syncThreadUrl();
+    void refreshWelcomeGreeting();
   }
 
   function getProfileUsername() {
     try {
-      const profile = JSON.parse(sessionStorage.getItem('nkbk_ai_profile') || '{}');
+      const profile = (window.NkbkAiAuthStore && window.NkbkAiAuthStore.getProfile()) || {};
       return String(profile.username || '').trim();
     } catch (_) {
       return '';
@@ -910,7 +1206,7 @@
     const u = getProfileUsername();
     if (!u || !imageId) return '';
     const base = `/api/nkbk-ai-image/${encodeURIComponent(u)}/${encodeURIComponent(imageId)}`;
-    const t = sessionStorage.getItem('nkbk_ai_token') || token || '';
+    const t = (window.NkbkAiAuthStore && window.NkbkAiAuthStore.getToken()) || '' || token || '';
     return t ? base + '?token=' + encodeURIComponent(t) : base;
   }
 
@@ -921,7 +1217,7 @@
     if (img.b64) return dataUrlFromB64(img.b64, img.mime);
     if (img.url) {
       if (/^https:\/\/firebasestorage\.googleapis\.com\//i.test(img.url)) return img.url;
-      const t = sessionStorage.getItem('nkbk_ai_token') || token || '';
+      const t = (window.NkbkAiAuthStore && window.NkbkAiAuthStore.getToken()) || '' || token || '';
       const sep = img.url.includes('?') ? '&' : '?';
       return t && !img.url.includes('token=') ? img.url + sep + 'token=' + encodeURIComponent(t) : img.url;
     }
@@ -992,15 +1288,10 @@
     if (types.includes('files') || types.includes('application/x-moz-file')) return true;
     if (types.some((t) => t === 'text/uri-list' || t === 'text/html' || t === 'url')) return true;
     try {
-      return Array.from(dt.items || []).some(
-        (item) =>
-          (item.kind === 'file' &&
-            (item.type.startsWith('image/') ||
-              item.type === '' ||
-              isImageFilename(item.type) ||
-              isAcceptedFilename(item.type))) ||
-          (item.kind === 'string' && /uri-list|html|url/i.test(item.type))
-      );
+      return Array.from(dt.items || []).some((item) => {
+        if (item.kind === 'file') return true;
+        return item.kind === 'string' && /uri-list|html|url/i.test(item.type);
+      });
     } catch (_) {
       return false;
     }
@@ -1020,7 +1311,7 @@
       } catch (_) {}
       return null;
     }
-    const t = sessionStorage.getItem('nkbk_ai_token') || token || '';
+    const t = (window.NkbkAiAuthStore && window.NkbkAiAuthStore.getToken()) || '' || token || '';
     const opts = { cache: 'no-store', credentials: 'same-origin' };
     const isApi =
       src.startsWith('/') ||
@@ -1147,6 +1438,7 @@
     pendingAttachments = pendingAttachments.filter((a) => !a.isEditRef);
     pendingEditRef = null;
     editImageMode = false;
+    viewerEditRefIndex = -1;
     setGenerateMode(false);
     renderAttachPreview();
     viewer?.classList.remove('is-edit-mode');
@@ -1214,23 +1506,57 @@
     });
   }
 
+  function collectBubbleViewParts(bubble) {
+    if (!bubble) return [];
+    return Array.from(bubble.children).filter(
+      (n) =>
+        n.classList.contains('nkbk-ai-text-wrap') ||
+        n.classList.contains('nkbk-ai-gallery') ||
+        n.classList.contains('nkbk-ai-text')
+    );
+  }
+
+  function repairExpandableTextWraps(root) {
+    const scope = root && root.querySelectorAll ? root : document;
+    scope.querySelectorAll('.nkbk-ai-text-wrap').forEach((wrap) => {
+      const btn = wrap.querySelector(':scope > .nkbk-ai-expand-btn');
+      let txt = wrap.querySelector(':scope > .nkbk-ai-text');
+      if (!btn) return;
+      if (!txt) {
+        const sibling = wrap.nextElementSibling;
+        if (sibling && sibling.classList.contains('nkbk-ai-text')) {
+          txt = sibling;
+          wrap.insertBefore(txt, btn);
+        }
+      } else if (wrap.firstElementChild === btn) {
+        wrap.insertBefore(txt, btn);
+      }
+    });
+  }
+
+  function restoreInlineEditView(bubble, saved) {
+    if (!bubble || !saved || !saved.view) return;
+    const anchor = saved.view;
+    while (anchor.firstChild) {
+      bubble.insertBefore(anchor.firstChild, anchor);
+    }
+    anchor.remove();
+    repairExpandableTextWraps(bubble);
+  }
+
   function cancelInlineEdit() {
     if (!inlineEditRow) return;
     const saved = inlineEditRow._editSaved;
     if (saved) {
-      if (saved.view && saved.view.parentElement) {
-        const bubble = saved.view.parentElement;
-        while (saved.view.firstChild) bubble.insertBefore(saved.view.firstChild, saved.view);
-        saved.view.remove();
-      }
-      if (saved.actions) saved.actions.classList.remove('hidden');
       const bubble = inlineEditRow.querySelector('.nkbk-ai-bubble');
-      const msgBody = inlineEditRow.querySelector('.nkbk-ai-msg-body');
       if (bubble) {
+        restoreInlineEditView(bubble, saved);
         bubble.style.width = '';
         bubble.style.minWidth = '';
         bubble.style.maxWidth = '';
       }
+      if (saved.actions) saved.actions.classList.remove('hidden');
+      const msgBody = inlineEditRow.querySelector('.nkbk-ai-msg-body');
       if (msgBody) {
         msgBody.style.width = '';
         msgBody.style.minWidth = '';
@@ -1244,7 +1570,7 @@
   }
 
   function startInlineEdit(row, text) {
-    if (!row || sending) return;
+    if (!row || isActiveThreadSending()) return;
     cancelInlineEdit();
     const bubble = row.querySelector('.nkbk-ai-bubble');
     const msgBody = row.querySelector('.nkbk-ai-msg-body');
@@ -1253,8 +1579,7 @@
 
     const lockWidth = Math.max(bubble.offsetWidth, msgBody ? msgBody.offsetWidth : 0, 240);
 
-    const viewParts = [];
-    bubble.querySelectorAll('.nkbk-ai-text-wrap, .nkbk-ai-gallery, .nkbk-ai-text').forEach((n) => viewParts.push(n));
+    const viewParts = collectBubbleViewParts(bubble);
     const viewWrap = document.createElement('div');
     viewWrap.className = 'nkbk-ai-msg-view';
     viewParts.forEach((n) => viewWrap.appendChild(n));
@@ -1367,7 +1692,8 @@
           showBanner('โหลดรูปไม่สำเร็จ — ไม่สามารถแก้ไขได้', 'warn');
           return;
         }
-        attachImageForEdit(dataUrl, img.mime || 'image/png', img, imageEl);
+        const src = imageEl.dataset.srcOriginal || imageEl.currentSrc || dataUrl;
+        openImageViewer(src, { imgMeta: img, simple: false, editMode: true });
       });
 
       const dlBtn = document.createElement('button');
@@ -1393,6 +1719,61 @@
     return wrap;
   }
 
+  function fallbackWelcomeText() {
+    return userCallName ? `${userCallName} วันนี้คุณคิดอะไรอยู่` : 'วันนี้คุณคิดอะไรอยู่';
+  }
+
+  function setWelcomeLoading() {
+    if (!welcomeTitleEl) return;
+    welcomeTitleEl.classList.add('is-loading');
+    welcomeTitleEl.setAttribute('aria-busy', 'true');
+    welcomeTitleEl.replaceChildren();
+    const dots = document.createElement('span');
+    dots.className = 'nkbk-ai-welcome-loading-dots';
+    dots.setAttribute('aria-label', 'กำลังโหลด');
+    for (let i = 0; i < 3; i++) {
+      const dot = document.createElement('span');
+      dot.className = 'dot';
+      dots.appendChild(dot);
+    }
+    welcomeTitleEl.appendChild(dots);
+  }
+
+  function setWelcomeTitle(text) {
+    if (!welcomeTitleEl) return;
+    welcomeTitleEl.classList.remove('is-loading');
+    welcomeTitleEl.removeAttribute('aria-busy');
+    welcomeTitleEl.replaceChildren();
+    welcomeTitleEl.textContent = text || fallbackWelcomeText();
+  }
+
+  async function refreshWelcomeGreeting() {
+    if (!landingMode || !welcomeTitleEl) return;
+    const seq = ++welcomeGreetingSeq;
+    setWelcomeLoading();
+    if (!token || !statusOk) {
+      setWelcomeTitle(fallbackWelcomeText());
+      return;
+    }
+    try {
+      const data = await Promise.race([
+        apiGet('/api/nkbk-ai-welcome'),
+        new Promise((_, reject) => {
+          window.setTimeout(() => reject(new Error('welcome_timeout')), WELCOME_LOAD_TIMEOUT_MS);
+        })
+      ]);
+      if (seq !== welcomeGreetingSeq || !landingMode) return;
+      if (data && data.ok && data.greeting) {
+        setWelcomeTitle(data.greeting);
+      } else {
+        setWelcomeTitle(fallbackWelcomeText());
+      }
+    } catch (_) {
+      if (seq !== welcomeGreetingSeq || !landingMode) return;
+      setWelcomeTitle(fallbackWelcomeText());
+    }
+  }
+
   function updateCallNameDisplay(name) {
     userCallName = name && String(name).trim() ? String(name).trim() : '';
     ['sidebarProfileSub', 'sidebarProfileMenuSub'].forEach((id) => {
@@ -1401,14 +1782,10 @@
       node.textContent = userCallName;
       node.classList.toggle('hidden', !userCallName);
     });
-    if (welcomeTitleEl) {
-      welcomeTitleEl.textContent = userCallName
-        ? `${userCallName} วันนี้คุณคิดอะไรอยู่`
-        : 'วันนี้คุณคิดอะไรอยู่';
-    }
     if (callNameInput && document.activeElement !== callNameInput) {
       callNameInput.value = userCallName;
     }
+    if (landingMode) void refreshWelcomeGreeting();
   }
 
   let displayMessageIndex = 0;
@@ -1445,6 +1822,7 @@
     } else {
       showWelcomeScreen();
     }
+    repairExpandableTextWraps(messagesEl);
     if (activeThreadId) rememberThreadHistory(activeThreadId, currentChatHistory);
   }
 
@@ -1477,9 +1855,10 @@
     const p = profile && typeof profile === 'object' ? profile : {};
     try {
       if (!p.displayName && !p.username) {
-        p.displayName = JSON.parse(sessionStorage.getItem('nkbk_ai_profile') || '{}').displayName;
-        p.username = JSON.parse(sessionStorage.getItem('nkbk_ai_profile') || '{}').username;
-        p.pictureUrl = JSON.parse(sessionStorage.getItem('nkbk_ai_profile') || '{}').pictureUrl;
+        const stored = (window.NkbkAiAuthStore && window.NkbkAiAuthStore.getProfile()) || {};
+        p.displayName = stored.displayName;
+        p.username = stored.username;
+        p.pictureUrl = stored.pictureUrl;
       }
     } catch (_) {}
     const name = p.displayName || p.username || 'ผู้ใช้';
@@ -1742,7 +2121,7 @@
   window.__nkbkConfirm = nkbkConfirm;
 
   async function deleteThreadById(threadId) {
-    if (sending || !threadId) return;
+    if (isThreadSending(threadId) || !threadId) return;
     const ok = await nkbkConfirm({
       title: 'ลบบทสนทนา?',
       message: 'ข้อความในบทสนทนานี้จะถูกลบถาวร',
@@ -2153,7 +2532,8 @@
   function refreshSendState() {
     const hasText = !!(inputEl && inputEl.value.trim());
     const hasAttach = pendingAttachments.length > 0;
-    if (sendBtn) sendBtn.disabled = sending || !statusOk || (!hasText && !hasAttach);
+    const busy = isActiveThreadSending();
+    if (sendBtn) sendBtn.disabled = busy || !statusOk || (!hasText && !hasAttach);
     if (genBtn) genBtn.classList.toggle('is-active', generateMode);
     updateLandingLayout();
   }
@@ -2239,7 +2619,7 @@
       chip.className = 'nkbk-ai-attach-chip' + (item.kind === 'document' ? ' nkbk-ai-attach-chip--doc' : '');
       if (item.kind === 'image') {
         const thumb = document.createElement('img');
-        thumb.src = item.dataUrl;
+        thumb.src = item.previewUrl || item.dataUrl || '';
         thumb.alt = '';
         chip.appendChild(thumb);
       } else {
@@ -2283,7 +2663,7 @@
       const chip = document.createElement('div');
       chip.className = 'nkbk-ai-viewer-attach-chip';
       const thumb = document.createElement('img');
-      thumb.src = item.dataUrl;
+      thumb.src = item.previewUrl || item.dataUrl || '';
       thumb.alt = '';
       chip.appendChild(thumb);
       const rm = document.createElement('button');
@@ -2308,9 +2688,10 @@
 
   async function ensureViewerEditRef() {
     if (!isViewerEditMode()) return true;
-    if (pendingAttachments.some((a) => a.isEditRef)) return true;
     const item = viewerImages[viewerIndex];
     if (!item) return false;
+    if (pendingAttachments.some((a) => a.isEditRef) && viewerEditRefIndex === viewerIndex) return true;
+    pendingAttachments = pendingAttachments.filter((a) => !a.isEditRef);
     const prepared = await prepareImageForEdit(item.src, item.mime || 'image/png', item.img, viewerImg);
     if (!prepared) return false;
     pendingAttachments.unshift({
@@ -2321,6 +2702,7 @@
       isEditRef: true
     });
     pendingEditRef = { previewUrl: prepared.dataUrl, mime: prepared.mime };
+    viewerEditRefIndex = viewerIndex;
     editImageMode = true;
     setGenerateMode(true);
     return true;
@@ -2345,7 +2727,7 @@
     if (!viewerSendBtn) return;
     const hasText = !!(viewerInput && viewerInput.value.trim());
     const hasExtra = pendingAttachments.some((a) => a.kind === 'image' && !a.isEditRef);
-    viewerSendBtn.disabled = sending || (!hasText && !hasExtra);
+    viewerSendBtn.disabled = isActiveThreadSending() || (!hasText && !hasExtra);
   }
 
   function readFileAsDataUrl(file) {
@@ -2447,15 +2829,18 @@
     }
   }
 
-  async function tryRecoverAssistantReply(beforeLastAsstTs, expectImage) {
-    setTypingStatus('กำลังดึงผลลัพธ์...');
-    const maxWait = expectImage ? 150000 : 45000;
+  async function tryRecoverAssistantReply(beforeLastAsstTs, expectImage, opts) {
+    const options = opts && typeof opts === 'object' ? opts : {};
+    if (!options.silent) setTypingStatus('กำลังดึงผลลัพธ์...');
+    const maxWait = Number(options.maxWaitMs) || (expectImage ? 180000 : 45000);
     const started = Date.now();
-    let delay = 2000;
+    let delay = 1500;
     while (Date.now() - started < maxWait) {
       await new Promise((r) => setTimeout(r, delay));
       delay = Math.min(4000, delay + 250);
-      if (Date.now() - started > 30000) setTypingStatus('กำลังสร้างรูป — รอสักครู่...');
+      if (!options.silent && Date.now() - started > 30000) {
+        setTypingStatus('กำลังสร้างรูป — รอสักครู่...');
+      }
       const mem = await fetchMemoryLenient();
       if (!mem || !mem.ok || !Array.isArray(mem.chatHistory)) continue;
       const lastAsst = getLastAssistantMeta(mem.chatHistory);
@@ -2503,8 +2888,10 @@
   async function apiPost(path, body) {
     const payload = body || {};
     const isImage = payload.mode === 'generate';
+    const attachCount = (payload.images || []).length + (payload.files || []).length;
+    const timeoutMs = isImage ? (attachCount >= 3 ? 360000 : 300000) : 120000;
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), isImage ? 300000 : 120000);
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
       const r = await fetch(path, {
         method: 'POST',
@@ -2545,7 +2932,7 @@
   }
 
   async function loadStatus() {
-    token = sessionStorage.getItem('nkbk_ai_token') || token;
+    token = (window.NkbkAiAuthStore && window.NkbkAiAuthStore.getToken()) || '' || token;
     if (!token) {
       showBanner('กรุณาเข้าสู่ระบบด้วย LINE', 'error');
       return;
@@ -2612,7 +2999,7 @@
   }
 
   async function sendMessage(forceGenerate, rewindOpts) {
-    if (sending || !statusOk) return;
+    if (isActiveThreadSending() || !statusOk) return;
     const rewind = rewindOpts && typeof rewindOpts === 'object' ? rewindOpts : null;
     const text = rewind ? String(rewind.text || '').trim() : (inputEl && inputEl.value || '').trim();
     const images = rewind ? (rewind.images || []) : pendingImages().slice();
@@ -2637,8 +3024,7 @@
       }
     }
 
-    sending = true;
-    refreshSendState();
+    const sendThreadId = activeThreadId;
 
     if (rewind && typeof rewind.rewindToMessageIndex === 'number') {
       const rows = messagesEl.querySelectorAll('.nkbk-ai-msg:not(.nkbk-ai-msg--typing)');
@@ -2675,6 +3061,12 @@
           }
         : null
     );
+    trackPendingUserSend(sendThreadId, displayText, isEditSend ? [] : images, documents, isEditSend
+      ? {
+          editRef: { previewUrl: pendingEditRef.previewUrl, mime: pendingEditRef.mime },
+          editExtras
+        }
+      : null);
 
     if (!rewind) {
       if (inputEl) inputEl.value = '';
@@ -2696,14 +3088,32 @@
     const beforeLastAsstTs = getLastAssistantMeta(currentChatHistory).ts;
     const expectImageReply =
       isGenerate || /สร้าง|วาด|generate|draw|เปลี่ยน.*(?:ภาพ|รูป)/i.test(text);
+    markInflightSend(sendThreadId, {
+      kind: expectImageReply ? 'image' : 'chat',
+      expectImage: expectImageReply,
+      beforeTs: beforeLastAsstTs,
+      text
+    });
+    refreshSendState();
 
+    let keepInflightForRecovery = false;
     try {
       const prepared = await prepareAttachmentsForSend(images, documents);
       const payload = {
         message: text,
         mode: isGenerate ? 'generate' : 'auto',
         isImageEdit: !!isEditSend,
-        images: prepared.images.map((i) => ({ dataUrl: i.dataUrl })),
+        images: prepared.images.map((i) => {
+          if (i.imageId && i._source === 'library') {
+            return {
+              imageId: i.imageId,
+              mime: i.mime || 'image/png',
+              libraryId: i.libraryId || '',
+              _source: 'library'
+            };
+          }
+          return { dataUrl: i.dataUrl, mime: i.mime };
+        }),
         files: prepared.documents.map((f) => ({
           name: f.name,
           mime: f.mime,
@@ -2715,26 +3125,25 @@
         payload.rewindToMessageIndex = rewind.rewindToMessageIndex;
       }
       const data = await apiPost('/api/nkbk-ai-chat', payload);
+      if (sendThreadId !== activeThreadId) {
+        threadsNeedRefresh.add(sendThreadId);
+        clearInflightSend(sendThreadId);
+        if (data && data.ok) stashBackgroundThreadResult(sendThreadId, data, beforeLastAsstTs);
+        return;
+      }
       removeTyping();
       if (!data.ok) throw new Error(data.message || 'ส่งไม่สำเร็จ');
 
-      const replyImages = (data.images || []).map((img) => ({
-        mime: img.mime || 'image/png',
-        b64: img.b64,
-        url: img.url,
-        publicUrl: img.publicUrl,
-        imageId: img.imageId
-      }));
-      const imageOnly = !!data.generated && replyImages.length > 0;
-      appendMessage('assistant', imageOnly ? '' : data.reply || '—', replyImages, {
-        imageOnly
-      });
-      notifyPromptCompletion(text, { generated: !!data.generated, images: replyImages });
-      maybePlayResponseNotification({
-        expectImageReply,
-        isGenerate,
-        startedAt: responseStartedAt
-      });
+      await applyAssistantResultToUi(
+        {
+          reply: data.reply,
+          images: data.images || [],
+          generated: !!data.generated
+        },
+        text,
+        { expectImageReply, isGenerate, startedAt: responseStartedAt }
+      );
+      clearPendingOutbound(sendThreadId);
 
       if (data.memoryUpdated && standingEl) {
         standingEl.value = data.standingInstructions || standingEl.value;
@@ -2742,43 +3151,71 @@
         setTimeout(() => bannerEl && bannerEl.classList.add('hidden'), 2200);
       }
       if (data.activeThreadId) activeThreadId = data.activeThreadId;
-      try {
-        const mem = await apiGet('/api/nkbk-ai-memory');
-        if (mem.ok) {
-          threads = mem.threads || threads;
-          renderThreadList();
-          if (Array.isArray(mem.chatHistory)) {
-            currentChatHistory = mem.chatHistory;
-          }
-        }
-      } catch (_) {}
+      await refreshActiveThreadFromServer();
       syncAppUrl();
     } catch (e) {
-      const recovered = await tryRecoverAssistantReply(beforeLastAsstTs, expectImageReply);
-      removeTyping();
+      const isNetworkish = /Failed to fetch|NetworkError|Load failed|network|504|502|503|timeout|timed out|AbortError/i.test(
+        String((e && e.message) || e || '')
+      );
+      const recovered = await tryRecoverAssistantReply(beforeLastAsstTs, expectImageReply, {
+        maxWaitMs: expectImageReply ? 240000 : 60000
+      });
+      if (sendThreadId === activeThreadId) removeTyping();
       if (recovered) {
-        const replyImages = recovered.images.map((img) => ({
-          mime: img.mime || 'image/png',
-          b64: img.b64,
-          url: img.url,
-          publicUrl: img.publicUrl,
-          imageId: img.imageId,
-          dataUrl: img.dataUrl
-        }));
-        const imageOnly = !!recovered.generated && replyImages.length > 0;
-        appendMessage('assistant', imageOnly ? '' : recovered.reply || '—', replyImages, { imageOnly });
-        notifyPromptCompletion(text, { generated: !!recovered.generated, images: replyImages });
-        maybePlayResponseNotification({
+        if (sendThreadId === activeThreadId) {
+          const lastAsst = getLastAssistantMeta(currentChatHistory);
+          if (!beforeLastAsstTs || lastAsst.ts <= beforeLastAsstTs) {
+            await applyAssistantResultToUi(recovered, text, {
+              expectImageReply,
+              isGenerate,
+              startedAt: responseStartedAt
+            });
+          }
+          await refreshActiveThreadFromServer();
+          clearPendingOutbound(sendThreadId);
+          syncAppUrl();
+        } else {
+          threadsNeedRefresh.add(sendThreadId);
+          stashBackgroundThreadResult(
+            sendThreadId,
+            {
+              ok: true,
+              reply: recovered.reply,
+              images: recovered.images,
+              generated: recovered.generated
+            },
+            beforeLastAsstTs
+          );
+        }
+      } else if (sendThreadId === activeThreadId) {
+        if (expectImageReply && isNetworkish) {
+          appendMessage(
+            'assistant',
+            '⚠ การเชื่อมต่อขาดระหว่างรอผลลัพธ์ — โมเน่อาจยังสร้างรูปอยู่ ลองกลับมาแชตนี้หรือรีเฟรชใน 1–2 นาที'
+          );
+          keepInflightForRecovery = true;
+          void continueBackgroundRecovery(
+            sendThreadId,
+            beforeLastAsstTs,
+            expectImageReply,
+            text,
+            responseStartedAt
+          );
+        } else {
+          appendMessage('assistant', '⚠ ' + friendlyApiError(e));
+        }
+      } else if (expectImageReply && isNetworkish) {
+        keepInflightForRecovery = true;
+        void continueBackgroundRecovery(
+          sendThreadId,
+          beforeLastAsstTs,
           expectImageReply,
-          isGenerate,
-          startedAt: responseStartedAt
-        });
-        syncAppUrl();
-      } else {
-        appendMessage('assistant', '⚠ ' + friendlyApiError(e));
+          text,
+          responseStartedAt
+        );
       }
     } finally {
-      sending = false;
+      if (!keepInflightForRecovery) clearInflightSend(sendThreadId);
       if (bannerEl && bannerEl.textContent === 'กำลังเตรียมไฟล์แนบ...') hideBanner();
       refreshSendState();
     }
@@ -2814,11 +3251,12 @@
   }
 
   async function newThread() {
-    if (sending) return;
+    if (isActiveThreadSending()) return;
     closeImageViewer();
     closeComposerMenu();
     closeSearchModal();
     closeSettingsModal();
+    window.NkbkAiHelp?.close?.();
     closeLibrary({ skipUrl: true });
     pendingAttachments = [];
     setGenerateMode(false);
@@ -2835,10 +3273,11 @@
   }
 
   async function startNewChatWithPrompt(text) {
-    if (sending) return false;
+    if (isActiveThreadSending()) return false;
     closeImageViewer();
     closeLibrary();
     closeSettingsModal();
+    window.NkbkAiHelp?.close?.();
     pendingAttachments = [];
     setGenerateMode(false);
     renderAttachPreview();
@@ -2880,7 +3319,7 @@
   }
 
   async function deleteCurrentThread() {
-    if (sending) return;
+    if (isActiveThreadSending()) return;
     if (!activeThreadId) return;
     const ok = await nkbkConfirm({
       title: 'ลบบทสนทนา?',
@@ -2904,7 +3343,10 @@
   }
 
   async function selectThread(threadId, opts) {
-    if (sending || !threadId) return;
+    if (!threadId) return;
+    if (isThreadSending(threadId) && threadId !== activeThreadId) {
+      /* อนุญาตเปิดแชตที่กำลังรอผล — จะโหลดจากเซิร์ฟเวอร์เมื่อสwitch */
+    }
     const leavingLibrary = isLibraryOpen();
     if (
       threadId === activeThreadId &&
@@ -2938,11 +3380,18 @@
     closeSidebar();
     closeThreadMenu();
     const cached = threadHistoryCache.get(threadId);
-    if (cached) renderMessagesFromHistory(cached);
-    else renderMessagesFromHistory([]);
+    renderMessagesFromHistory(reconcilePendingOutbound(threadId, mergePendingHistory(threadId, cached || [])));
+    syncTypingForActiveThread();
     try {
       await threadAction('switch', threadId);
       if (seq !== threadSwitchSeq || activeThreadId !== threadId) return;
+      if (threadsNeedRefresh.has(threadId)) threadsNeedRefresh.delete(threadId);
+      const displayHist = reconcilePendingOutbound(
+        threadId,
+        mergePendingHistory(threadId, currentChatHistory)
+      );
+      renderMessagesFromHistory(displayHist);
+      syncTypingForActiveThread();
       syncAppUrl();
     } catch (e) {
       if (seq !== threadSwitchSeq) return;
@@ -3345,6 +3794,13 @@
     return ext === 'FILE' ? 'ไฟล์' : 'ChatGPT Image ' + ext;
   }
 
+  function shortLibraryLabel(item, maxLen) {
+    const label = libraryItemLabel(item);
+    const max = Math.max(12, Number(maxLen) || 32);
+    if (label.length <= max) return label;
+    return label.slice(0, max - 1) + '…';
+  }
+
   function isLibraryItemUserImage(item) {
     if (!item || !String(item.mime || '').startsWith('image/')) return false;
     if (item.source === 'library') return true;
@@ -3474,6 +3930,9 @@
       libraryItems = data.ok && Array.isArray(data.items) ? data.items : libraryItems.filter((x) => !itemIds.includes(x.id));
       clearLibrarySelection();
       renderLibraryList();
+      if (composerSubmenuType === 'recent' && composerMenuOpen) {
+        renderRecentComposerSubmenu();
+      }
       showBanner('ลบจากไลบรารีแล้ว', 'ok');
       setTimeout(() => bannerEl && bannerEl.classList.add('hidden'), 1800);
       window.dispatchEvent(new CustomEvent('nkbk-ai-threads-changed'));
@@ -3769,6 +4228,31 @@
   let composerLibraryLoading = null;
   let composerSubmenuHideTimer = null;
   let composerSubmenuAnchor = null;
+  let composerRecentSelected = new Set();
+
+  function updateComposerRecentFoot() {
+    const foot = el('nkbkAiComposerRecentFoot');
+    const countEl = el('nkbkAiComposerRecentCount');
+    const confirmBtn = el('nkbkAiComposerRecentConfirm');
+    const isRecent = composerSubmenuType === 'recent';
+    if (foot) foot.classList.toggle('hidden', !isRecent);
+    const n = composerRecentSelected.size;
+    if (countEl) countEl.textContent = 'เลือกแล้ว ' + String(n) + ' รายการ';
+    if (confirmBtn) confirmBtn.disabled = n < 1;
+  }
+
+  function resetComposerRecentSelection() {
+    composerRecentSelected = new Set();
+    updateComposerRecentFoot();
+  }
+
+  function toggleComposerRecentSelection(id) {
+    const key = String(id || '').trim();
+    if (!key) return;
+    if (composerRecentSelected.has(key)) composerRecentSelected.delete(key);
+    else composerRecentSelected.add(key);
+    updateComposerRecentFoot();
+  }
 
   function cancelComposerSubmenuHide() {
     if (composerSubmenuHideTimer) {
@@ -3788,6 +4272,72 @@
     return window.matchMedia('(min-width: 769px) and (hover: hover) and (pointer: fine)').matches;
   }
 
+  function isComposerMobileMenu() {
+    return window.matchMedia('(max-width: 768px)').matches;
+  }
+
+  function getComposerPlusWrap() {
+    return document.querySelector('.nkbk-ai-composer-plus-wrap');
+  }
+
+  function ensureComposerMenuPortal() {
+    if (composerMenuPortalEl) return composerMenuPortalEl;
+    composerMenuPortalEl = document.createElement('div');
+    composerMenuPortalEl.id = 'nkbkAiComposerMenuPortal';
+    composerMenuPortalEl.className = 'nkbk-ai-composer-menu-portal hidden';
+    composerMenuPortalEl.innerHTML =
+      '<div class="nkbk-ai-composer-menu-portal-backdrop" aria-hidden="true"></div>';
+    composerMenuPortalEl.addEventListener('click', (e) => {
+      if (e.target.classList.contains('nkbk-ai-composer-menu-portal-backdrop')) closeComposerMenu();
+    });
+    document.body.appendChild(composerMenuPortalEl);
+    return composerMenuPortalEl;
+  }
+
+  function positionComposerMenuMobile() {
+    if (!composerMenuPortalEl || !isComposerMobileMenu()) return;
+    const vv = window.visualViewport;
+    if (!vv) {
+      composerMenuPortalEl.style.removeProperty('padding-top');
+      composerMenuPortalEl.style.removeProperty('padding-bottom');
+      return;
+    }
+    const padTop = Math.max(16, Math.round(vv.offsetTop + 12));
+    const padBottom = Math.max(16, Math.round(window.innerHeight - vv.offsetTop - vv.height + 12));
+    composerMenuPortalEl.style.paddingTop = padTop + 'px';
+    composerMenuPortalEl.style.paddingBottom = padBottom + 'px';
+  }
+
+  function mountComposerMenuMobile() {
+    if (!isComposerMobileMenu() || !composerMenuHost) return;
+    const portal = ensureComposerMenuPortal();
+    if (composerMenuHost.parentElement !== portal) portal.appendChild(composerMenuHost);
+    portal.classList.remove('hidden');
+    positionComposerMenuMobile();
+    requestAnimationFrame(() => {
+      positionComposerMenuMobile();
+    });
+  }
+
+  function unmountComposerMenuMobile() {
+    const plusWrap = getComposerPlusWrap();
+    if (composerMenuPortalEl) composerMenuPortalEl.classList.add('hidden');
+    if (composerMenuHost && plusWrap && composerMenuHost.parentElement !== plusWrap) {
+      plusWrap.appendChild(composerMenuHost);
+    }
+    if (composerMenuPortalEl) {
+      composerMenuPortalEl.style.removeProperty('padding-top');
+      composerMenuPortalEl.style.removeProperty('padding-bottom');
+    }
+    if (composerMenuHost) {
+      composerMenuHost.style.removeProperty('top');
+      composerMenuHost.style.removeProperty('bottom');
+      composerMenuHost.style.removeProperty('transform');
+      composerMenuHost.style.removeProperty('max-height');
+      composerMenuHost.style.removeProperty('height');
+    }
+  }
+
   function closeComposerMenu() {
     cancelComposerSubmenuHide();
     composerMenuOpen = false;
@@ -3798,6 +4348,8 @@
     composerSubmenu?.classList.add('hidden');
     composerSubmenu?.setAttribute('aria-hidden', 'true');
     attachBtn?.setAttribute('aria-expanded', 'false');
+    document.body.classList.remove('nkbk-ai-composer-menu-open');
+    unmountComposerMenuMobile();
     composerMenu?.querySelectorAll('[data-composer-menu]').forEach((btn) => {
       btn.classList.remove('is-active');
     });
@@ -3808,9 +4360,12 @@
       closeComposerMenu();
       return;
     }
+    if (isComposerMobileMenu()) closeSidebar();
     composerMenuOpen = true;
     composerMenuHost?.classList.remove('hidden');
     composerMenuHost?.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('nkbk-ai-composer-menu-open');
+    mountComposerMenuMobile();
     attachBtn?.setAttribute('aria-expanded', 'true');
     if (!composerLibraryLoading) {
       composerLibraryLoading = ensureComposerLibraryItems().finally(() => {
@@ -3819,8 +4374,13 @@
     }
   }
 
-  async function ensureComposerLibraryItems() {
-    if (libraryItems.length) return libraryItems;
+  function invalidateComposerLibraryCache() {
+    libraryItems = [];
+    composerLibraryLoading = null;
+  }
+
+  async function ensureComposerLibraryItems(forceRefresh) {
+    if (!forceRefresh && libraryItems.length) return libraryItems;
     try {
       const data = await apiGet('/api/nkbk-ai-library');
       if (data.ok && Array.isArray(data.items)) libraryItems = data.items;
@@ -3840,26 +4400,47 @@
     try {
       if (String(item.mime || '').startsWith('image/')) {
         const fetchSrc = libraryItemFetchSrc(item);
-        if (!fetchSrc) {
+        if (item.imageId && fetchSrc) {
+          pendingAttachments.push({
+            kind: 'image',
+            mime: item.mime || 'image/png',
+            name: libraryItemLabel(item) + '.png',
+            libraryId: String(item.id || ''),
+            imageId: String(item.imageId),
+            librarySource: true,
+            previewUrl: fetchSrc
+          });
+        } else if (fetchSrc) {
+          let dataUrl = fetchSrc;
+          if (!dataUrl.startsWith('data:')) {
+            const blob = await fetchImageBlobFromUrl(fetchSrc);
+            if (!blob) {
+              showBanner('แนบไฟล์ไม่สำเร็จ', 'warn');
+              return false;
+            }
+            dataUrl = await readFileAsDataUrl(
+              new File([blob], 'library.png', { type: blob.type || item.mime })
+            );
+          }
+          pendingAttachments.push({
+            kind: 'image',
+            dataUrl,
+            mime: item.mime || 'image/png',
+            name: libraryItemLabel(item) + '.png'
+          });
+        } else {
           showBanner('แนบไฟล์ไม่สำเร็จ', 'warn');
           return false;
         }
-        let dataUrl = fetchSrc;
-        if (!dataUrl.startsWith('data:')) {
-          const blob = await fetchImageBlobFromUrl(fetchSrc);
-          if (!blob) {
-            showBanner('แนบไฟล์ไม่สำเร็จ', 'warn');
-            return false;
-          }
-          dataUrl = await readFileAsDataUrl(
-            new File([blob], 'library.png', { type: blob.type || item.mime })
-          );
-        }
+      } else if (item.fileId && item.src) {
         pendingAttachments.push({
-          kind: 'image',
-          dataUrl,
-          mime: item.mime || 'image/png',
-          name: libraryItemLabel(item) + '.png'
+          kind: 'document',
+          mime: item.mime || 'application/octet-stream',
+          name: libraryItemLabel(item) || 'file',
+          libraryId: String(item.id || ''),
+          fileId: String(item.fileId),
+          librarySource: true,
+          previewUrl: item.src
         });
       } else if (item.src) {
         pendingAttachments.push({
@@ -3926,24 +4507,34 @@
     const items = libraryItems
       .filter((x) => String(x.mime || '').startsWith('image/') && (x.src || x.imageId))
       .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-      .slice(0, 6);
+      .slice(0, 8);
+    updateComposerRecentFoot();
     if (!items.length) {
       composerSubmenuList.innerHTML =
         '<div class="nkbk-ai-composer-submenu-empty">ยังไม่มีไฟล์ล่าสุด — อัปโหลดได้ที่ไลบรารี</div>';
       return;
     }
     composerSubmenuList.innerHTML =
-      '<div class="nkbk-ai-composer-recent-label">เมื่อเร็วๆ นี้</div>' +
+      '<div class="nkbk-ai-composer-recent-label">เมื่อเร็วๆ นี้ — แตะเลือกหลายรูป แล้วกดแนบที่เลือก</div>' +
       '<div class="nkbk-ai-composer-recent-grid">' +
       items
         .map((item) => {
-          const label = libraryItemLabel(item);
+          const id = String(item.id || '');
+          const selected = composerRecentSelected.has(id);
+          const label = shortLibraryLabel(item, 28);
           const safeLabel = label.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
           const safeSrc = String(libraryItemFetchSrc(item) || '').replace(/"/g, '&quot;');
           return (
-            '<button type="button" class="nkbk-ai-composer-recent-cell" data-library-id="' +
-            String(item.id || '').replace(/"/g, '&quot;') +
+            '<button type="button" class="nkbk-ai-composer-recent-cell' +
+            (selected ? ' is-selected' : '') +
+            '" data-library-id="' +
+            id.replace(/"/g, '&quot;') +
+            '" aria-pressed="' +
+            (selected ? 'true' : 'false') +
             '">' +
+            '<span class="nkbk-ai-composer-recent-check" aria-hidden="true">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L19 7"/></svg>' +
+            '</span>' +
             '<span class="nkbk-ai-composer-recent-thumb"><img src="' +
             safeSrc +
             '" alt="" loading="lazy"></span>' +
@@ -4015,22 +4606,31 @@
     });
 
     if (type === 'recent') {
+      resetComposerRecentSelection();
       renderRecentComposerSubmenuHead();
       renderRecentComposerSubmenu();
       positionComposerFlyout();
-      void (composerLibraryLoading || ensureComposerLibraryItems()).then(() => {
+      void (composerLibraryLoading || ensureComposerLibraryItems(true)).then(() => {
         if (composerSubmenuType === 'recent') {
           renderRecentComposerSubmenu();
+          if (composerMenuOpen && isComposerMobileMenu()) positionComposerMenuMobile();
         }
       });
+      if (composerMenuOpen && isComposerMobileMenu()) {
+        requestAnimationFrame(() => positionComposerMenuMobile());
+      }
       return;
     }
 
     if (type === 'prompts') {
+      updateComposerRecentFoot();
       composerSubmenuTitle.innerHTML =
         '<span class="nkbk-ai-composer-flyout-title">พรอมต์ที่บันทึก</span>';
       renderPromptsComposerSubmenu();
       positionComposerFlyout();
+    }
+    if (composerMenuOpen && isComposerMobileMenu()) {
+      requestAnimationFrame(() => positionComposerMenuMobile());
     }
   }
 
@@ -4051,6 +4651,7 @@
   function closeProfileMenu() {
     sidebarProfileMenu?.classList.add('hidden');
     el('btnProfileMenu')?.setAttribute('aria-expanded', 'false');
+    window.NkbkAiHelp?.closeSubmenu?.();
   }
 
   function toggleProfileMenu() {
@@ -4148,7 +4749,7 @@
 
   async function applyViewerAspect(aspect) {
     const item = viewerImages[viewerIndex];
-    if (!item || sending) return;
+    if (!item || isActiveThreadSending()) return;
     viewerAspectMenu?.classList.add('hidden');
     const prompt = 'สร้างภาพเดิมในอัตราส่วน ' + aspect;
     const prepared = await prepareImageForEdit(item.src, item.mime || 'image/png', item.img, viewerImg);
@@ -4171,7 +4772,7 @@
   }
 
   async function submitViewerEdit() {
-    if (!viewerInput || sending) return;
+    if (!viewerInput || isActiveThreadSending()) return;
     const text = viewerInput.value.trim();
     const hasExtra = pendingAttachments.some((a) => a.kind === 'image' && !a.isEditRef);
     if (!text && !hasExtra) return;
@@ -4276,12 +4877,38 @@
     }
     if (composerSubmenuList && !composerSubmenuList.dataset.bound) {
       composerSubmenuList.dataset.bound = '1';
+      composerSubmenuList.addEventListener(
+        'error',
+        (e) => {
+          const img = e.target;
+          if (!img || img.tagName !== 'IMG') return;
+          const cell = img.closest('.nkbk-ai-composer-recent-cell');
+          if (!cell) return;
+          const id = cell.getAttribute('data-library-id');
+          if (id) composerRecentSelected.delete(id);
+          cell.remove();
+          updateComposerRecentFoot();
+          const grid = composerSubmenuList.querySelector('.nkbk-ai-composer-recent-grid');
+          if (grid && !grid.querySelector('.nkbk-ai-composer-recent-cell')) {
+            composerSubmenuList.innerHTML =
+              '<div class="nkbk-ai-composer-submenu-empty">ยังไม่มีไฟล์ล่าสุด — อัปโหลดได้ที่ไลบรารี</div>';
+          }
+        },
+        true
+      );
       composerSubmenuList.addEventListener('click', (e) => {
         const libBtn = e.target.closest('[data-library-id]');
         if (libBtn) {
           e.preventDefault();
           e.stopPropagation();
-          const item = getLibraryItemById(libBtn.getAttribute('data-library-id'));
+          const id = libBtn.getAttribute('data-library-id');
+          if (composerSubmenuType === 'recent') {
+            toggleComposerRecentSelection(id);
+            libBtn.classList.toggle('is-selected', composerRecentSelected.has(id));
+            libBtn.setAttribute('aria-pressed', composerRecentSelected.has(id) ? 'true' : 'false');
+            return;
+          }
+          const item = getLibraryItemById(id);
           void attachLibraryItemToComposer(item);
           return;
         }
@@ -4300,6 +4927,22 @@
         }
       });
     }
+    el('nkbkAiComposerRecentClear')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      resetComposerRecentSelection();
+      if (composerSubmenuType === 'recent') renderRecentComposerSubmenu();
+    });
+    el('nkbkAiComposerRecentConfirm')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const items = [...composerRecentSelected]
+        .map((id) => getLibraryItemById(id))
+        .filter(Boolean);
+      if (!items.length) return;
+      void attachLibraryItemsToComposer(items);
+      resetComposerRecentSelection();
+    });
     fileInput.addEventListener('change', () => {
       onFilesSelected(fileInput.files);
       fileInput.value = '';
@@ -4307,31 +4950,70 @@
     document.addEventListener('click', (e) => {
       if (!composerMenuOpen) return;
       if (e.target.closest('.nkbk-ai-composer-plus-wrap')) return;
+      if (e.target.closest('#nkbkAiComposerMenuPortal')) return;
+      if (e.target.closest('#nkbkAiComposerMenuHost')) return;
       closeComposerMenu();
     });
+    window.addEventListener('resize', () => {
+      if (composerMenuOpen && isComposerMobileMenu()) positionComposerMenuMobile();
+    });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => {
+        if (composerMenuOpen && isComposerMobileMenu()) positionComposerMenuMobile();
+      });
+      window.visualViewport.addEventListener('scroll', () => {
+        if (composerMenuOpen && isComposerMobileMenu()) positionComposerMenuMobile();
+      });
+    }
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && composerMenuOpen) closeComposerMenu();
     });
   }
 
+  function canAcceptChatFileDrop() {
+    if (isLibraryOpen()) return false;
+    if (isViewerOpen()) return false;
+    if (document.body.classList.contains('nkbk-ai-composer-menu-open')) return false;
+    const modalIds = [
+      'nkbkAiSettingsModal',
+      'searchChatModal',
+      'nkbkAiSharedLinksModal',
+      'nkbkAiArchivedModal',
+      'nkbkAiLibraryPickerModal'
+    ];
+    if (modalIds.some((id) => {
+      const node = el(id);
+      return node && node.getAttribute('aria-hidden') === 'false';
+    })) {
+      return false;
+    }
+    return true;
+  }
+
   function setupGlobalImageDrop() {
     const app = document.querySelector('.nkbk-ai-app');
     if (!app) return;
-    const composerWrap = el('nkbkAiComposerWrap');
+    const chatView = el('nkbkAiChatView');
     const overlay = el('nkbkAiDropOverlay');
-    let dragActive = false;
+    let dragDepth = 0;
 
     const showDrop = () => {
-      dragActive = true;
-      if (overlay) overlay.classList.remove('hidden');
-      composerWrap?.classList.add('is-dragover');
-      messagesEl?.classList.add('is-dragover');
+      if (!canAcceptChatFileDrop()) return;
+      dragDepth += 1;
+      if (dragDepth !== 1) return;
+      overlay?.classList.remove('hidden');
+      overlay?.setAttribute('aria-hidden', 'false');
+      chatView?.classList.add('is-dragover');
+      document.body.classList.add('nkbk-ai-file-dragging');
     };
-    const hideDrop = () => {
-      dragActive = false;
-      if (overlay) overlay.classList.add('hidden');
-      composerWrap?.classList.remove('is-dragover');
-      messagesEl?.classList.remove('is-dragover');
+    const hideDrop = (force) => {
+      if (force) dragDepth = 0;
+      else dragDepth = Math.max(0, dragDepth - 1);
+      if (dragDepth !== 0) return;
+      overlay?.classList.add('hidden');
+      overlay?.setAttribute('aria-hidden', 'true');
+      chatView?.classList.remove('is-dragover');
+      document.body.classList.remove('nkbk-ai-file-dragging');
     };
 
     app.addEventListener(
@@ -4349,16 +5031,17 @@
         if (!isProbableImageDrag(e.dataTransfer)) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'copy';
+        if (canAcceptChatFileDrop() && dragDepth === 0) showDrop();
       },
       true
     );
     app.addEventListener(
       'dragleave',
       (e) => {
-        if (!dragActive) return;
+        if (!dragDepth) return;
         const related = e.relatedTarget;
         if (related && app.contains(related)) return;
-        hideDrop();
+        hideDrop(false);
       },
       true
     );
@@ -4369,7 +5052,8 @@
         e.preventDefault();
         e.stopPropagation();
         const payload = captureDropPayload(e.dataTransfer);
-        hideDrop();
+        hideDrop(true);
+        if (!canAcceptChatFileDrop()) return;
         resolveDropPayload(payload)
           .then((files) => {
             if (files.length) {
@@ -4390,7 +5074,9 @@
       if (!isProbableImageDrag(e.dataTransfer)) return;
       if (app.contains(e.target)) return;
       e.preventDefault();
+      hideDrop(true);
     });
+    window.addEventListener('blur', () => hideDrop(true));
   }
 
   setupGlobalImageDrop();
@@ -4475,14 +5161,14 @@
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
       const action = btn.getAttribute('data-action');
+      if (action === 'help') {
+        window.NkbkAiHelp?.toggleSubmenu?.(btn);
+        return;
+      }
       closeProfileMenu();
       if (action === 'personalize') openSettingsModal('personalize');
       else if (action === 'settings') openSettingsModal('general');
       else if (action === 'logout') el('btnLogout')?.click();
-      else {
-        showBanner('ฟีเจอร์นี้จะเปิดใช้เร็วๆ นี้', 'info');
-        setTimeout(() => bannerEl && bannerEl.classList.add('hidden'), 2200);
-      }
     });
   }
   if (sidebarThreadMenu) {
@@ -4509,6 +5195,12 @@
   if (el('nkbkAiSettingsClose')) el('nkbkAiSettingsClose').addEventListener('click', closeSettingsModal);
   if (el('nkbkAiSettingsBackdrop')) el('nkbkAiSettingsBackdrop').addEventListener('click', closeSettingsModal);
   window.addEventListener('nkbk-ai-threads-changed', async (ev) => {
+    invalidateComposerLibraryCache();
+    if (composerSubmenuType === 'recent' && composerMenuOpen) {
+      void ensureComposerLibraryItems(true).then(() => {
+        if (composerSubmenuType === 'recent') renderRecentComposerSubmenu();
+      });
+    }
     const detail = ev && ev.detail;
     try {
       if (detail && detail.ok) {
@@ -4723,6 +5415,7 @@
       closeSearchModal();
       closeLibrary();
       closeSettingsModal();
+      window.NkbkAiHelp?.close?.();
       closeSidebarThreadMenu();
       closeProfileMenu();
     }
@@ -4817,7 +5510,10 @@
   function bootChat() {
     if (chatBootStarted) return;
     chatBootStarted = true;
-    token = sessionStorage.getItem('nkbk_ai_token') || '';
+    removeTyping();
+    inflightByThread.clear();
+    pendingOutboundByThread.clear();
+    token = (window.NkbkAiAuthStore && window.NkbkAiAuthStore.getToken()) || '' || '';
     bootStartedAt = Date.now();
     syncSidebarProfile();
     updateLandingLayout();
@@ -4853,6 +5549,14 @@
   });
 
   window.addEventListener('nkbk-ai-auth-ready', bootChat);
+  window.addEventListener('pageshow', (e) => {
+    if (!e.persisted) return;
+    removeTyping();
+    inflightByThread.clear();
+    pendingOutboundByThread.clear();
+    sending = false;
+    refreshSendState();
+  });
   if (el('appRoot') && !el('appRoot').classList.contains('hidden')) {
     bootChat();
   }

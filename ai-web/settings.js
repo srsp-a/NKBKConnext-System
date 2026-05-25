@@ -62,7 +62,7 @@
 
   function token() {
     try {
-      return sessionStorage.getItem('nkbk_ai_token') || '';
+      return (window.NkbkAiAuthStore && window.NkbkAiAuthStore.getToken()) || '' || '';
     } catch (_) {
       return '';
     }
@@ -450,6 +450,13 @@
     node.textContent = 'เลือกแล้ว ' + n + ' รายการ';
   }
 
+  function shortPickerTitle(title, maxLen) {
+    const text = String(title || 'ไฟล์').trim();
+    const max = Math.max(12, Number(maxLen) || 48);
+    if (text.length <= max) return text;
+    return text.slice(0, max - 1) + '…';
+  }
+
   function renderLibraryPickerList() {
     const listEl = el('libraryPickerList');
     if (!listEl) return;
@@ -495,7 +502,7 @@
           '</span>' +
           '<span class="nkbk-ai-library-picker-meta">' +
           '<span class="nkbk-ai-library-picker-title">' +
-          esc(item.title || 'ไฟล์') +
+          esc(shortPickerTitle(item.title)) +
           '</span>' +
           '<span class="nkbk-ai-library-picker-subline">' +
           esc(mimeLabel(item.mime) + ' · ' + fmtBytes(item.sizeBytes || 0)) +
@@ -656,8 +663,8 @@
     const sub = el('libraryPickerSub');
     const confirmBtn = el('libraryPickerConfirm');
     if (libraryPickerMode === 'attach') {
-      if (sub) sub.textContent = 'เลือกไฟล์เพื่อแนบในข้อความ';
-      if (confirmBtn) confirmBtn.textContent = 'แนบที่เลือก';
+      if (sub) sub.textContent = 'เลือกไฟล์เพื่อแนบในข้อความ (เลือกได้หลายรายการ)';
+      if (confirmBtn) confirmBtn.textContent = 'ตกลง';
     } else {
       if (sub) sub.textContent = 'เลือกไฟล์ที่ต้องการให้' + an() + 'จำไว้';
       if (confirmBtn) confirmBtn.textContent = 'เพิ่มที่เลือก';
@@ -666,10 +673,10 @@
 
   function settingsImageApiUrl(imageId) {
     try {
-      const profile = JSON.parse(sessionStorage.getItem('nkbk_ai_profile') || '{}');
+      const profile = (window.NkbkAiAuthStore && window.NkbkAiAuthStore.getProfile()) || {};
       const u = String(profile.username || '').trim();
       if (!u || !imageId) return '';
-      const t = sessionStorage.getItem('nkbk_ai_token') || '';
+      const t = (window.NkbkAiAuthStore && window.NkbkAiAuthStore.getToken()) || '' || '';
       const base = `/api/nkbk-ai-image/${encodeURIComponent(u)}/${encodeURIComponent(imageId)}`;
       return t ? base + '?token=' + encodeURIComponent(t) : base;
     } catch (_) {

@@ -190,7 +190,7 @@ function renderHomeHero() {
         <p class="kb-hero-v2-sub" data-i18n="hero.sub">สหกรณ์ออมทรัพย์เพื่อสวัสดิการสมาชิก...</p>
         <div class="kb-hero-v2-actions">
           <a href="${CmsLayout.menuUrl('/app/')}" class="kb-btn kb-btn-primary">
-            ${kbIcon('download', 18)}<span data-i18n="hero.ctaApp">ดาวน์โหลด NKBKConnect</span>
+            ${kbIcon('download', 18)}<span data-i18n="hero.ctaApp">ดาวน์โหลด NKBKConnext</span>
           </a>
         </div>
       </div>
@@ -225,10 +225,10 @@ function renderHomeLegacySections() {
   <div class="kb-container">
     <h2 class="kb-section-title" data-i18n="home.servicesTitle">บริการยอดนิยม</h2>
     <div class="kb-services">
-      <a href="${CmsLayout.menuUrl('/infrom-payment/')}" class="kb-service-card"><div class="kb-service-icon">${kbIcon('card', 28)}</div><h3 data-i18n="nav.payment">แจ้งโอนเงิน</h3></a>
-      <a href="${CmsLayout.menuUrl('/download/')}" class="kb-service-card"><div class="kb-service-icon">${kbIcon('download', 28)}</div><h3 data-i18n="nav.download">ดาวน์โหลด</h3></a>
-      <a href="/news" class="kb-service-card"><div class="kb-service-icon">${kbIcon('news', 28)}</div><h3 data-i18n="nav.news">ข่าวสาร</h3></a>
-      <a href="${CmsLayout.menuUrl('/contact/')}" class="kb-service-card"><div class="kb-service-icon">${kbIcon('phone', 28)}</div><h3 data-i18n="nav.contact">ติดต่อเรา</h3></a>
+      <a href="${CmsLayout.menuUrl('/infrom-payment/')}" class="kb-service-card"><div class="kb-service-icon kb-service-icon--payment">${kbIcon('svc-payment', 26)}</div><h3 data-i18n="nav.payment">แจ้งโอนเงิน</h3></a>
+      <a href="${CmsLayout.menuUrl('/download/')}" class="kb-service-card"><div class="kb-service-icon kb-service-icon--download">${kbIcon('svc-download', 26)}</div><h3 data-i18n="nav.download">ดาวน์โหลด</h3></a>
+      <a href="/news" class="kb-service-card"><div class="kb-service-icon kb-service-icon--news">${kbIcon('svc-news', 26)}</div><h3 data-i18n="nav.news">ข่าวสาร</h3></a>
+      <a href="${CmsLayout.menuUrl('/contact/')}" class="kb-service-card"><div class="kb-service-icon kb-service-icon--contact">${kbIcon('svc-contact', 26)}</div><h3 data-i18n="nav.contact">ติดต่อเรา</h3></a>
     </div>
   </div>
 </section>

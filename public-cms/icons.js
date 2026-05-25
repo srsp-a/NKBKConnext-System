@@ -42,7 +42,15 @@
     youtube:
       '<path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-2C18.88 4 12 4 12 4s-6.88 0-8.59.42a2.78 2.78 0 0 0-1.95 2 29 29 0 0 0 0 11.16 2.78 2.78 0 0 0 1.95 2C5.12 20 12 20 12 20s6.88 0 8.59-.42a2.78 2.78 0 0 0 1.95-2 29 29 0 0 0 0-11.16z"/><polygon points="10 15 16 12 10 9 10 15"/>',
     smartphone:
-      '<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/>'
+      '<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/>',
+    'svc-payment':
+      '<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18"/><circle cx="7.5" cy="15" r="1" fill="currentColor" stroke="none"/><path d="M12 15h5"/><path d="m16 12 3 3-3 3"/>',
+    'svc-download':
+      '<path d="M12 4v10"/><path d="m8.5 10.5 3.5 3.5 3.5-3.5"/><path d="M5 18h14"/><path d="M7 21h10"/>',
+    'svc-news':
+      '<path d="M6 4h12a2 2 0 0 1 2 2v13H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="M8 9h8"/><path d="M8 13h8"/><path d="M8 17h5"/><circle cx="17" cy="7" r="2.5" fill="currentColor" stroke="none"/>',
+    'svc-contact':
+      '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/><path d="M9 10h.01"/><path d="M12 10h.01"/><path d="M15 10h.01"/>'
   };
 
   const brands = {
@@ -61,11 +69,13 @@
     return `<svg class="kb-icon-svg kb-icon-svg--brand" viewBox="0 0 24 24" width="${n}" height="${n}" aria-hidden="true" fill="currentColor" stroke="none">${body}</svg>`;
   }
 
-  function svg(name, size) {
+  function svg(name, size, strokeWidth) {
     const n = size || 24;
     const body = icons[name];
     if (!body) return '';
-    return `<svg class="kb-icon-svg" viewBox="0 0 24 24" width="${n}" height="${n}" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+    const sw = strokeWidth != null ? strokeWidth : name.indexOf('svc-') === 0 ? 1.85 : 1.75;
+    const svcClass = name.indexOf('svc-') === 0 ? ' kb-icon-svg--service' : '';
+    return `<svg class="kb-icon-svg${svcClass}" viewBox="0 0 24 24" width="${n}" height="${n}" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
   }
 
   function wrap(name, className, size) {

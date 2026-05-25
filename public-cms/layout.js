@@ -57,7 +57,8 @@
       : '/#home-services';
   }
 
-  function renderHeader(activeKey) {
+  function renderHeader(activeKey, headerOpts) {
+    const opts = headerOpts || {};
     const c = cfg();
     const logo = c.logos?.header || c.logos?.favicon || '/assets/img/favicon-32.png';
     const cats = c.newsCategories || [];
@@ -67,6 +68,10 @@
           `<li><a href="/news?c=${encodeURIComponent(cat.slug)}">${catLabel(cat)}</a></li>`
       )
       .join('');
+    const newsNavLabel = opts.navNewsLabel ? String(opts.navNewsLabel) : '';
+    const newsTriggerBtn = newsNavLabel
+      ? `<button type="button" class="kb-nav-link kb-nav-trigger">${newsNavLabel.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</button>`
+      : `<button type="button" class="kb-nav-link kb-nav-trigger" data-i18n="nav.news">ข่าวสาร</button>`;
 
     const homeIcon =
       activeKey === 'home' && window.KbIcon ? KbIcon.svg('home', 16) : '';
@@ -102,7 +107,7 @@
       </div>
       <a href="${servicesHref()}" class="kb-nav-link${navActive(activeKey, 'services')}" data-i18n="nav.services">บริการของเรา</a>
       <div class="kb-nav-item kb-has-drop${navActive(activeKey, 'news')}">
-        <button type="button" class="kb-nav-link kb-nav-trigger" data-i18n="nav.news">ข่าวสาร</button>
+        ${newsTriggerBtn}
         <div class="kb-drop">
           <ul>
             <li><a href="/news" data-i18n="nav.newsAll">ข่าวทั้งหมด</a></li>
@@ -542,7 +547,9 @@
     const footerEl = document.getElementById('cms-footer');
     const titleEl = document.getElementById('cms-page-title');
     if (headerEl) {
-      headerEl.innerHTML = renderHeader(options.activeNav || '');
+      headerEl.innerHTML = renderHeader(options.activeNav || '', {
+        navNewsLabel: options.navNewsLabel || ''
+      });
       bindShellEvents(headerEl);
       scheduleHeaderOffsetSync();
     }
@@ -553,6 +560,26 @@
       footerEl.innerHTML = renderFooter();
       CmsI18n?.initLangToggle(footerEl);
       CmsI18n?.applyTranslations();
+    }
+    initMemberChatWidget();
+  }
+
+  function initMemberChatWidget() {
+    if (document.getElementById('kb-member-chat-root')) return;
+    const root = document.createElement('div');
+    root.id = 'kb-member-chat-root';
+    document.body.appendChild(root);
+    if (!document.querySelector('link[href*="member-chat-widget.css"]')) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = '/member-chat-widget.css?v=2';
+      document.head.appendChild(link);
+    }
+    if (!document.querySelector('script[src*="member-chat-widget.js"]')) {
+      const script = document.createElement('script');
+      script.src = '/member-chat-widget.js?v=2';
+      script.defer = true;
+      document.body.appendChild(script);
     }
   }
 

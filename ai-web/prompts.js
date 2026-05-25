@@ -13,7 +13,7 @@
 
   function token() {
     try {
-      return sessionStorage.getItem('nkbk_ai_token') || '';
+      return (window.NkbkAiAuthStore && window.NkbkAiAuthStore.getToken()) || '' || '';
     } catch (_) {
       return '';
     }
@@ -79,7 +79,7 @@
 
   function getProfileUsername() {
     try {
-      const profile = JSON.parse(sessionStorage.getItem('nkbk_ai_profile') || '{}');
+      const profile = (window.NkbkAiAuthStore && window.NkbkAiAuthStore.getProfile()) || {};
       return String(profile.username || '').trim();
     } catch (_) {
       return '';

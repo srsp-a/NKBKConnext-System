@@ -1,0 +1,337 @@
+/* แชทด่วน — น้องโมเน่ (สมาชิกสหกรณ์) */
+#kb-member-chat-root {
+  --kb-chat-primary: #c2185b;
+  --kb-chat-primary-dark: #880e4f;
+  --kb-chat-gradient: linear-gradient(135deg, #880e4f 0%, #c2185b 50%, #e91e8c 100%);
+  --kb-chat-shadow: 0 12px 40px rgba(136, 14, 79, 0.28);
+  font-family: 'Noto Sans Thai', 'Noto Sans', system-ui, sans-serif;
+  z-index: 99990;
+}
+
+.kb-chat-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  width: 62px;
+  height: 62px;
+  border: none;
+  border-radius: 50%;
+  background: var(--kb-chat-gradient);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: var(--kb-chat-shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  z-index: 99991;
+}
+
+.kb-chat-fab:hover {
+  transform: scale(1.06);
+  box-shadow: 0 16px 48px rgba(136, 14, 79, 0.35);
+}
+
+.kb-chat-fab:active {
+  transform: scale(0.98);
+}
+
+.kb-chat-fab svg {
+  width: 28px;
+  height: 28px;
+}
+
+.kb-chat-fab-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--kb-chat-primary-dark);
+  font-size: 11px;
+  font-weight: 700;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.kb-chat-fab-badge.is-visible {
+  display: flex;
+}
+
+.kb-chat-panel {
+  position: fixed;
+  right: 20px;
+  bottom: 92px;
+  width: min(400px, calc(100vw - 32px));
+  height: min(560px, calc(100vh - 120px));
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: var(--kb-chat-shadow);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(16px) scale(0.96);
+  transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s;
+  z-index: 99992;
+}
+
+.kb-chat-panel.is-open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+}
+
+.kb-chat-head {
+  padding: 16px 18px;
+  background: var(--kb-chat-gradient);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.kb-chat-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+}
+
+.kb-chat-head-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.kb-chat-head-title {
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.kb-chat-head-sub {
+  font-size: 0.78rem;
+  opacity: 0.92;
+  margin-top: 2px;
+}
+
+.kb-chat-close {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  cursor: pointer;
+  font-size: 1.4rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.kb-chat-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.kb-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  background: linear-gradient(180deg, #fdf6f8 0%, #fff 120px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.kb-chat-msg {
+  max-width: 88%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.kb-chat-msg--bot {
+  align-self: flex-start;
+  background: #fff;
+  border: 1px solid #f0d9e2;
+  border-bottom-left-radius: 4px;
+  color: #3a2a32;
+  box-shadow: 0 2px 8px rgba(194, 24, 91, 0.06);
+}
+
+.kb-chat-msg--user {
+  align-self: flex-end;
+  background: var(--kb-chat-gradient);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.kb-chat-msg--typing {
+  opacity: 0.75;
+  font-style: italic;
+}
+
+.kb-chat-quick {
+  flex-shrink: 0;
+  border-top: 1px solid #f0d9e2;
+  background: #fff;
+}
+
+.kb-chat-quick-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: var(--kb-chat-primary-dark);
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.kb-chat-quick-toggle:hover {
+  background: #fdf6f8;
+}
+
+.kb-chat-quick-chevron {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.kb-chat-quick.is-collapsed .kb-chat-quick-chevron {
+  transform: rotate(-90deg);
+}
+
+.kb-chat-quick-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 16px 10px;
+}
+
+.kb-chat-quick.is-collapsed .kb-chat-quick-inner {
+  display: none;
+}
+
+.kb-chat-quick-btn {
+  border: 1px solid #f0d9e2;
+  background: #fff;
+  color: var(--kb-chat-primary-dark);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  font-family: inherit;
+}
+
+.kb-chat-quick-btn:hover {
+  background: #fce4ec;
+  border-color: #f8bbd0;
+}
+
+.kb-chat-foot {
+  padding: 12px 14px 14px;
+  border-top: 1px solid #f0d9e2;
+  background: #fff;
+  flex-shrink: 0;
+}
+
+.kb-chat-form {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.kb-chat-input {
+  flex: 1;
+  min-height: 44px;
+  max-height: 120px;
+  padding: 10px 14px;
+  border: 1px solid #f0d9e2;
+  border-radius: 14px;
+  font-size: 0.92rem;
+  font-family: inherit;
+  resize: none;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.kb-chat-input:focus {
+  border-color: #f48fb1;
+  box-shadow: 0 0 0 3px rgba(233, 30, 99, 0.12);
+}
+
+.kb-chat-send {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 14px;
+  background: var(--kb-chat-gradient);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.kb-chat-send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.kb-chat-send:not(:disabled):hover {
+  transform: scale(1.04);
+}
+
+.kb-chat-note {
+  font-size: 0.68rem;
+  color: #9e8a92;
+  text-align: center;
+  margin-top: 8px;
+}
+
+@media (max-width: 480px) {
+  .kb-chat-panel {
+    right: 12px;
+    left: 12px;
+    width: auto;
+    bottom: 84px;
+    height: min(70vh, 520px);
+    border-radius: 18px;
+  }
+
+  .kb-chat-fab {
+    right: 16px;
+    bottom: 16px;
+    width: 56px;
+    height: 56px;
+  }
+}

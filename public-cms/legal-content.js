@@ -33,7 +33,7 @@ window.CMS_LEGAL_CONTENT = {
             },
             {
               q: 'ฝาก–ถอนเงินทำได้ที่ไหน?',
-              a: 'ทำได้ที่สหกรณ์ฯ ในวันและเวลาทำการ หรือใช้บริการออนไลน์ผ่านแอป NKBKConnect ตามเงื่อนไขที่เปิดให้บริการ'
+              a: 'ทำได้ที่สหกรณ์ฯ ในวันและเวลาทำการ หรือใช้บริการออนไลน์ผ่านแอป NKBKConnext ตามเงื่อนไขที่เปิดให้บริการ'
             }
           ]
         },
@@ -47,7 +47,7 @@ window.CMS_LEGAL_CONTENT = {
             },
             {
               q: 'ชำระเงินกู้หรือหุ้นสะสมอย่างไร?',
-              a: 'โอนเข้าบัญชีสหกรณ์ที่กำหนด แล้วแจ้งโอนผ่านหน้า <a href="/infrom-payment">แจ้งโอนเงิน</a> หรือแอป NKBKConnect เพื่อให้เจ้าหน้าที่บันทึกรายการ'
+              a: 'โอนเข้าบัญชีสหกรณ์ที่กำหนด แล้วแจ้งโอนผ่านหน้า <a href="/infrom-payment">แจ้งโอนเงิน</a> หรือแอป NKBKConnext เพื่อให้เจ้าหน้าที่บันทึกรายการ'
             }
           ]
         },
@@ -56,8 +56,8 @@ window.CMS_LEGAL_CONTENT = {
           label: 'บริการออนไลน์',
           items: [
             {
-              q: 'NKBKConnect คืออะไร?',
-              a: 'แอปพลิเคชันสำหรับสมาชิก ใช้ตรวจสอบยอดเงินฝาก–เงินกู้ แจ้งโอน และรับข่าวสารจากสหกรณ์ ดูวิธีดาวน์โหลดได้ที่หน้า <a href="/app">NKBKConnect</a>'
+              q: 'NKBKConnext คืออะไร?',
+              a: 'แอปพลิเคชันสำหรับสมาชิก ใช้ตรวจสอบยอดเงินฝาก–เงินกู้ แจ้งโอน และรับข่าวสารจากสหกรณ์ ดูวิธีดาวน์โหลดได้ที่หน้า <a href="/app">NKBKConnext</a>'
             },
             {
               q: 'ลืมรหัสผ่านแอปทำอย่างไร?',
@@ -137,7 +137,7 @@ window.CMS_LEGAL_CONTENT = {
             },
             {
               q: 'Where can I deposit or withdraw?',
-              a: 'At the cooperative during business hours, or online via the NKBKConnect app where available.'
+              a: 'At the cooperative during business hours, or online via the NKBKConnext app where available.'
             }
           ]
         },
@@ -151,7 +151,7 @@ window.CMS_LEGAL_CONTENT = {
             },
             {
               q: 'How do I pay loans or share instalments?',
-              a: 'Transfer to the designated cooperative account, then notify us via <a href="/infrom-payment">transfer notification</a> or the NKBKConnect app.'
+              a: 'Transfer to the designated cooperative account, then notify us via <a href="/infrom-payment">transfer notification</a> or the NKBKConnext app.'
             }
           ]
         },
@@ -160,7 +160,7 @@ window.CMS_LEGAL_CONTENT = {
           label: 'Digital services',
           items: [
             {
-              q: 'What is NKBKConnect?',
+              q: 'What is NKBKConnext?',
               a: 'The member mobile app to check deposit and loan balances, notify transfers, and receive news. See <a href="/app">how to download</a>.'
             },
             {
@@ -222,7 +222,7 @@ window.CMS_LEGAL_CONTENT = {
         },
         {
           title: '2. คำจำกัดความ',
-          body: '<p>“สหกรณ์” หมายถึง สหกรณ์ออมทรัพย์สาธารณสุขหนองคาย จำกัด “สมาชิก” หมายถึง ผู้มีสิทธิ์ตามข้อบังคับสหกรณ์ “บริการออนไลน์” รวมถึงเว็บไซต์ แอป NKBKConnect และช่องทางแจ้งโอนเงิน</p>'
+          body: '<p>“สหกรณ์” หมายถึง สหกรณ์ออมทรัพย์สาธารณสุขหนองคาย จำกัด “สมาชิก” หมายถึง ผู้มีสิทธิ์ตามข้อบังคับสหกรณ์ “บริการออนไลน์” รวมถึงเว็บไซต์ แอป NKBKConnext และช่องทางแจ้งโอนเงิน</p>'
         },
         {
           title: '3. การใช้งานที่เหมาะสม',
@@ -265,7 +265,7 @@ window.CMS_LEGAL_CONTENT = {
         },
         {
           title: '2. Definitions',
-          body: '<p>“Cooperative” means Nongkhai Public Health Savings Cooperative Limited. “Member” means a person with rights under the bylaws. “Online services” includes this website, NKBKConnect, and transfer notification channels.</p>'
+          body: '<p>“Cooperative” means Nongkhai Public Health Savings Cooperative Limited. “Member” means a person with rights under the bylaws. “Online services” includes this website, NKBKConnext, and transfer notification channels.</p>'
         },
         {
           title: '3. Acceptable use',

@@ -1,4 +1,4 @@
-/** หน้า NKBKConnect — ดาวน์โหลดและวิธีใช้งานแอป */
+/** หน้า NKBKConnext — ดาวน์โหลดและวิธีใช้งานแอป */
 const CMS_APP_PAGE_ID = '9208';
 const APP_MEDIA_BASE =
   'https://storage.googleapis.com/admin-panel-nkbkcoop-cbf10.firebasestorage.app/cms/wp/media/';
@@ -15,7 +15,7 @@ const APP_I18N_FALLBACK = {
   pageTitle: 'วิธีดาวน์โหลด/วิธีสมัครใช้บริการ App NKBKConnext',
   pageSubtitle: 'ดาวน์โหลดแอป สมัครใช้งาน และเริ่มต้นใช้บริการสมาชิกบนมือถือ',
   kicker: 'แอปสมาชิก',
-  heroTitle: 'NKBKConnect',
+  heroTitle: 'NKBKConnext',
   heroDesc:
     'ตรวจสอบยอดเงินฝาก เงินกู้ แจ้งโอน และรับข่าวสารจากสหกรณ์ — ใช้งานได้ทุกที่ทุกเวลา',
   f1: 'ตรวจสอบยอดบัญชีแบบเรียลไทม์',
@@ -24,13 +24,13 @@ const APP_I18N_FALLBACK = {
   appStore: 'App Store',
   googlePlay: 'Google Play',
   videoTitle: 'วิดีโอแนะนำการใช้งาน',
-  videoDesc: 'ชมขั้นตอนการดาวน์โหลดและสมัครใช้บริการแอป NKBKConnect',
+  videoDesc: 'ชมขั้นตอนการดาวน์โหลดและสมัครใช้บริการแอป NKBKConnext',
   videoFallback: 'เบราว์เซอร์ของคุณไม่รองรับการเล่นวิดีโอ',
   stepsTitle: 'ขั้นตอนการใช้งาน',
   stepsDesc: 'ทำตามภาพด้านล่างทีละขั้นตอน — จากดาวน์โหลดจนถึงเข้าใช้งานได้',
   stepLabel: 'ขั้นตอนที่',
   ctaTitle: 'พร้อมเริ่มใช้งานแล้ว?',
-  ctaDesc: 'ดาวน์โหลด NKBKConnect ได้ทั้ง iOS และ Android'
+  ctaDesc: 'ดาวน์โหลด NKBKConnext ได้ทั้ง iOS และ Android'
 };
 
 function appT(key) {

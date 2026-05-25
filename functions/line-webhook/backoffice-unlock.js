@@ -2,15 +2,12 @@
  * ปลดล็อคแอปสมาชิกที่ Back Office (nkhadmin.icoopsiam.com) ด้วย Puppeteer
  * ใช้เมื่อสั่งผ่าน LINE (คำสั่ง "ปลดล็อค 7368") — ระบบทำงานที่ backend ไม่ต้องเปิดเบราว์เซอร์
  *
- * ต้องติดตั้ง: npm install puppeteer
- * ถ้าไม่ติดตั้ง จะ return { ok: false, error: 'Puppeteer not installed' }
+ * Credentials: Firestore config/backoffice_secrets (Admin SDK) → env vars → ไม่มี fallback ในโค้ด
  */
 
 const BACKOFFICE = {
   loginUrl: 'https://nkhadmin.icoopsiam.com/',
-  manageUrl: 'https://nkhadmin.icoopsiam.com/mobileadmin/manageuser/manageuseraccount',
-  username: 'gloszilla',
-  password: 'nkbk43120'
+  manageUrl: 'https://nkhadmin.icoopsiam.com/mobileadmin/manageuser/manageuseraccount'
 };
 
 function normalizeMemberId(memberId) {
@@ -20,10 +17,43 @@ function normalizeMemberId(memberId) {
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
+async function resolveBackofficeCreds() {
+  try {
+    const { loadBackofficeCredentials } = require('../monitor-api/backoffice-creds');
+    const admin = require('firebase-admin');
+    if (!admin.apps.length) {
+      try {
+        admin.initializeApp();
+      } catch (e) {
+        if (!/already exists/i.test(e.message)) throw e;
+      }
+    }
+    const creds = await loadBackofficeCredentials(admin.firestore());
+    if (creds) return creds;
+  } catch (e) {
+    console.warn('[backoffice-unlock] Firestore creds:', e.message);
+  }
+  const username = (process.env.BACKOFFICE_USERNAME || '').trim();
+  const password = (process.env.BACKOFFICE_PASSWORD || '').trim();
+  if (username && password) {
+    return {
+      username,
+      password,
+      database: (process.env.BACKOFFICE_DATABASE || 'ฐานข้อมูลหลัก').trim()
+    };
+  }
+  return null;
+}
+
 async function runBackOfficeUnlock(memberId) {
   const id8 = normalizeMemberId(memberId);
   if (!id8) {
     return { ok: false, error: 'เลขสมาชิกไม่ถูกต้อง' };
+  }
+
+  const loginCreds = await resolveBackofficeCreds();
+  if (!loginCreds) {
+    return { ok: false, error: 'ยังไม่ได้ตั้งค่า Back Office ใน Admin Panel' };
   }
 
   let puppeteer;
@@ -44,14 +74,12 @@ async function runBackOfficeUnlock(memberId) {
     await page.setDefaultNavigationTimeout(30000);
     await page.setDefaultTimeout(15000);
 
-    // ไปหน้า Back Office (อาจ redirect ไป login)
     await page.goto(BACKOFFICE.manageUrl, { waitUntil: 'networkidle2' }).catch(() => {});
 
-    // ถ้ามีฟอร์มล็อกอิน ให้ใส่ user/pass แล้วกดเข้าสู่ระบบ
     const loginUser = await page.$('#form-login_username');
     if (loginUser) {
-      await page.type('#form-login_username', BACKOFFICE.username, { delay: 50 });
-      await page.type('#form-login_password', BACKOFFICE.password, { delay: 50 });
+      await page.type('#form-login_username', loginCreds.username, { delay: 50 });
+      await page.type('#form-login_password', loginCreds.password, { delay: 50 });
       await Promise.all([
         page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 }).catch(() => {}),
         page.click('button.ant-btn-primary')
@@ -59,11 +87,9 @@ async function runBackOfficeUnlock(memberId) {
       await delay(2000);
     }
 
-    // ไปหน้าจัดการบัญชี (ถ้ายังไม่อยู่)
     await page.goto(BACKOFFICE.manageUrl, { waitUntil: 'networkidle2' }).catch(() => {});
     await delay(1500);
 
-    // ช่องค้นหา (id จาก DOM ที่ user ให้มา)
     const searchSel = 'input#search-bar-0, input[placeholder*="ค้นหา"], input.search-table';
     const searchEl = await page.$(searchSel);
     if (!searchEl) {
@@ -75,7 +101,6 @@ async function runBackOfficeUnlock(memberId) {
     await page.keyboard.press('Enter');
     await delay(2500);
 
-    // หาแถวในตาราง แล้วกดเมนู (ไอคอนสถานะ / ปุ่มดำเนินการ)
     const rowSel = 'tr.user-row, table tbody tr';
     await page.waitForSelector(rowSel, { timeout: 8000 }).catch(() => null);
     const rows = await page.$$(rowSel);
@@ -84,7 +109,6 @@ async function runBackOfficeUnlock(memberId) {
       return { ok: false, error: 'ไม่พบรายการสมาชิกหลังค้นหา' };
     }
 
-    // แถวแรกที่ตรงเลขสมาชิก (หรือแถวแรกถ้าค้นหาแล้วได้แถวเดียว)
     const actionCell = await rows[0].$('td:nth-child(5), td:last-child');
     const menuTrigger = await (actionCell || rows[0]).$('i.anticon, button, [role="button"], .ant-dropdown-trigger');
     if (!menuTrigger) {
@@ -94,7 +118,6 @@ async function runBackOfficeUnlock(memberId) {
     await menuTrigger.click();
     await delay(800);
 
-    // คลิกเมนู "ล็อคบัญชี" หรือ "ปลดล็อค" (ถ้าบัญชีล็อคอยู่ การกดล็อคบัญชี = ปลดล็อค หรือมีเมนูแยก)
     const clicked = await page.evaluate(() => {
       const items = Array.from(document.querySelectorAll('li.MuiMenuItem-root, li[role="menuitem"], ul.MuiList-root li, .MuiMenu-list li'));
       const unlock = items.find(el => /ปลดล็อค|ล็อคบัญชี/.test(el.textContent || ''));
