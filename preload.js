@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   isPackagedApp: () => ipcRenderer.invoke('app-is-packaged'),
   checkAppUpdatesNow: () => ipcRenderer.invoke('app-check-updates-now'),
   setMonitorPushToken: (token) => ipcRenderer.invoke('monitor-set-push-token', token),
+  getMonitorPushToken: () => ipcRenderer.invoke('monitor-get-push-token'),
   clearMonitorPushToken: () => ipcRenderer.invoke('monitor-clear-push-token'),
   openExternalUrl: (url) => ipcRenderer.invoke('shell-open-external', url),
   /** เปิด LINE OAuth ในหน้าต่าง Electron (session เดียวกับ login) */

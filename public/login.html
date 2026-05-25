@@ -438,6 +438,34 @@
         }
         return fetch(url, options);
       }
+      function restoreMonitorTokenFromPushFile(done) {
+        var existing = localStorage.getItem('monitor_token');
+        if (existing) {
+          if (done) done(existing);
+          return;
+        }
+        if (!window.electronAPI || typeof window.electronAPI.getMonitorPushToken !== 'function') {
+          if (done) done('');
+          return;
+        }
+        window.electronAPI
+          .getMonitorPushToken()
+          .then(function(t) {
+            t = t != null ? String(t).trim() : '';
+            if (t && t.length >= 16) {
+              localStorage.setItem('monitor_token', t);
+              if (!localStorage.getItem(MONITOR_LOGIN_API_BASE_KEY)) {
+                localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, 'local');
+              }
+              if (done) done(t);
+              return;
+            }
+            if (done) done('');
+          })
+          .catch(function() {
+            if (done) done('');
+          });
+      }
       function persistMonitorSessionLocally(data, done) {
         if (!data || !data.token) {
           if (done) done();
@@ -679,38 +707,43 @@
       var monitorRemoteLogin = false;
       var apiBase = '';
       var saFirestoreHint = document.getElementById('saFirestoreHint');
-      var hasStoredToken = !!localStorage.getItem('monitor_token');
-      if (hasStoredToken) {
-        checkTokenAndShowForm();
-      } else {
-        setTimeout(function() {
-          if (!authFormShown && !authRedirecting) showLoginFormNow();
-        }, 3000);
+      function beginLoginPageAuth() {
+        var hasStoredToken = !!localStorage.getItem('monitor_token');
+        if (hasStoredToken) {
+          checkTokenAndShowForm();
+        } else {
+          setTimeout(function() {
+            if (!authFormShown && !authRedirecting) showLoginFormNow();
+          }, 3000);
+        }
+        fetch('/api/config', { cache: 'no-store' })
+          .then(function(r) { return r.json(); })
+          .then(function(c) {
+            applyLoginConfig(c);
+            try {
+              var savedSt = sessionStorage.getItem(LINE_STATE_KEY);
+              var started = parseInt(sessionStorage.getItem(LINE_STARTED_KEY) || '0', 10);
+              if (
+                savedSt &&
+                started &&
+                Date.now() - started < 10 * 60 * 1000 &&
+                !linePollTimer &&
+                !localStorage.getItem('monitor_token')
+              ) {
+                showMsg('กำลังรอผลจาก LINE (เบราว์เซอร์)...', false);
+                if (btnLine) btnLine.disabled = true;
+                startLineLoginPoll(savedSt);
+              }
+            } catch (xResume) {}
+            if (!hasStoredToken) showLoginFormNow();
+          })
+          .catch(function() {
+            if (!hasStoredToken) showLoginFormNow();
+          });
       }
-      fetch('/api/config', { cache: 'no-store' })
-        .then(function(r) { return r.json(); })
-        .then(function(c) {
-          applyLoginConfig(c);
-          try {
-            var savedSt = sessionStorage.getItem(LINE_STATE_KEY);
-            var started = parseInt(sessionStorage.getItem(LINE_STARTED_KEY) || '0', 10);
-            if (
-              savedSt &&
-              started &&
-              Date.now() - started < 10 * 60 * 1000 &&
-              !linePollTimer &&
-              !localStorage.getItem('monitor_token')
-            ) {
-              showMsg('กำลังรอผลจาก LINE (เบราว์เซอร์)...', false);
-              if (btnLine) btnLine.disabled = true;
-              startLineLoginPoll(savedSt);
-            }
-          } catch (xResume) {}
-          if (!hasStoredToken) showLoginFormNow();
-        })
-        .catch(function() {
-          if (!hasStoredToken) showLoginFormNow();
-        });
+      restoreMonitorTokenFromPushFile(function() {
+        beginLoginPageAuth();
+      });
 
       pinInput.addEventListener('input', function() {
         if (monitorRemoteLogin) return;
@@ -732,13 +765,16 @@
       function finishLineLoginWithToken(d) {
         stopLinePoll();
         clearLineOAuthSessionStorage();
-        localStorage.setItem('monitor_token', d.token);
-        localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, 'local');
-        if (window.electronAPI && typeof window.electronAPI.setMonitorPushToken === 'function') {
-          window.electronAPI.setMonitorPushToken(d.token);
+        function completeLineLogin() {
+          localStorage.setItem('monitor_token', d.token);
+          localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, 'local');
+          if (window.electronAPI && typeof window.electronAPI.setMonitorPushToken === 'function') {
+            window.electronAPI.setMonitorPushToken(d.token);
+          }
+          showMsg('เข้าสู่ระบบสำเร็จ กำลังเปลี่ยนหน้า...', false);
+          window.location.replace('index.html');
         }
-        showMsg('เข้าสู่ระบบสำเร็จ กำลังเปลี่ยนหน้า...', false);
-        window.location.replace('index.html');
+        persistMonitorSessionLocally(d, completeLineLogin);
       }
       function applyLinePollJson(d) {
         if (!d) return false;

@@ -822,6 +822,34 @@
           window.electronAPI.clearMonitorPushToken();
         }
       }
+      function restoreMonitorTokenFromPushFile(done) {
+        var existing = localStorage.getItem('monitor_token');
+        if (existing) {
+          if (done) done(existing);
+          return;
+        }
+        if (!window.electronAPI || typeof window.electronAPI.getMonitorPushToken !== 'function') {
+          if (done) done('');
+          return;
+        }
+        window.electronAPI
+          .getMonitorPushToken()
+          .then(function(t) {
+            t = t != null ? String(t).trim() : '';
+            if (t && t.length >= 16) {
+              localStorage.setItem('monitor_token', t);
+              if (!localStorage.getItem(MONITOR_LOGIN_API_BASE_KEY)) {
+                localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, 'local');
+              }
+              if (done) done(t);
+              return;
+            }
+            if (done) done('');
+          })
+          .catch(function() {
+            if (done) done('');
+          });
+      }
       function redirectToLogin() { window.location.replace('login.html'); }
       function performMonitorLogout() {
         if (token) {
@@ -961,13 +989,6 @@
           })
           .catch(function () {});
       }
-      if (!token) {
-        redirectToLogin();
-        return;
-      }
-      if (window.electronAPI && typeof window.electronAPI.setMonitorPushToken === 'function') {
-        window.electronAPI.setMonitorPushToken(token);
-      }
       function setMonitorUserField(id, val) {
         var el = document.getElementById(id);
         if (!el) return;
@@ -1066,10 +1087,22 @@
       function checkMe() {
         var attempts = buildMonitorMeAttempts();
         var idx = 0;
-        function next() {
-          if (idx >= attempts.length) {
+        var anyOk = false;
+        var finishedAttempts = 0;
+        var auth401Count = 0;
+        function finishIfDone() {
+          if (anyOk) return;
+          if (finishedAttempts < attempts.length) return;
+          if (auth401Count === attempts.length) {
             clearMonitorAuth();
             redirectToLogin();
+          } else {
+            onAuthReady();
+          }
+        }
+        function next() {
+          if (idx >= attempts.length) {
+            finishIfDone();
             return;
           }
           var b = attempts[idx++];
@@ -1077,32 +1110,32 @@
             .then(function(r) {
               var st = r.status;
               if (st === 401) {
-                next();
+                finishedAttempts++;
+                auth401Count++;
+                finishIfDone();
+                if (idx < attempts.length) next();
                 return null;
               }
               return r.json().then(function(data) { return { st: st, data: data }; });
             })
             .then(function(pack) {
               if (!pack) return;
+              finishedAttempts++;
               if (pack.data && pack.data.ok) {
+                anyOk = true;
                 applySuccessfulSessionBase(b);
                 applyMonitorUserProfile(pack.data);
                 onAuthReady();
                 return;
               }
+              finishIfDone();
               if (idx < attempts.length) next();
-              else {
-                clearMonitorAuth();
-                redirectToLogin();
-              }
             })
             .catch(function(err) {
+              finishedAttempts++;
               console.warn('monitor-me', err);
+              finishIfDone();
               if (idx < attempts.length) next();
-              else {
-                clearMonitorAuth();
-                redirectToLogin();
-              }
             });
         }
         next();
@@ -1351,18 +1384,31 @@
         if (el1) el1.textContent = t;
         if (el2) el2.textContent = t;
       }
-      fetch('/api/config').then(function(r) { return r.json(); }).then(function(c) {
-        apiBase = (c.monitorApiUrl || '').trim().replace(/\/$/, '');
-        monitorSessionBase = readSavedSessionBase();
-        if (c && c.appVersion) setAppVersion(c.appVersion);
-        checkMe();
-      }).catch(function() {
-        monitorSessionBase = readSavedSessionBase();
-        checkMe();
-      });
-      if (window.electronAPI && window.electronAPI.getAppVersion) {
-        window.electronAPI.getAppVersion().then(function(v) { if (v) setAppVersion(v); }).catch(function() {});
+      function startIndexAuth() {
+        if (!token) {
+          redirectToLogin();
+          return;
+        }
+        if (window.electronAPI && typeof window.electronAPI.setMonitorPushToken === 'function') {
+          window.electronAPI.setMonitorPushToken(token);
+        }
+        fetch('/api/config').then(function(r) { return r.json(); }).then(function(c) {
+          apiBase = (c.monitorApiUrl || '').trim().replace(/\/$/, '');
+          monitorSessionBase = readSavedSessionBase();
+          if (c && c.appVersion) setAppVersion(c.appVersion);
+          checkMe();
+        }).catch(function() {
+          monitorSessionBase = readSavedSessionBase();
+          checkMe();
+        });
+        if (window.electronAPI && window.electronAPI.getAppVersion) {
+          window.electronAPI.getAppVersion().then(function(v) { if (v) setAppVersion(v); }).catch(function() {});
+        }
       }
+      restoreMonitorTokenFromPushFile(function(restored) {
+        if (restored) token = restored;
+        startIndexAuth();
+      });
     })();
   </script>
   <script src="update-flow-overlay.js"></script>

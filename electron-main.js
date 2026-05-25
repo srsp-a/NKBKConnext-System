@@ -1318,6 +1318,16 @@ ipcMain.handle('monitor-set-push-token', (_e, tokenRaw) => {
     return { ok: false, error: (e && e.message) || String(e) };
   }
 });
+ipcMain.handle('monitor-get-push-token', () => {
+  try {
+    const p = getMonitorPushTokenPath();
+    if (!fs.existsSync(p)) return '';
+    const t = fs.readFileSync(p, { encoding: 'utf8' }).trim();
+    return t.length >= 16 ? t : '';
+  } catch (_) {
+    return '';
+  }
+});
 ipcMain.handle('monitor-clear-push-token', () => {
   try {
     fs.unlinkSync(getMonitorPushTokenPath());
