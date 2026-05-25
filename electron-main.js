@@ -1382,17 +1382,43 @@ ipcMain.handle('open-line-oauth-window', async (_e, url) => {
     lineOAuthWindow.on('closed', () => {
       lineOAuthWindow = null;
     });
-    const notifyMainWindowLineCallback = (navigatedUrl) => {
+    const notifyMainWindowLineOAuth = (navigatedUrl) => {
       try {
-        if (typeof navigatedUrl !== 'string' || navigatedUrl.indexOf('/api/line-login-callback') === -1) {
-          return;
-        }
+        if (typeof navigatedUrl !== 'string') return;
         let parsed;
         try {
           parsed = new URL(navigatedUrl.split('#')[0]);
         } catch (_) {
           return;
         }
+        const lineOk = parsed.searchParams.get('line_ok');
+        const lineErr = parsed.searchParams.get('line_err');
+        if (lineOk === '1') {
+          const tok = parsed.searchParams.get('token');
+          const username = parsed.searchParams.get('username') || '';
+          if (tok && mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('nkbk-line-oauth-token', { token: tok, username });
+          }
+          setTimeout(() => {
+            try {
+              if (lineOAuthWindow && !lineOAuthWindow.isDestroyed()) lineOAuthWindow.close();
+            } catch (_) {}
+          }, 400);
+          return;
+        }
+        if (lineErr === '1') {
+          const message = parsed.searchParams.get('message') || 'เข้าสู่ระบบ LINE ไม่สำเร็จ';
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('nkbk-line-oauth-error', { message });
+          }
+          setTimeout(() => {
+            try {
+              if (lineOAuthWindow && !lineOAuthWindow.isDestroyed()) lineOAuthWindow.close();
+            } catch (_) {}
+          }, 400);
+          return;
+        }
+        if (navigatedUrl.indexOf('/api/line-login-callback') === -1) return;
         const st = parsed.searchParams.get('state');
         if (!st) return;
         setTimeout(() => {
@@ -1401,12 +1427,14 @@ ipcMain.handle('open-line-oauth-window', async (_e, url) => {
               mainWindow.webContents.send('nkbk-line-oauth-done', { state: st });
             }
           } catch (_) {}
-        }, 900);
+        }, 1500);
       } catch (_) {}
     };
     const scheduleCloseIfLineCallback = (navigatedUrl) => {
       try {
-        if (typeof navigatedUrl !== 'string' || navigatedUrl.indexOf('/api/line-login-callback') === -1) return;
+        if (typeof navigatedUrl !== 'string') return;
+        if (navigatedUrl.indexOf('line_ok=1') >= 0 || navigatedUrl.indexOf('line_err=1') >= 0) return;
+        if (navigatedUrl.indexOf('/api/line-login-callback') === -1) return;
         const q = navigatedUrl.indexOf('?');
         const qs = q >= 0 ? navigatedUrl.slice(q) : '';
         if (!qs || (qs.indexOf('code=') < 0 && qs.indexOf('error=') < 0)) return;
@@ -1418,7 +1446,7 @@ ipcMain.handle('open-line-oauth-window', async (_e, url) => {
       } catch (_) {}
     };
     const onLineOauthChildNavigated = (navigatedUrl) => {
-      notifyMainWindowLineCallback(navigatedUrl);
+      notifyMainWindowLineOAuth(navigatedUrl);
       scheduleCloseIfLineCallback(navigatedUrl);
     };
     lineOAuthWindow.webContents.on('did-navigate', (_evt, navigatedUrl) => {

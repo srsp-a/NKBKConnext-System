@@ -3120,7 +3120,7 @@ app.get('/api/line-login-callback', async (req, res) => {
       role: v2User.role != null ? String(v2User.role).trim() : ''
     });
     await setLineLoginPollState(state, { token, username: sessionName, expires: Date.now() + 120000 });
-    const back = `${returnOrigin}/login.html?line_resume=1&state=${encodeURIComponent(state)}`;
+    const back = `${returnOrigin}/login.html?line_ok=1&token=${encodeURIComponent(token)}&username=${encodeURIComponent(sessionName)}`;
     return res.status(200).type('html').send(
       '<!DOCTYPE html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">' +
         '<title>เข้าสู่ระบบแล้ว</title></head><body style="font-family:sans-serif;padding:2rem;text-align:center;background:#0d0f14;color:#e8eaed">' +

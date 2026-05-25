@@ -21,6 +21,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
       } catch (_) {}
     });
   },
+  /** main process ส่ง token โดยตรงหลัง LINE callback สำเร็จ (ไม่ต้อง poll) */
+  onLineOAuthToken: (cb) => {
+    const ch = 'nkbk-line-oauth-token';
+    ipcRenderer.removeAllListeners(ch);
+    ipcRenderer.on(ch, (_e, payload) => {
+      try {
+        if (payload && payload.token && typeof cb === 'function') cb(payload);
+      } catch (_) {}
+    });
+  },
+  onLineOAuthError: (cb) => {
+    const ch = 'nkbk-line-oauth-error';
+    ipcRenderer.removeAllListeners(ch);
+    ipcRenderer.on(ch, (_e, payload) => {
+      try {
+        if (payload && typeof cb === 'function') cb(payload);
+      } catch (_) {}
+    });
+  },
   minimize: () => ipcRenderer.send('window-minimize'),
   maximize: () => ipcRenderer.send('window-maximize'),
   close: () => ipcRenderer.send('window-close'),
