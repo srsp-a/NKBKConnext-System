@@ -185,14 +185,93 @@ function persistMonitorSessionsToDisk() {
     }
   }, 80);
 }
+const MONITOR_SESSIONS_FS_COLLECTION = 'monitor_api_sessions';
+const MONITOR_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+function isMonitorApiOnCloudFunctions() {
+  return !!(process.env.K_SERVICE || process.env.FUNCTION_TARGET);
+}
+
+function monitorSessionFirestoreRef(token) {
+  const db = getMonitorAdminFirestore();
+  if (!db || !token) return null;
+  return db.collection(MONITOR_SESSIONS_FS_COLLECTION).doc(String(token));
+}
+
+async function loadMonitorSessionFromFirestore(token) {
+  const ref = monitorSessionFirestoreRef(token);
+  if (!ref) return null;
+  try {
+    const snap = await ref.get();
+    if (!snap.exists) return null;
+    const d = snap.data() || {};
+    let expiresMs = 0;
+    if (d.expiresAt && typeof d.expiresAt.toMillis === 'function') {
+      expiresMs = d.expiresAt.toMillis();
+    } else if (typeof d.expiresAtMs === 'number') {
+      expiresMs = d.expiresAtMs;
+    }
+    if (expiresMs && Date.now() > expiresMs) {
+      ref.delete().catch(() => {});
+      return null;
+    }
+    const sess = {
+      username: String(d.username || '').trim(),
+      createdAt: typeof d.createdAtMs === 'number' ? d.createdAtMs : Date.now(),
+      fullname: d.fullname != null ? String(d.fullname).trim() : '',
+      email: d.email != null ? String(d.email).trim() : '',
+      group: d.group != null ? String(d.group).trim() : '',
+      role: d.role != null ? String(d.role).trim() : ''
+    };
+    if (!sess.username) return null;
+    MONITOR_SESSIONS.set(token, sess);
+    return sess;
+  } catch (e) {
+    console.warn('[Monitor API] load session Firestore:', e.message);
+    return null;
+  }
+}
+
+async function persistMonitorSessionToFirestore(token, sessionObj) {
+  if (!isMonitorApiOnCloudFunctions()) return;
+  const ref = monitorSessionFirestoreRef(token);
+  if (!ref) return;
+  try {
+    const admin = require('firebase-admin');
+    const createdAt = sessionObj.createdAt || Date.now();
+    await ref.set({
+      username: String(sessionObj.username || '').trim(),
+      createdAtMs: createdAt,
+      fullname: sessionObj.fullname != null ? String(sessionObj.fullname).trim() : '',
+      email: sessionObj.email != null ? String(sessionObj.email).trim() : '',
+      group: sessionObj.group != null ? String(sessionObj.group).trim() : '',
+      role: sessionObj.role != null ? String(sessionObj.role).trim() : '',
+      expiresAt: admin.firestore.Timestamp.fromDate(new Date(createdAt + MONITOR_SESSION_TTL_MS))
+    });
+  } catch (e) {
+    console.warn('[Monitor API] persist session Firestore:', e.message);
+  }
+}
+
+async function getMonitorSession(token) {
+  if (!token) return null;
+  const cached = MONITOR_SESSIONS.get(token);
+  if (cached) return cached;
+  if (!isMonitorApiOnCloudFunctions()) return null;
+  return loadMonitorSessionFromFirestore(token);
+}
+
 function monitorSessionsSet(token, sessionObj) {
   MONITOR_SESSIONS.set(token, sessionObj);
   persistMonitorSessionsToDisk();
+  persistMonitorSessionToFirestore(token, sessionObj).catch(() => {});
 }
 function monitorSessionsDelete(token) {
   if (!token) return;
   MONITOR_SESSIONS.delete(token);
   persistMonitorSessionsToDisk();
+  const ref = monitorSessionFirestoreRef(token);
+  if (ref) ref.delete().catch(() => {});
 }
 loadMonitorSessionsFromDisk();
 
@@ -1382,7 +1461,7 @@ app.get('/', (req, res) => {
 // =====================================================
 // สเปกเครื่องจากแอป Monitor -> แสดงบนเว็บ (nkbk.srsp.app)
 // =====================================================
-app.post('/api/monitor-system-snapshot', (req, res) => {
+app.post('/api/monitor-system-snapshot', async (req, res) => {
   if (!getMonitorSystemUploadSecret()) {
     return res.status(503).json({ ok: false, message: 'เซิร์ฟเวอร์ยังไม่ตั้ง MONITOR_SYSTEM_UPLOAD_SECRET' });
   }
@@ -1408,7 +1487,7 @@ app.post('/api/monitor-system-snapshot', (req, res) => {
     req.body && req.body.monitorToken != null ? String(req.body.monitorToken).trim() : '';
   const tok = tokenHdr || tokenBody;
   if (tok) {
-    const sess = MONITOR_SESSIONS.get(tok);
+    const sess = await getMonitorSession(tok);
     if (sess && sess.username) {
       sessionUserLabel = (sess.fullname && String(sess.fullname).trim()) || String(sess.username).trim();
     }
@@ -1787,7 +1866,7 @@ function _notifNormalize(n) {
 
 app.get('/api/monitor-notifications', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
-  const session = token ? MONITOR_SESSIONS.get(token) : null;
+  const session = token ? await getMonitorSession(token) : null;
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
   try {
     const u = await findUserForMonitor(session.username);
@@ -1805,7 +1884,7 @@ app.get('/api/monitor-notifications', async (req, res) => {
 
 app.post('/api/monitor-notification-read', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
-  const session = token ? MONITOR_SESSIONS.get(token) : null;
+  const session = token ? await getMonitorSession(token) : null;
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
   const ids = Array.isArray(req.body && req.body.ids) ? req.body.ids.map(String) : [];
   const all = !!(req.body && req.body.all);
@@ -1836,7 +1915,7 @@ app.post('/api/monitor-notification-read', async (req, res) => {
 /** สร้าง notification โดย admin (broadcast / role / position / user) */
 app.post('/api/monitor-notification-create', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
-  const session = token ? MONITOR_SESSIONS.get(token) : null;
+  const session = token ? await getMonitorSession(token) : null;
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
   try {
     const u = await findUserForMonitor(session.username);
@@ -2106,7 +2185,7 @@ function _leaveIsIsoDate(s) {
 
 app.get('/api/monitor-leave-submit-meta', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
-  const session = token ? MONITOR_SESSIONS.get(token) : null;
+  const session = token ? await getMonitorSession(token) : null;
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
   try {
     const typesMap = await _leaveLoadTypes();
@@ -2130,7 +2209,7 @@ app.get('/api/monitor-leave-submit-meta', async (req, res) => {
 
 app.post('/api/monitor-leave-submit', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
-  const session = token ? MONITOR_SESSIONS.get(token) : null;
+  const session = token ? await getMonitorSession(token) : null;
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
   const body = req.body || {};
   const typeId = String(body.type || '').trim();
@@ -2202,7 +2281,7 @@ app.post('/api/monitor-leave-submit', async (req, res) => {
 
 app.get('/api/monitor-my-leaves', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
-  const session = token ? MONITOR_SESSIONS.get(token) : null;
+  const session = token ? await getMonitorSession(token) : null;
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
   try {
     const u = await findUserForMonitor(session.username);
@@ -2236,7 +2315,7 @@ app.get('/api/monitor-my-leaves', async (req, res) => {
 
 app.get('/api/monitor-my-leave-balance', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
-  const session = token ? MONITOR_SESSIONS.get(token) : null;
+  const session = token ? await getMonitorSession(token) : null;
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
   try {
     const u = await findUserForMonitor(session.username);
@@ -2267,7 +2346,7 @@ app.get('/api/monitor-my-leave-balance', async (req, res) => {
 
 app.get('/api/monitor-leave-pending-approvals', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
-  const session = token ? MONITOR_SESSIONS.get(token) : null;
+  const session = token ? await getMonitorSession(token) : null;
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
   try {
     const u = await findUserForMonitor(session.username);
@@ -2308,7 +2387,7 @@ app.get('/api/monitor-leave-pending-approvals', async (req, res) => {
 
 app.post('/api/monitor-leave-approve', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
-  const session = token ? MONITOR_SESSIONS.get(token) : null;
+  const session = token ? await getMonitorSession(token) : null;
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
   const leaveId = req.body && req.body.leaveId ? String(req.body.leaveId) : '';
   if (!leaveId) return res.status(400).json({ ok: false, reason: 'no_id' });
@@ -2393,7 +2472,7 @@ app.post('/api/monitor-leave-approve', async (req, res) => {
 
 app.post('/api/monitor-leave-reject', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
-  const session = token ? MONITOR_SESSIONS.get(token) : null;
+  const session = token ? await getMonitorSession(token) : null;
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
   const leaveId = req.body && req.body.leaveId ? String(req.body.leaveId) : '';
   const reason = req.body && req.body.reason != null ? String(req.body.reason).trim() : '';
@@ -2445,7 +2524,7 @@ app.post('/api/monitor-leave-reject', async (req, res) => {
 
 app.get('/api/monitor-leave-form-data', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
-  const session = token ? MONITOR_SESSIONS.get(token) : null;
+  const session = token ? await getMonitorSession(token) : null;
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
   const leaveId = String(req.query.leaveId || '').trim();
   if (!leaveId) return res.status(400).json({ ok: false, reason: 'no_id' });
@@ -2530,7 +2609,7 @@ app.get('/api/monitor-leave-form-data', async (req, res) => {
 // =====================================================
 app.get('/api/monitor-me', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
-  const session = token ? MONITOR_SESSIONS.get(token) : null;
+  const session = token ? await getMonitorSession(token) : null;
   if (!session) return res.status(401).json({ ok: false });
   let fullname = session.fullname || '';
   let email = session.email || '';
@@ -2575,7 +2654,7 @@ app.get('/api/monitor-me', async (req, res) => {
 // =====================================================
 app.get('/api/monitor-attendance-month', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
-  const session = token ? MONITOR_SESSIONS.get(token) : null;
+  const session = token ? await getMonitorSession(token) : null;
   if (!session) return res.status(401).json({ ok: false, message: 'กรุณาเข้าสู่ระบบใหม่' });
   const year = parseInt(req.query.year, 10);
   const month = parseInt(req.query.month, 10);
@@ -2598,7 +2677,7 @@ app.get('/api/monitor-attendance-month', async (req, res) => {
 // =====================================================
 app.post('/api/monitor-change-pin', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || '').trim();
-  const session = token ? MONITOR_SESSIONS.get(token) : null;
+  const session = token ? await getMonitorSession(token) : null;
   if (!session) return res.status(401).json({ ok: false, message: 'กรุณาเข้าสู่ระบบใหม่' });
   const currentPin = String((req.body && req.body.currentPin) || '').trim();
   const newPin = String((req.body && req.body.newPin) || '').trim();
@@ -3104,7 +3183,7 @@ function loadNkbkAiModule(name) {
 
 async function resolveMonitorSessionFromToken(token) {
   if (!token) return null;
-  const session = MONITOR_SESSIONS.get(token);
+  const session = await getMonitorSession(token);
   if (!session) return null;
   return {
     username: session.username || '',

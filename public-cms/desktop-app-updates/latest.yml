@@ -1,8 +1,8 @@
-version: 1.0.13
+version: 1.0.14
 files:
-  - url: NKBKConnext System Setup 1.0.13.exe
-    sha512: UmxbzRw9H6mx2xZ7H/CT49zmLURsQ+eqUlS0JZM/35T/IoAapxCNYZwYc4v1Q6niDgVqcxFEcjzT+8yu5DCMxg==
-    size: 91188050
-path: NKBKConnext System Setup 1.0.13.exe
-sha512: UmxbzRw9H6mx2xZ7H/CT49zmLURsQ+eqUlS0JZM/35T/IoAapxCNYZwYc4v1Q6niDgVqcxFEcjzT+8yu5DCMxg==
-releaseDate: '2026-05-25T02:41:02.777Z'
+  - url: NKBKConnext System Setup 1.0.14.exe
+    sha512: Xl+kUKjyHqooa4YYMfpQetc9CFBJ576hksimrBeKq7rUUaYMCMBpBYBGFgicrt+Ufylw4Ezp6e0x7BG+Cw+8pg==
+    size: 91188272
+path: NKBKConnext System Setup 1.0.14.exe
+sha512: Xl+kUKjyHqooa4YYMfpQetc9CFBJ576hksimrBeKq7rUUaYMCMBpBYBGFgicrt+Ufylw4Ezp6e0x7BG+Cw+8pg==
+releaseDate: '2026-05-25T03:04:11.160Z'

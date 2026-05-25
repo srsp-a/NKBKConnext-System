@@ -984,9 +984,15 @@ async function proxyMonitorMeFromRemote(token) {
   let saw401 = false;
   for (const base of bases) {
     try {
-      const r = await fetch(`${String(base).replace(/\/$/, '')}/api/monitor-me`, {
-        headers: { 'X-Monitor-Token': token }
-      });
+      const url = `${String(base).replace(/\/$/, '')}/api/monitor-me`;
+      const r = await requestMonitorApi(
+        url,
+        'GET',
+        { 'X-Monitor-Token': token },
+        null,
+        12000,
+        url.startsWith('https') ? false : true
+      );
       let data = null;
       try {
         data = await r.json();
@@ -2317,6 +2323,43 @@ function postJsonToMonitorApi(url, body, timeoutMs, rejectUnauthorized = false, 
   });
 }
 
+/** HTTP(S) request ไป monitor API — รองรับ Windows ที่ไม่เชื่อถือใบรับรอง HTTPS ของโดเมนองค์กร */
+function requestMonitorApi(url, method, headers, bodyStr, timeoutMs, rejectUnauthorized = false) {
+  const u = new URL(url);
+  const isHttps = u.protocol === 'https:';
+  const opts = {
+    hostname: u.hostname,
+    port: u.port || (isHttps ? 443 : 80),
+    path: u.pathname + u.search,
+    method: method || 'GET',
+    headers: {
+      Accept: 'application/json',
+      'User-Agent': 'NKBKConnext-Monitor/1.0',
+      ...(headers || {})
+    }
+  };
+  if (isHttps && rejectUnauthorized === false) {
+    opts.rejectUnauthorized = false;
+  }
+  const mod = isHttps ? https : http;
+  return new Promise((resolve, reject) => {
+    const req = mod.request(opts, (res) => {
+      let raw = '';
+      res.on('data', (ch) => {
+        raw += ch;
+      });
+      res.on('end', () => resolve({ status: res.statusCode, raw }));
+    });
+    req.on('error', reject);
+    req.setTimeout(timeoutMs || 25000, () => {
+      req.destroy();
+      reject(new Error('ETIMEDOUT'));
+    });
+    if (bodyStr != null && bodyStr !== '') req.end(bodyStr);
+    else req.end();
+  });
+}
+
 /** GET JSON จาก monitor API (HTTPS บน Windows อาจต้อง rejectUnauthorized: false) */
 function getJsonFromMonitorApi(url, timeoutMs, rejectUnauthorized = false) {
   const u = new URL(url);
@@ -2663,6 +2706,11 @@ app.get('/api/diag-monitor-config', (req, res) => {
   res.json({
     ok: true,
     monitorApiUrlResolved: getMonitorApiUrl() || null,
+    remoteLoginReady: !!getMonitorApiUrl(),
+    hint:
+      !getMonitorApiUrl() && !ensureMonitorFirestore()
+        ? 'ติดตั้งใหม่: ต้องมี monitor-config.json ข้าง .exe ที่มี monitorApiUrl หรือไฟล์ firebase-service-account.json'
+        : null,
     envMonitorApiUrl: String(process.env.MONITOR_API_URL || '').trim() || null,
     lineLoginLocalCreds: (() => {
       const lc = getLineLoginChannelCredentials();
@@ -3300,13 +3348,20 @@ async function proxyMonitorToRemote(req, res, apiPath) {
     try {
       const url = base.replace(/\/$/, '') + apiPath + queryStr;
       const headers = { 'X-Monitor-Token': token };
-      let body;
-      if (req.method === 'POST') {
+      let bodyStr = null;
+      if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
         headers['Content-Type'] = 'application/json';
-        body = JSON.stringify(req.body || {});
+        bodyStr = JSON.stringify(req.body || {});
       }
-      const r = await fetch(url, { method: req.method, headers, body });
-      const raw = await r.text();
+      const r = await requestMonitorApi(
+        url,
+        req.method,
+        headers,
+        bodyStr,
+        25000,
+        url.startsWith('https') ? false : true
+      );
+      const raw = r.raw || '';
       let j;
       try {
         j = raw ? JSON.parse(raw) : {};
@@ -3352,11 +3407,22 @@ async function resolveMonitorSessionFromToken(token) {
   if (fallbackBase && fallbackBase !== remoteBase) bases.push(fallbackBase);
   for (const base of bases) {
     try {
-      const r = await fetch(`${base.replace(/\/$/, '')}/api/monitor-me`, {
-        headers: { 'X-Monitor-Token': token }
-      });
+      const url = `${base.replace(/\/$/, '')}/api/monitor-me`;
+      const r = await requestMonitorApi(
+        url,
+        'GET',
+        { 'X-Monitor-Token': token },
+        null,
+        12000,
+        url.startsWith('https') ? false : true
+      );
       if (r.status !== 200) continue;
-      const data = await r.json().catch(() => null);
+      let data;
+      try {
+        data = r.raw ? JSON.parse(r.raw) : null;
+      } catch (_) {
+        data = null;
+      }
       if (!data || !data.ok) continue;
       return {
         username: String(data.username || ''),
@@ -4364,15 +4430,20 @@ app.post('/api/monitor-logout', async (req, res) => {
     if (fallbackBase && fallbackBase !== remoteBase) bases.push(fallbackBase);
     for (const base of bases) {
       try {
-        const r = await fetch(`${base}/api/monitor-logout`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Monitor-Token': token
-          },
-          body: JSON.stringify(req.body || {})
-        });
-        const data = await r.json().catch(() => ({ ok: true }));
+        const url = `${base.replace(/\/$/, '')}/api/monitor-logout`;
+        const bodyStr = JSON.stringify(req.body || {});
+        const r = await requestMonitorApi(
+          url,
+          'POST',
+          { 'Content-Type': 'application/json', 'X-Monitor-Token': token },
+          bodyStr,
+          12000,
+          url.startsWith('https') ? false : true
+        );
+        let data = { ok: true };
+        try {
+          data = r.raw ? JSON.parse(r.raw) : { ok: true };
+        } catch (_) {}
         return res.status(r.status).json(data);
       } catch (err) {
         if (bases.indexOf(base) < bases.length - 1) continue;

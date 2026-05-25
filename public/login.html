@@ -413,6 +413,15 @@
         loginMsg.textContent = '';
       }
       var MONITOR_LOGIN_API_BASE_KEY = 'monitor_login_api_base';
+      function saveMonitorLoginApiBase(usedDirectRemote) {
+        if (usedDirectRemote && apiBase) {
+          localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, apiBase);
+        } else if (monitorRemoteLogin && apiBase) {
+          localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, apiBase);
+        } else {
+          localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, 'local');
+        }
+      }
       var authRedirecting = false;
       var authFormShown = false;
       function showLoginFormNow() {
@@ -767,7 +776,7 @@
         clearLineOAuthSessionStorage();
         function completeLineLogin() {
           localStorage.setItem('monitor_token', d.token);
-          localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, 'local');
+          saveMonitorLoginApiBase(false);
           if (window.electronAPI && typeof window.electronAPI.setMonitorPushToken === 'function') {
             window.electronAPI.setMonitorPushToken(d.token);
           }
@@ -955,19 +964,21 @@
             }
           });
         }
-        function finishLogin(res) {
+        function finishLogin(res, usedDirectRemote) {
           var data = res.data;
           if (data && data.ok && data.token) {
-            function completeLogin() {
+            function completeLogin(directRemote) {
               localStorage.setItem('monitor_token', data.token);
-              localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, 'local');
+              saveMonitorLoginApiBase(!!directRemote);
               if (window.electronAPI && typeof window.electronAPI.setMonitorPushToken === 'function') {
                 window.electronAPI.setMonitorPushToken(data.token);
               }
               showMsg('เข้าสู่ระบบสำเร็จ กำลังเปลี่ยนหน้า...', false);
               window.location.replace('index.html');
             }
-            persistMonitorSessionLocally(data, completeLogin);
+            persistMonitorSessionLocally(data, function() {
+              completeLogin(!!usedDirectRemote);
+            });
           } else {
             btnSubmit.disabled = false;
             btnSubmit.textContent = 'เข้าสู่ระบบ';
@@ -1002,18 +1013,25 @@
             body: body
           }).then(parseLoginResponse);
         }
+        var loginUsedDirectRemote = false;
         postLocalLogin()
           .then(function(res) {
-            if (shouldFallbackToDirectRemote(res)) return postDirectLogin();
+            if (shouldFallbackToDirectRemote(res)) {
+              loginUsedDirectRemote = true;
+              return postDirectLogin();
+            }
             return res;
           })
           .then(function(res) {
-            finishLogin(res);
+            finishLogin(res, loginUsedDirectRemote);
           })
           .catch(function() {
             if (directUrl) {
+              loginUsedDirectRemote = true;
               return postDirectLogin()
-                .then(finishLogin)
+                .then(function(res) {
+                  finishLogin(res, true);
+                })
                 .catch(function() {
                   btnSubmit.disabled = false;
                   btnSubmit.textContent = 'เข้าสู่ระบบ';
