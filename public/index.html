@@ -766,7 +766,19 @@
       /** ฝั่งที่ออกโทเคน (local = ว่าง, remote = URL) — ต้องตรงกับตอนล็อกอิน รีเฟรชจึงไม่เด้งออก */
       var monitorSessionBase = '';
       var MONITOR_LOGIN_API_BASE_KEY = 'monitor_login_api_base';
+      /** แอป Electron ต้องเรียก API ผ่าน localhost เท่านั้น — server.js จะ proxy ไป cloud (หลีกเลี่ยง CORS/SSL ใน renderer) */
+      function isDesktopMonitorClient() {
+        return !!(window.electronAPI);
+      }
+      function enforceDesktopLocalApiRouting() {
+        if (!isDesktopMonitorClient()) return;
+        monitorSessionBase = '';
+        try {
+          localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, 'local');
+        } catch (eDesk) {}
+      }
       function readSavedSessionBase() {
+        if (isDesktopMonitorClient()) return '';
         var saved = localStorage.getItem(MONITOR_LOGIN_API_BASE_KEY);
         if (saved === 'local' || saved === null || saved === undefined || saved === '') return '';
         return String(saved).trim().replace(/\/$/, '');
@@ -796,6 +808,7 @@
         return monitorUrlForBase(monitorSessionBase, apiPath);
       }
       function buildMonitorMeAttempts() {
+        if (isDesktopMonitorClient()) return [''];
         var attempts = [''];
         var saved = localStorage.getItem(MONITOR_LOGIN_API_BASE_KEY);
         var remote = '';
@@ -811,6 +824,10 @@
         return monitorUrlForBase(b, '/api/monitor-me');
       }
       function applySuccessfulSessionBase(b) {
+        if (isDesktopMonitorClient()) {
+          enforceDesktopLocalApiRouting();
+          return;
+        }
         monitorSessionBase = b === '' ? '' : String(b).replace(/\/$/, '');
         if (b === '') localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, 'local');
         else localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, monitorSessionBase);
@@ -926,6 +943,7 @@
         }
       }
       window.__nkbkAuthFetch = function(apiPath, options) {
+        enforceDesktopLocalApiRouting();
         var url = monitorAuthUrl(apiPath);
         var opts = options || {};
         var headers = opts.headers ? Object.assign({}, opts.headers) : {};
@@ -935,6 +953,7 @@
       };
       window.__nkbkPermissionsRefresh = function() {
         if (!token) return;
+        enforceDesktopLocalApiRouting();
         var attempts = buildMonitorMeAttempts();
         var ix = 0;
         function tryOne() {
@@ -1415,15 +1434,15 @@
         }
         fetch('/api/config').then(function(r) { return r.json(); }).then(function(c) {
           apiBase = (c.monitorApiUrl || '').trim().replace(/\/$/, '');
-          monitorSessionBase = readSavedSessionBase();
-          if (apiBase && localStorage.getItem(MONITOR_LOGIN_API_BASE_KEY) === 'local' && c.remoteLogin) {
-            localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, apiBase);
-            monitorSessionBase = apiBase;
+          enforceDesktopLocalApiRouting();
+          if (!isDesktopMonitorClient()) {
+            monitorSessionBase = readSavedSessionBase();
           }
           if (c && c.appVersion) setAppVersion(c.appVersion);
           checkMe();
         }).catch(function() {
-          monitorSessionBase = readSavedSessionBase();
+          enforceDesktopLocalApiRouting();
+          if (!isDesktopMonitorClient()) monitorSessionBase = readSavedSessionBase();
           checkMe();
         });
         if (window.electronAPI && window.electronAPI.getAppVersion) {

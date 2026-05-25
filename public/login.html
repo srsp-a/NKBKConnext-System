@@ -414,6 +414,10 @@
       }
       var MONITOR_LOGIN_API_BASE_KEY = 'monitor_login_api_base';
       function saveMonitorLoginApiBase(usedDirectRemote) {
+        if (window.electronAPI) {
+          localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, 'local');
+          return;
+        }
         if (usedDirectRemote && apiBase) {
           localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, apiBase);
         } else if (monitorRemoteLogin && apiBase) {
