@@ -973,6 +973,54 @@ function monitorSessionsDelete(token) {
   MONITOR_SESSIONS.delete(token);
   persistMonitorSessionsToDisk();
 }
+
+/** ดึง /api/monitor-me จาก monitorApiUrl (เมื่อเครื่องไม่มี Firestore หรือโทเคนออกจาก remote) */
+async function proxyMonitorMeFromRemote(token) {
+  const remoteBase = getMonitorApiUrl();
+  if (!remoteBase || !token) return { kind: 'skip' };
+  const fallbackBase = getMonitorApiUrlFallback();
+  const bases = [remoteBase];
+  if (fallbackBase && fallbackBase !== remoteBase) bases.push(fallbackBase);
+  let saw401 = false;
+  for (const base of bases) {
+    try {
+      const r = await fetch(`${String(base).replace(/\/$/, '')}/api/monitor-me`, {
+        headers: { 'X-Monitor-Token': token }
+      });
+      let data = null;
+      try {
+        data = await r.json();
+      } catch (_) {
+        data = null;
+      }
+      if (r.status === 401) {
+        saw401 = true;
+        continue;
+      }
+      if (r.status >= 200 && r.status < 300 && data && data.ok) {
+        return { kind: 'ok', data };
+      }
+    } catch (err) {
+      console.warn('[monitor-me] remote', base, err.message);
+    }
+  }
+  if (saw401) return { kind: 'auth' };
+  return { kind: 'fail' };
+}
+
+function monitorSessionFromMePayload(data, prev) {
+  const p = prev && typeof prev === 'object' ? prev : {};
+  const d = data && typeof data === 'object' ? data : {};
+  return {
+    username: String(d.username || p.username || '').trim(),
+    createdAt: typeof p.createdAt === 'number' ? p.createdAt : Date.now(),
+    fullname: d.fullname != null ? String(d.fullname).trim() : '',
+    email: d.email != null ? String(d.email).trim() : '',
+    group: d.group != null ? String(d.group).trim() : '',
+    role: d.role != null ? String(d.role).trim() : ''
+  };
+}
+
 loadMonitorSessionsFromDisk();
 const MONITOR_COLLECTION = 'monitor_users';
 /** เจ้าหน้าที่ V2 — ชื่อผู้ใช้ + PIN เดียวกับหน้าแก้ไขเจ้าหน้าที่ */
@@ -3127,7 +3175,7 @@ app.post('/api/monitor-login', async (req, res) => {
 app.get('/api/monitor-me', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
   const session = token ? MONITOR_SESSIONS.get(token) : null;
-  /** โทเคนที่ออกจากเครื่องนี้ (PIN / LINE) — ต้องตอบจาก RAM ที่นี่ ห้ามส่งไป remote ก่อน */
+  /** โทเคนที่ออกจากเครื่องนี้ (PIN / LINE) — ตอบจาก RAM; ถ้าไม่มี Firestore ให้ดึงโปรไฟล์จาก remote */
   if (session) {
     let fullname = session.fullname || '';
     let email = session.email || '';
@@ -3142,6 +3190,7 @@ app.get('/api/monitor-me', async (req, res) => {
       lateText: '',
       lateLevel: null
     };
+    let hasLocalProfile = false;
     if (ensureMonitorFirestore()) {
       try {
         const db = getMonitorDb();
@@ -3152,13 +3201,26 @@ app.get('/api/monitor-me', async (req, res) => {
           email = p.email;
           group = p.group;
           role = p.role;
+          hasLocalProfile = !!(fullname || group || role);
         }
         if (u) {
           work = buildWorkFromV2User(u);
           todayAttendance = await buildTodayAttendanceFromDb(db, u);
+          hasLocalProfile = true;
         }
       } catch (e) {
         console.error('monitor-me profile lookup:', e.message);
+      }
+    }
+    if (!hasLocalProfile && getMonitorApiUrl()) {
+      const remote = await proxyMonitorMeFromRemote(token);
+      if (remote.kind === 'ok' && remote.data) {
+        monitorSessionsSet(token, monitorSessionFromMePayload(remote.data, session));
+        return res.json(remote.data);
+      }
+      if (remote.kind === 'auth') {
+        monitorSessionsDelete(token);
+        return res.status(401).json({ ok: false, message: 'กรุณาเข้าสู่ระบบใหม่' });
       }
     }
     return res.json({
@@ -3175,22 +3237,15 @@ app.get('/api/monitor-me', async (req, res) => {
 
   const remoteBase = getMonitorApiUrl();
   if (remoteBase) {
-    const fallbackBase = getMonitorApiUrlFallback();
-    const bases = [remoteBase];
-    if (fallbackBase && fallbackBase !== remoteBase) bases.push(fallbackBase);
-    for (const base of bases) {
-      try {
-        const r = await fetch(`${base}/api/monitor-me`, {
-          headers: { 'X-Monitor-Token': token }
-        });
-        const data = await r.json().catch(() => ({ ok: false }));
-        return res.status(r.status).json(data);
-      } catch (err) {
-        if (bases.indexOf(base) < bases.length - 1) continue;
-        console.error('monitor-me proxy', err);
-        return res.status(502).json({ ok: false });
-      }
+    const remote = await proxyMonitorMeFromRemote(token);
+    if (remote.kind === 'ok' && remote.data) {
+      monitorSessionsSet(token, monitorSessionFromMePayload(remote.data, null));
+      return res.json(remote.data);
     }
+    if (remote.kind === 'auth') {
+      return res.status(401).json({ ok: false, message: 'กรุณาเข้าสู่ระบบใหม่' });
+    }
+    return res.status(502).json({ ok: false, message: 'เชื่อมต่อเซิร์ฟเวอร์ข้อมูลไม่ได้' });
   }
   return res.status(401).json({ ok: false });
 });
@@ -3251,7 +3306,21 @@ async function proxyLeaveToRemote(req, res, apiPath) {
         body = JSON.stringify(req.body || {});
       }
       const r = await fetch(url, { method: req.method, headers, body });
-      const j = await r.json().catch(() => ({ ok: false, reason: 'bad_json' }));
+      const raw = await r.text();
+      let j;
+      try {
+        j = raw ? JSON.parse(raw) : {};
+      } catch (_) {
+        console.error('[leave-proxy] not JSON:', apiPath, r.status, (raw || '').trim().slice(0, 120));
+        return res.status(502).json({
+          ok: false,
+          reason: 'bad_json',
+          message:
+            r.status === 401
+              ? 'เซสชันหมดอายุ — ออกจากระบบแล้วเข้าใหม่'
+              : 'เชื่อมต่อเซิร์ฟเวอร์ข้อมูลไม่สำเร็จ — ตรวจอินเทอร์เน็ตแล้วเข้าสู่ระบบใหม่'
+        });
+      }
       return res.status(r.status).json(j);
     } catch (e) {
       if (bases.indexOf(base) < bases.length - 1) continue;
