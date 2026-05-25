@@ -2824,7 +2824,10 @@ app.get('/api/line-login-poll', async (req, res) => {
         console.warn('[line-login-poll] remote', b, err.message);
       }
     }
-    return res.json({ ok: true, pending: true });
+    return res.status(502).json({
+      ok: false,
+      message: 'เชื่อมต่อเซิร์ฟเวอร์ LINE ไม่ได้ — ตรวจอินเทอร์เน็ตแล้วลองใหม่ หรือใช้ PIN'
+    });
   }
   const row = LINE_LOGIN_POLL.get(state);
   if (!row) return res.json({ ok: true, pending: true });

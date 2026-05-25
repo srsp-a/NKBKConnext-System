@@ -1401,7 +1401,7 @@ ipcMain.handle('open-line-oauth-window', async (_e, url) => {
               mainWindow.webContents.send('nkbk-line-oauth-done', { state: st });
             }
           } catch (_) {}
-        }, 250);
+        }, 900);
       } catch (_) {}
     };
     const scheduleCloseIfLineCallback = (navigatedUrl) => {

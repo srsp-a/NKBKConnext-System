@@ -776,7 +776,7 @@
         clearLineOAuthSessionStorage();
         function completeLineLogin() {
           localStorage.setItem('monitor_token', d.token);
-          saveMonitorLoginApiBase(false);
+          saveMonitorLoginApiBase(!!monitorRemoteLogin);
           if (window.electronAPI && typeof window.electronAPI.setMonitorPushToken === 'function') {
             window.electronAPI.setMonitorPushToken(d.token);
           }
@@ -816,13 +816,37 @@
             else console.warn('[LINE poll]', err && err.message);
           });
       }
+      function handleLinePollFailure(err, d) {
+        if (d && applyLinePollJson(d)) return true;
+        if (d && d.pending) return false;
+        stopLinePoll();
+        clearLineOAuthSessionStorage();
+        var msg =
+          (d && d.message) ||
+          (err && err.message) ||
+          'ไม่สามารถรับผลจาก LINE ได้ — ลองใหม่หรือใช้ PIN';
+        showMsg(msg, true);
+        if (btnLine) btnLine.disabled = false;
+        return true;
+      }
       function runLinePollBurst(state, burstsLeft) {
         fetchLinePollOnce(state, function(err, d) {
           if (!err && applyLinePollJson(d)) return;
           if (burstsLeft > 0 && (err || !d || d.pending)) {
             setTimeout(function() {
               runLinePollBurst(state, burstsLeft - 1);
-            }, 300);
+            }, 500);
+            return;
+          }
+          if (d && d.pending) {
+            startLineLoginPoll(state);
+            return;
+          }
+          if (err || (d && d.ok === false && !d.message)) {
+            stopLinePoll();
+            clearLineOAuthSessionStorage();
+            showMsg('ไม่สามารถรับผลจาก LINE ได้ — ลองใหม่หรือใช้ PIN', true);
+            if (btnLine) btnLine.disabled = false;
           }
         });
       }
@@ -841,9 +865,13 @@
           if (!stateFromMain) return;
           try {
             sessionStorage.setItem(LINE_STATE_KEY, stateFromMain);
+            sessionStorage.setItem(LINE_STARTED_KEY, String(Date.now()));
           } catch (eSt) {}
           showMsg('ได้รับผลจาก LINE — กำลังเข้าสู่ระบบ...', false);
-          runLinePollBurst(stateFromMain, 60);
+          if (btnLine) btnLine.disabled = true;
+          setTimeout(function() {
+            runLinePollBurst(stateFromMain, 40);
+          }, 900);
         });
       }
       function startLineLoginPoll(state) {

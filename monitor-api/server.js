@@ -2719,6 +2719,73 @@ app.post('/api/monitor-logout', (req, res) => {
 // =====================================================
 const LINE_OAUTH_PENDING = new Map();
 const LINE_LOGIN_POLL = new Map();
+const LINE_LOGIN_POLL_FS_COLLECTION = 'line_login_oauth_poll';
+const LINE_LOGIN_POLL_TTL_MS = 10 * 60 * 1000;
+
+function lineLoginPollFirestoreRef(state) {
+  const db = getMonitorAdminFirestore();
+  if (!db || !state) return null;
+  return db.collection(LINE_LOGIN_POLL_FS_COLLECTION).doc(String(state));
+}
+
+async function setLineLoginPollState(state, row) {
+  const expires = typeof row.expires === 'number' ? row.expires : Date.now() + LINE_LOGIN_POLL_TTL_MS;
+  const data = { ...row, expires };
+  LINE_LOGIN_POLL.set(state, data);
+  if (!isMonitorApiOnCloudFunctions()) return;
+  const ref = lineLoginPollFirestoreRef(state);
+  if (!ref) return;
+  try {
+    const admin = require('firebase-admin');
+    await ref.set({
+      token: data.token ? String(data.token) : null,
+      username: data.username ? String(data.username) : null,
+      error: data.error ? String(data.error) : null,
+      expiresAt: admin.firestore.Timestamp.fromDate(new Date(expires))
+    });
+  } catch (e) {
+    console.warn('[Monitor API] persist line-login poll:', e.message);
+  }
+}
+
+async function getLineLoginPollState(state) {
+  const cached = LINE_LOGIN_POLL.get(state);
+  if (cached) return cached;
+  if (!isMonitorApiOnCloudFunctions()) return null;
+  const ref = lineLoginPollFirestoreRef(state);
+  if (!ref) return null;
+  try {
+    const snap = await ref.get();
+    if (!snap.exists) return null;
+    const d = snap.data() || {};
+    let expiresMs = 0;
+    if (d.expiresAt && typeof d.expiresAt.toMillis === 'function') {
+      expiresMs = d.expiresAt.toMillis();
+    }
+    if (!expiresMs || Date.now() > expiresMs) {
+      ref.delete().catch(() => {});
+      LINE_LOGIN_POLL.delete(state);
+      return null;
+    }
+    const row = {
+      token: d.token ? String(d.token) : undefined,
+      username: d.username ? String(d.username) : undefined,
+      error: d.error ? String(d.error) : undefined,
+      expires: expiresMs
+    };
+    LINE_LOGIN_POLL.set(state, row);
+    return row;
+  } catch (e) {
+    console.warn('[Monitor API] load line-login poll:', e.message);
+    return null;
+  }
+}
+
+async function deleteLineLoginPollState(state) {
+  LINE_LOGIN_POLL.delete(state);
+  const ref = lineLoginPollFirestoreRef(state);
+  if (ref) ref.delete().catch(() => {});
+}
 
 function lineHtmlEscMonitor(s) {
   return String(s || '')
@@ -2917,23 +2984,23 @@ app.get('/api/line-login-start', (req, res) => {
   res.json({ ok: true, url, state, redirectUri: callbackPublic });
 });
 
-app.get('/api/line-login-poll', (req, res) => {
+app.get('/api/line-login-poll', async (req, res) => {
   const state = String(req.query.state || '').trim();
   if (!state || !/^[a-f0-9]{48}$/i.test(state)) {
     return res.status(400).json({ ok: false, message: 'state ไม่ถูกต้อง' });
   }
-  const row = LINE_LOGIN_POLL.get(state);
+  const row = await getLineLoginPollState(state);
   if (!row) return res.json({ ok: true, pending: true });
   if (row.expires < Date.now()) {
-    LINE_LOGIN_POLL.delete(state);
+    await deleteLineLoginPollState(state);
     return res.json({ ok: false, message: 'หมดเวลา ลองเข้า LINE ใหม่' });
   }
   if (row.error) {
-    LINE_LOGIN_POLL.delete(state);
+    await deleteLineLoginPollState(state);
     return res.json({ ok: false, message: row.error });
   }
   if (row.token) {
-    LINE_LOGIN_POLL.delete(state);
+    await deleteLineLoginPollState(state);
     return res.json({ ok: true, token: row.token, username: row.username });
   }
   return res.json({ ok: true, pending: true });
@@ -2992,7 +3059,7 @@ app.get('/api/line-login-callback', async (req, res) => {
     } catch (_) {}
     if (tr.status < 200 || tr.status >= 300) {
       const msg = (tj && (tj.error_description || tj.error)) || 'token error';
-      LINE_LOGIN_POLL.set(state, { error: String(msg), expires: Date.now() + 120000 });
+      await setLineLoginPollState(state, { error: String(msg), expires: Date.now() + 120000 });
       return res
         .status(200)
         .type('html')
@@ -3002,7 +3069,7 @@ app.get('/api/line-login-callback', async (req, res) => {
     }
     const idToken = (tj && tj.id_token) || '';
     if (!idToken) {
-      LINE_LOGIN_POLL.set(state, { error: 'LINE ไม่ส่ง id_token', expires: Date.now() + 120000 });
+      await setLineLoginPollState(state, { error: 'LINE ไม่ส่ง id_token', expires: Date.now() + 120000 });
       return res.status(200).type('html').send('<body>LINE ไม่ส่ง id_token</body>');
     }
     const vb = new URLSearchParams({ id_token: idToken, client_id: channelId }).toString();
@@ -3013,7 +3080,7 @@ app.get('/api/line-login-callback', async (req, res) => {
     } catch (_) {}
     if (vr.status < 200 || vr.status >= 300 || !vj.sub) {
       const msg = (vj && (vj.error_description || vj.error)) || 'verify id_token failed';
-      LINE_LOGIN_POLL.set(state, { error: String(msg), expires: Date.now() + 120000 });
+      await setLineLoginPollState(state, { error: String(msg), expires: Date.now() + 120000 });
       return res.status(200).type('html').send(`<body>${lineHtmlEscMonitor(msg)}</body>`);
     }
     const lineSub = String(vj.sub).trim();
@@ -3024,7 +3091,7 @@ app.get('/api/line-login-callback', async (req, res) => {
       console.error('[line-login-callback] Firestore:', e.message);
     }
     if (!v2User) {
-      LINE_LOGIN_POLL.set(state, {
+      await setLineLoginPollState(state, {
         error: 'ไม่พบบัญชีที่ผูก LINE นี้ — ผูกบัญชีที่ลิงก์ของสหกรณ์ก่อน',
         expires: Date.now() + 120000
       });
@@ -3036,7 +3103,7 @@ app.get('/api/line-login-callback', async (req, res) => {
         );
     }
     if (!v2UserMayAccessMonitorLine(v2User)) {
-      LINE_LOGIN_POLL.set(state, { error: 'บัญชีนี้ไม่มีสิทธิ์เข้าแอป Monitor', expires: Date.now() + 120000 });
+      await setLineLoginPollState(state, { error: 'บัญชีนี้ไม่มีสิทธิ์เข้าแอป Monitor', expires: Date.now() + 120000 });
       return res
         .status(200)
         .type('html')
@@ -3052,7 +3119,7 @@ app.get('/api/line-login-callback', async (req, res) => {
       group: v2User.group != null ? String(v2User.group).trim() : '',
       role: v2User.role != null ? String(v2User.role).trim() : ''
     });
-    LINE_LOGIN_POLL.set(state, { token, username: sessionName, expires: Date.now() + 120000 });
+    await setLineLoginPollState(state, { token, username: sessionName, expires: Date.now() + 120000 });
     const back = `${returnOrigin}/login.html?line_resume=1&state=${encodeURIComponent(state)}`;
     return res.status(200).type('html').send(
       '<!DOCTYPE html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">' +
@@ -3062,7 +3129,7 @@ app.get('/api/line-login-callback', async (req, res) => {
     );
   } catch (e) {
     console.error('[monitor-api line-login-callback]', e);
-    LINE_LOGIN_POLL.set(state, { error: (e && e.message) || 'ผิดพลาด', expires: Date.now() + 120000 });
+    await setLineLoginPollState(state, { error: (e && e.message) || 'ผิดพลาด', expires: Date.now() + 120000 });
     return res.status(500).type('html').send('<body>เกิดข้อผิดพลาด</body>');
   }
 });
