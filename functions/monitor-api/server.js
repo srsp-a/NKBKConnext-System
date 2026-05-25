@@ -3203,7 +3203,15 @@ app.post('/api/monitor-login', async (req, res) => {
       role: user.role != null ? String(user.role).trim() : ''
     });
 
-    res.status(200).json({ ok: true, token, username: sessionName });
+    res.status(200).json({
+      ok: true,
+      token,
+      username: sessionName,
+      fullname: user.fullname != null ? String(user.fullname).trim() : '',
+      email: user.email != null ? String(user.email).trim() : '',
+      group: user.group != null ? String(user.group).trim() : '',
+      role: user.role != null ? String(user.role).trim() : ''
+    });
   } catch (error) {
     console.error('Monitor login error:', error.message);
     res.status(500).json({ ok: false, message: 'เกิดข้อผิดพลาด กรุณาลองใหม่' });

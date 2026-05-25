@@ -993,12 +993,7 @@ async function proxyMonitorMeFromRemote(token) {
         12000,
         url.startsWith('https') ? false : true
       );
-      let data = null;
-      try {
-        data = await r.json();
-      } catch (_) {
-        data = null;
-      }
+      const data = parseMonitorApiJson(r);
       if (r.status === 401) {
         saw401 = true;
         continue;
@@ -1025,6 +1020,24 @@ function monitorSessionFromMePayload(data, prev) {
     group: d.group != null ? String(d.group).trim() : '',
     role: d.role != null ? String(d.role).trim() : ''
   };
+}
+
+function monitorMePayloadHasProfile(data) {
+  if (!data || !data.ok) return false;
+  if (data.fullname || data.group || data.role || data.email) return true;
+  const w = data.work;
+  if (!w || typeof w !== 'object') return false;
+  return Object.keys(w).some((k) => {
+    const v = w[k];
+    return v != null && String(v).trim() && String(v).trim() !== '—' && String(v).trim() !== '-';
+  });
+}
+
+async function enrichMonitorSessionFromRemote(token, prevSession) {
+  const remote = await proxyMonitorMeFromRemote(token);
+  if (remote.kind !== 'ok' || !remote.data) return remote;
+  monitorSessionsSet(token, monitorSessionFromMePayload(remote.data, prevSession));
+  return remote;
 }
 
 loadMonitorSessionsFromDisk();
@@ -2360,6 +2373,16 @@ function requestMonitorApi(url, method, headers, bodyStr, timeoutMs, rejectUnaut
   });
 }
 
+/** แปลงผลจาก requestMonitorApi / getJsonFromMonitorApi */
+function parseMonitorApiJson(r) {
+  if (!r || r.raw == null) return null;
+  try {
+    return r.raw ? JSON.parse(r.raw) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 /** GET JSON จาก monitor API (HTTPS บน Windows อาจต้อง rejectUnauthorized: false) */
 function getJsonFromMonitorApi(url, timeoutMs, rejectUnauthorized = false) {
   const u = new URL(url);
@@ -3114,14 +3137,27 @@ app.post('/api/monitor-login', async (req, res) => {
         ) {
           try {
             const tok = String(data.token).trim();
-            monitorSessionsSet(tok, {
+            const prevSession = {
               username: String(data.username || username).trim() || username,
               createdAt: Date.now(),
               fullname: String(data.fullname || '').trim(),
               email: String(data.email || '').trim(),
               group: String(data.group || '').trim(),
               role: String(data.role || '').trim()
-            });
+            };
+            monitorSessionsSet(tok, prevSession);
+            const enriched = await enrichMonitorSessionFromRemote(tok, prevSession);
+            if (enriched.kind === 'ok' && enriched.data) {
+              return res.status(200).json({
+                ok: true,
+                token: tok,
+                username: enriched.data.username || prevSession.username,
+                fullname: enriched.data.fullname || '',
+                email: enriched.data.email || '',
+                group: enriched.data.group || '',
+                role: enriched.data.role || ''
+              });
+            }
           } catch (_) {}
         }
         return res.status(r.status >= 200 && r.status < 300 ? 200 : r.status).json(data);
@@ -3263,10 +3299,9 @@ app.get('/api/monitor-me', async (req, res) => {
         console.error('monitor-me profile lookup:', e.message);
       }
     }
-    if (!hasLocalProfile && getMonitorApiUrl()) {
-      const remote = await proxyMonitorMeFromRemote(token);
+    if ((!hasLocalProfile || !monitorMePayloadHasProfile({ ok: true, fullname, email, group, role, work })) && getMonitorApiUrl()) {
+      const remote = await enrichMonitorSessionFromRemote(token, session);
       if (remote.kind === 'ok' && remote.data) {
-        monitorSessionsSet(token, monitorSessionFromMePayload(remote.data, session));
         return res.json(remote.data);
       }
       if (remote.kind === 'auth') {
@@ -4398,7 +4433,7 @@ app.post('/api/monitor-change-pin', async (req, res) => {
 });
 
 /** บันทึกโทเคนจาก remote login ลงเครื่อง — เปิดแอปใหม่ยังใช้ /api/monitor-me ในเครื่องได้ */
-app.post('/api/monitor-session-register', (req, res) => {
+app.post('/api/monitor-session-register', async (req, res) => {
   if (!isLocalhostSnapshotRequest(req)) {
     return res.status(403).json({ ok: false, message: 'localhost only' });
   }
@@ -4409,14 +4444,18 @@ app.post('/api/monitor-session-register', (req, res) => {
   const body = req.body && typeof req.body === 'object' ? req.body : {};
   const username = String(body.username || '').trim();
   if (!username) return res.status(400).json({ ok: false, message: 'missing username' });
-  monitorSessionsSet(token, {
+  const prevSession = {
     username,
     createdAt: Date.now(),
     fullname: body.fullname != null ? String(body.fullname).trim() : '',
     email: body.email != null ? String(body.email).trim() : '',
     group: body.group != null ? String(body.group).trim() : '',
     role: body.role != null ? String(body.role).trim() : ''
-  });
+  };
+  monitorSessionsSet(token, prevSession);
+  if (getMonitorApiUrl()) {
+    await enrichMonitorSessionFromRemote(token, prevSession);
+  }
   return res.json({ ok: true });
 });
 

@@ -1084,6 +1084,18 @@
         applyMonitorWork(data.work);
         applyMonitorToday(data.todayAttendance);
       }
+      function monitorProfileHasData(data) {
+        if (!data || !data.ok) return false;
+        if (data.fullname || data.group || data.role || data.email) return true;
+        var w = data.work;
+        if (!w || typeof w !== 'object') return false;
+        var keys = Object.keys(w);
+        for (var i = 0; i < keys.length; i++) {
+          var v = w[keys[i]];
+          if (v != null && String(v).trim() && String(v).trim() !== '—' && String(v).trim() !== '-') return true;
+        }
+        return false;
+      }
       function checkMe() {
         var attempts = buildMonitorMeAttempts();
         var idx = 0;
@@ -1122,6 +1134,11 @@
               if (!pack) return;
               finishedAttempts++;
               if (pack.data && pack.data.ok) {
+                if (!monitorProfileHasData(pack.data) && idx < attempts.length) {
+                  finishIfDone();
+                  next();
+                  return;
+                }
                 anyOk = true;
                 applySuccessfulSessionBase(b);
                 applyMonitorUserProfile(pack.data);
@@ -1158,6 +1175,10 @@
             .then(function(data) {
               if (!data) return;
               if (data && data.ok) {
+                if (!monitorProfileHasData(data) && ix < attempts.length) {
+                  go();
+                  return;
+                }
                 applySuccessfulSessionBase(b);
                 applyMonitorUserProfile(data);
               } else if (ix < attempts.length) go();
@@ -1395,6 +1416,10 @@
         fetch('/api/config').then(function(r) { return r.json(); }).then(function(c) {
           apiBase = (c.monitorApiUrl || '').trim().replace(/\/$/, '');
           monitorSessionBase = readSavedSessionBase();
+          if (apiBase && localStorage.getItem(MONITOR_LOGIN_API_BASE_KEY) === 'local' && c.remoteLogin) {
+            localStorage.setItem(MONITOR_LOGIN_API_BASE_KEY, apiBase);
+            monitorSessionBase = apiBase;
+          }
           if (c && c.appVersion) setAppVersion(c.appVersion);
           checkMe();
         }).catch(function() {
