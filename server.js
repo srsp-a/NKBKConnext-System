@@ -3287,7 +3287,7 @@ async function _notifCreate(data) {
 }
 
 /** Proxy request ไป remote monitor-api เมื่อเครื่องไม่มี firebase-service-account.json */
-async function proxyLeaveToRemote(req, res, apiPath) {
+async function proxyMonitorToRemote(req, res, apiPath) {
   const remoteBase = getMonitorApiUrl();
   if (!remoteBase) return res.status(503).json({ ok: false, reason: 'no_remote', message: 'ไม่ได้ตั้ง monitorApiUrl' });
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
@@ -3311,7 +3311,7 @@ async function proxyLeaveToRemote(req, res, apiPath) {
       try {
         j = raw ? JSON.parse(raw) : {};
       } catch (_) {
-        console.error('[leave-proxy] not JSON:', apiPath, r.status, (raw || '').trim().slice(0, 120));
+        console.error('[monitor-proxy] not JSON:', apiPath, r.status, (raw || '').trim().slice(0, 120));
         return res.status(502).json({
           ok: false,
           reason: 'bad_json',
@@ -3377,8 +3377,9 @@ const { registerNkbkAiRoutes } = require('./lib/nkbk-ai-routes');
 registerNkbkAiRoutes(app, {
   getDb: () => (ensureMonitorFirestore() ? getMonitorDb() : null),
   resolveSession: resolveMonitorSessionFromToken,
-  proxyToRemote: proxyLeaveToRemote
+  proxyToRemote: proxyMonitorToRemote
 });
+const proxyLeaveToRemote = proxyMonitorToRemote;
 
 function _leaveFiscalYearKey(now) {
   const d = now instanceof Date ? now : new Date();
@@ -3580,7 +3581,7 @@ app.get('/api/monitor-leave-submit-meta', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
   const session = await resolveMonitorSessionFromToken(token);
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
-  if (!ensureMonitorFirestore()) return proxyLeaveToRemote(req, res, '/api/monitor-leave-submit-meta');
+  if (!ensureMonitorFirestore()) return proxyMonitorToRemote(req, res, '/api/monitor-leave-submit-meta');
   try {
     const db = getMonitorDb();
     const typesMap = await _leaveLoadTypes(db);
@@ -3606,7 +3607,7 @@ app.post('/api/monitor-leave-submit', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
   const session = await resolveMonitorSessionFromToken(token);
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
-  if (!ensureMonitorFirestore()) return proxyLeaveToRemote(req, res, '/api/monitor-leave-submit');
+  if (!ensureMonitorFirestore()) return proxyMonitorToRemote(req, res, '/api/monitor-leave-submit');
   const body = req.body || {};
   const typeId = String(body.type || '').trim();
   const partial = String(body.partial || 'full').trim();
@@ -3683,7 +3684,7 @@ app.get('/api/monitor-my-leaves', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
   const session = await resolveMonitorSessionFromToken(token);
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
-  if (!ensureMonitorFirestore()) return proxyLeaveToRemote(req, res, '/api/monitor-my-leaves');
+  if (!ensureMonitorFirestore()) return proxyMonitorToRemote(req, res, '/api/monitor-my-leaves');
   try {
     const db = getMonitorDb();
     const u = await findV2UserByUsername(db, session.username);
@@ -3726,7 +3727,7 @@ app.get('/api/monitor-my-leave-balance', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
   const session = await resolveMonitorSessionFromToken(token);
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
-  if (!ensureMonitorFirestore()) return proxyLeaveToRemote(req, res, '/api/monitor-my-leave-balance');
+  if (!ensureMonitorFirestore()) return proxyMonitorToRemote(req, res, '/api/monitor-my-leave-balance');
   try {
     const db = getMonitorDb();
     const u = await findV2UserByUsername(db, session.username);
@@ -3763,7 +3764,7 @@ app.get('/api/monitor-leave-pending-approvals', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
   const session = await resolveMonitorSessionFromToken(token);
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
-  if (!ensureMonitorFirestore()) return proxyLeaveToRemote(req, res, '/api/monitor-leave-pending-approvals');
+  if (!ensureMonitorFirestore()) return proxyMonitorToRemote(req, res, '/api/monitor-leave-pending-approvals');
   try {
     const db = getMonitorDb();
     const u = await findV2UserByUsername(db, session.username);
@@ -3817,7 +3818,7 @@ app.post('/api/monitor-leave-approve', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
   const session = await resolveMonitorSessionFromToken(token);
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
-  if (!ensureMonitorFirestore()) return proxyLeaveToRemote(req, res, '/api/monitor-leave-approve');
+  if (!ensureMonitorFirestore()) return proxyMonitorToRemote(req, res, '/api/monitor-leave-approve');
   const leaveId = req.body && req.body.leaveId ? String(req.body.leaveId) : '';
   if (!leaveId) return res.status(400).json({ ok: false, reason: 'no_id' });
   try {
@@ -3905,7 +3906,7 @@ app.get('/api/monitor-leave-form-data', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
   const session = await resolveMonitorSessionFromToken(token);
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
-  if (!ensureMonitorFirestore()) return proxyLeaveToRemote(req, res, '/api/monitor-leave-form-data');
+  if (!ensureMonitorFirestore()) return proxyMonitorToRemote(req, res, '/api/monitor-leave-form-data');
   const leaveId = String(req.query.leaveId || '').trim();
   if (!leaveId) return res.status(400).json({ ok: false, reason: 'no_id' });
   try {
@@ -4018,7 +4019,7 @@ app.post('/api/monitor-leave-reject', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
   const session = await resolveMonitorSessionFromToken(token);
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
-  if (!ensureMonitorFirestore()) return proxyLeaveToRemote(req, res, '/api/monitor-leave-reject');
+  if (!ensureMonitorFirestore()) return proxyMonitorToRemote(req, res, '/api/monitor-leave-reject');
   const leaveId = req.body && req.body.leaveId ? String(req.body.leaveId) : '';
   const reason = req.body && req.body.reason != null ? String(req.body.reason).trim() : '';
   if (!leaveId) return res.status(400).json({ ok: false, reason: 'no_id' });
@@ -4076,7 +4077,7 @@ app.get('/api/monitor-notifications', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
   const session = await resolveMonitorSessionFromToken(token);
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
-  if (!ensureMonitorFirestore()) return proxyLeaveToRemote(req, res, '/api/monitor-notifications');
+  if (!ensureMonitorFirestore()) return proxyMonitorToRemote(req, res, '/api/monitor-notifications');
   try {
     const db = getMonitorDb();
     const u = await findV2UserByUsername(db, session.username);
@@ -4126,7 +4127,7 @@ app.post('/api/monitor-notification-read', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
   const session = await resolveMonitorSessionFromToken(token);
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
-  if (!ensureMonitorFirestore()) return proxyLeaveToRemote(req, res, '/api/monitor-notification-read');
+  if (!ensureMonitorFirestore()) return proxyMonitorToRemote(req, res, '/api/monitor-notification-read');
   const ids = Array.isArray(req.body && req.body.ids) ? req.body.ids.map(String) : [];
   const all = !!(req.body && req.body.all);
   try {
@@ -4159,7 +4160,7 @@ app.post('/api/monitor-notification-create', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
   const session = await resolveMonitorSessionFromToken(token);
   if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
-  if (!ensureMonitorFirestore()) return proxyLeaveToRemote(req, res, '/api/monitor-notification-create');
+  if (!ensureMonitorFirestore()) return proxyMonitorToRemote(req, res, '/api/monitor-notification-create');
   try {
     const db = getMonitorDb();
     const u = await findV2UserByUsername(db, session.username);
@@ -4274,52 +4275,26 @@ app.get('/api/me-permissions', async (req, res) => {
 
 app.get('/api/monitor-attendance-month', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
-  const session = token ? MONITOR_SESSIONS.get(token) : null;
-  const y = req.query.year;
-  const m = req.query.month;
-  const qs = new URLSearchParams({ year: String(y || ''), month: String(m || '') }).toString();
-
-  if (session) {
-    const year = parseInt(req.query.year, 10);
-    const month = parseInt(req.query.month, 10);
-    if (!year || !month || month < 1 || month > 12 || year < 2000 || year > 2100) {
-      return res.status(400).json({ ok: false, message: 'ระบุ year (ค.ศ.) และ month (1-12)' });
-    }
-    if (!ensureMonitorFirestore()) {
-      return res.status(503).json({ ok: false, message: 'ไม่ได้ตั้งค่า Firestore' });
-    }
-    try {
-      const db = getMonitorDb();
-      const u = await findV2UserByUsername(db, session.username);
-      if (!u) return res.status(404).json({ ok: false, message: 'ไม่พบบัญชีผู้ใช้' });
-      const payload = await buildAttendanceMonthFromDb(db, u, year, month);
-      return res.json({ ok: true, ...payload });
-    } catch (e) {
-      console.error('monitor-attendance-month', e);
-      return res.status(500).json({ ok: false, message: e.message || 'โหลดไม่สำเร็จ' });
-    }
+  const session = await resolveMonitorSessionFromToken(token);
+  if (!session) return res.status(401).json({ ok: false, message: 'กรุณาเข้าสู่ระบบใหม่' });
+  const year = parseInt(req.query.year, 10);
+  const month = parseInt(req.query.month, 10);
+  if (!year || !month || month < 1 || month > 12 || year < 2000 || year > 2100) {
+    return res.status(400).json({ ok: false, message: 'ระบุ year (ค.ศ.) และ month (1-12)' });
   }
-
-  const remoteBase = getMonitorApiUrl();
-  if (remoteBase) {
-    const fallbackBase = getMonitorApiUrlFallback();
-    const bases = [remoteBase];
-    if (fallbackBase && fallbackBase !== remoteBase) bases.push(fallbackBase);
-    for (const base of bases) {
-      try {
-        const r = await fetch(`${base}/api/monitor-attendance-month?${qs}`, {
-          headers: { 'X-Monitor-Token': token }
-        });
-        const data = await r.json().catch(() => ({ ok: false }));
-        return res.status(r.status).json(data);
-      } catch (err) {
-        if (bases.indexOf(base) < bases.length - 1) continue;
-        console.error('monitor-attendance-month proxy', err);
-        return res.status(502).json({ ok: false, message: 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้' });
-      }
-    }
+  if (!ensureMonitorFirestore()) {
+    return proxyMonitorToRemote(req, res, '/api/monitor-attendance-month');
   }
-  return res.status(401).json({ ok: false, message: 'กรุณาเข้าสู่ระบบใหม่' });
+  try {
+    const db = getMonitorDb();
+    const u = await findV2UserByUsername(db, session.username);
+    if (!u) return res.status(404).json({ ok: false, message: 'ไม่พบบัญชีผู้ใช้' });
+    const payload = await buildAttendanceMonthFromDb(db, u, year, month);
+    return res.json({ ok: true, ...payload });
+  } catch (e) {
+    console.error('monitor-attendance-month', e);
+    return res.status(500).json({ ok: false, message: e.message || 'โหลดไม่สำเร็จ' });
+  }
 });
 
 app.post('/api/monitor-change-pin', async (req, res) => {
@@ -4332,58 +4307,25 @@ app.post('/api/monitor-change-pin', async (req, res) => {
   if (currentPin === newPin) {
     return res.status(400).json({ ok: false, message: 'รหัสใหม่ต้องไม่ซ้ำกับรหัสเดิม' });
   }
-  const session = token ? MONITOR_SESSIONS.get(token) : null;
-  if (session) {
-    if (!ensureMonitorFirestore()) {
-      return res.status(503).json({ ok: false, message: 'ระบบไม่ได้ตั้งค่า Firestore บนเครื่องนี้' });
-    }
-    try {
-      const db = getMonitorDb();
-      const u = await findV2UserByUsername(db, session.username);
-      if (!u) return res.status(404).json({ ok: false, message: 'ไม่พบบัญชีผู้ใช้' });
-      const pinOk = String(u.pin != null ? u.pin : '').trim() === currentPin;
-      if (!pinOk) return res.status(400).json({ ok: false, message: 'รหัส PIN ปัจจุบันไม่ถูกต้อง' });
-      const docId = u._docId;
-      if (!docId) return res.status(500).json({ ok: false, message: 'ไม่พบรหัสเอกสารผู้ใช้' });
-      await db.collection(V2_USERS_COLLECTION).doc(docId).update({ pin: newPin });
-      return res.json({ ok: true, message: 'เปลี่ยนรหัส PIN เรียบร้อย' });
-    } catch (e) {
-      console.error('monitor-change-pin:', e);
-      return res.status(500).json({ ok: false, message: e.message || 'ไม่สามารถเปลี่ยนรหัสได้' });
-    }
+  const session = await resolveMonitorSessionFromToken(token);
+  if (!session) return res.status(401).json({ ok: false, message: 'กรุณาเข้าสู่ระบบใหม่' });
+  if (!ensureMonitorFirestore()) {
+    return proxyMonitorToRemote(req, res, '/api/monitor-change-pin');
   }
-
-  const remoteBase = getMonitorApiUrl();
-  if (remoteBase) {
-    const fallbackBase = getMonitorApiUrlFallback();
-    const bases = [remoteBase];
-    if (fallbackBase && fallbackBase !== remoteBase) bases.push(fallbackBase);
-    for (const base of bases) {
-      try {
-        const skipSsl = base.startsWith('https');
-        const r = await postJsonToMonitorApi(
-          `${base}/api/monitor-change-pin`,
-          { currentPin, newPin },
-          25000,
-          skipSsl ? false : true,
-          { 'X-Monitor-Token': token }
-        );
-        let data;
-        try {
-          data = r.raw ? JSON.parse(r.raw) : {};
-        } catch (_) {
-          data = { ok: false, message: 'ตอบกลับจากเซิร์ฟเวอร์ไม่ถูกต้อง' };
-        }
-        const okHttp = r.status >= 200 && r.status < 300;
-        return res.status(okHttp ? 200 : r.status >= 400 ? r.status : 502).json(data);
-      } catch (err) {
-        if (bases.indexOf(base) < bases.length - 1) continue;
-        console.error('monitor-change-pin proxy', err.message);
-        return res.status(502).json({ ok: false, message: 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้' });
-      }
-    }
+  try {
+    const db = getMonitorDb();
+    const u = await findV2UserByUsername(db, session.username);
+    if (!u) return res.status(404).json({ ok: false, message: 'ไม่พบบัญชีผู้ใช้' });
+    const pinOk = String(u.pin != null ? u.pin : '').trim() === currentPin;
+    if (!pinOk) return res.status(400).json({ ok: false, message: 'รหัส PIN ปัจจุบันไม่ถูกต้อง' });
+    const docId = u._docId;
+    if (!docId) return res.status(500).json({ ok: false, message: 'ไม่พบรหัสเอกสารผู้ใช้' });
+    await db.collection(V2_USERS_COLLECTION).doc(docId).update({ pin: newPin });
+    return res.json({ ok: true, message: 'เปลี่ยนรหัส PIN เรียบร้อย' });
+  } catch (e) {
+    console.error('monitor-change-pin:', e);
+    return res.status(500).json({ ok: false, message: e.message || 'ไม่สามารถเปลี่ยนรหัสได้' });
   }
-  return res.status(401).json({ ok: false, message: 'กรุณาเข้าสู่ระบบใหม่' });
 });
 
 /** บันทึกโทเคนจาก remote login ลงเครื่อง — เปิดแอปใหม่ยังใช้ /api/monitor-me ในเครื่องได้ */

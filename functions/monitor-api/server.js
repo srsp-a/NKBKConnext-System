@@ -1922,6 +1922,284 @@ function _leaveCreatedMs(v) {
   return 0;
 }
 
+const LEAVE_RETRO_MAX_DAYS = 60;
+const LEAVE_RETRO_MAX_MONTHS = 3;
+
+function _leaveParseModes(t) {
+  if (!t) return ['full'];
+  if (t.modes && typeof t.modes === 'object' && !Array.isArray(t.modes)) {
+    const keys = Object.keys(t.modes).filter((k) => t.modes[k]);
+    if (keys.length) return keys;
+  }
+  if (Array.isArray(t.modes) && t.modes.length) return t.modes.slice();
+  return ['full'];
+}
+
+function _leaveBangkokToday() {
+  const s = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+  const p = s.split('-').map((n) => parseInt(n, 10));
+  return new Date(p[0], p[1] - 1, p[2]);
+}
+
+function _leaveFormatLocal(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + day;
+}
+
+function _leaveEarliestRetrospectiveDate() {
+  const today = _leaveBangkokToday();
+  const d60 = new Date(today.getFullYear(), today.getMonth(), today.getDate() - LEAVE_RETRO_MAX_DAYS);
+  const d3m = new Date(today.getFullYear(), today.getMonth() - LEAVE_RETRO_MAX_MONTHS, today.getDate());
+  const earliest = d60 > d3m ? d60 : d3m;
+  return _leaveFormatLocal(earliest);
+}
+
+function _leaveStaticHolidayDatesApi() {
+  const set = new Set();
+  for (const h of getThaiPublicHolidaysListApi()) {
+    const dt = (h && h.date ? h.date : '').toString().trim();
+    if (dt) set.add(dt);
+  }
+  return set;
+}
+
+async function _leaveHolidaySetApi() {
+  const set = new Set(_leaveStaticHolidayDatesApi());
+  const hidden = new Set();
+  try {
+    const list = await firebaseGetCollection('holidays', { pageSize: 500 });
+    for (const data of list || []) {
+      if (data.hidden === true && data.date) hidden.add(String(data.date));
+      if (data.hidden !== true && data.date && data.type === 'custom') set.add(String(data.date));
+    }
+  } catch (_) {}
+  hidden.forEach((d) => set.delete(d));
+  return set;
+}
+
+function _leaveComputeDurationDays(startDate, endDate, partial, holidaySet) {
+  try {
+    const sp = String(startDate || '').split('-').map((n) => parseInt(n, 10));
+    const ep = String(endDate || startDate || '').split('-').map((n) => parseInt(n, 10));
+    if (sp.length !== 3 || ep.length !== 3 || !partial) return 0;
+    let current = new Date(sp[0], sp[1] - 1, sp[2]);
+    const endD = new Date(ep[0], ep[1] - 1, ep[2]);
+    const validDates = [];
+    while (current <= endD) {
+      const dow = current.getDay();
+      if (dow !== 0 && dow !== 6) {
+        const iso = _leaveFormatLocal(current);
+        if (!holidaySet || !holidaySet.has(iso)) validDates.push(iso);
+      }
+      current.setDate(current.getDate() + 1);
+    }
+    if (!validDates.length) return 0;
+    const p = String(partial).toLowerCase();
+    if (p === 'full') return validDates.length;
+    if (validDates.length === 1) return 0.5;
+    return 0.5 + (validDates.length - 1);
+  } catch (_) {
+    return 0;
+  }
+}
+
+function _leaveIsoDateRange(startDate, endDate) {
+  const out = [];
+  const start = new Date(String(startDate));
+  const end = new Date(String(endDate || startDate));
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    out.push(d.toISOString().split('T')[0]);
+  }
+  return out;
+}
+
+async function _leaveCheckDuplicateApi(userId, startDate, endDate, partial) {
+  const result = { hasDuplicate: false, conflictDates: [], status: '' };
+  try {
+    const all = await firebaseQueryAll('leaves', 'userId', userId, 100);
+    const requestedDates = _leaveIsoDateRange(startDate, endDate);
+    const statusMap = {
+      pending: 'รอหัวหน้างานอนุมัติ',
+      approved_lv1: 'รอผู้จัดการยืนยัน',
+      approved: 'อนุมัติแล้ว',
+      rejected: 'ไม่อนุมัติ'
+    };
+    (all || []).forEach((data) => {
+      const status = String(data.status || '').toLowerCase();
+      if (status === 'cancelled' || status === 'ยกเลิก') return;
+      const existingDates = _leaveIsoDateRange(data.startDate, data.endDate || data.startDate);
+      const existingPartial = String(data.partial || 'full').toLowerCase();
+      const newPartial = String(partial || 'full').toLowerCase();
+      requestedDates.forEach((reqDate) => {
+        if (!existingDates.includes(reqDate)) return;
+        if (existingPartial === 'full' || newPartial === 'full' || existingPartial === newPartial) {
+          result.hasDuplicate = true;
+          if (!result.conflictDates.includes(reqDate)) result.conflictDates.push(reqDate);
+          result.status = statusMap[status] || status;
+        }
+      });
+    });
+  } catch (e) {
+    console.warn('[leave-submit] duplicate check:', e.message);
+  }
+  return result;
+}
+
+async function _leaveCreateLeaveDoc(leaveDoc) {
+  const adb = getMonitorAdminFirestore();
+  if (adb) {
+    const adminSdk = require('firebase-admin');
+    const ref = await adb.collection('leaves').add({
+      ...leaveDoc,
+      createdAt: adminSdk.firestore.FieldValue.serverTimestamp()
+    });
+    return ref.id;
+  }
+  const id = 'lv_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+  await firebaseSet('leaves', id, { ...leaveDoc, createdAt: new Date().toISOString() });
+  return id;
+}
+
+async function _leaveNotifySubmittedApi(leaveDoc, leaveId, typeName) {
+  const tName = typeName || leaveDoc.type || '';
+  try {
+    await _notifCreate({
+      userId: leaveDoc.userId,
+      category: 'leave.submitted',
+      title: '📋 ส่งคำขอลาแล้ว',
+      body: 'คำขอลา ' + tName + ' ' + (leaveDoc.startDate || '') + ' จำนวน ' + (leaveDoc.durationDays || 0) + ' วัน — รอการอนุมัติ',
+      severity: 'info',
+      icon: 'fa-paper-plane',
+      relatedType: 'leave',
+      relatedId: leaveId
+    });
+    const adb = getMonitorAdminFirestore();
+    if (adb) {
+      const qs = await adb.collection('users').where('canApproveLeave', '==', true).limit(50).get();
+      const tasks = [];
+      qs.forEach((doc) => {
+        const approverId = doc.id;
+        if (approverId === leaveDoc.userId) return;
+        tasks.push(_notifCreate({
+          userId: approverId,
+          category: 'leave.pending_approval',
+          title: '📨 คำขอลาใหม่',
+          body: (leaveDoc.userName || 'พนักงาน') + ' ขอลา ' + tName + ' ' + (leaveDoc.startDate || '') + ' (' + (leaveDoc.durationDays || 0) + ' วัน)',
+          severity: 'warning',
+          icon: 'fa-inbox',
+          relatedType: 'leave',
+          relatedId: leaveId
+        }));
+      });
+      await Promise.all(tasks);
+    }
+  } catch (e) {
+    console.warn('[leave-submit] notify:', e.message);
+  }
+}
+
+function _leaveIsIsoDate(s) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''));
+}
+
+app.get('/api/monitor-leave-submit-meta', async (req, res) => {
+  const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
+  const session = token ? MONITOR_SESSIONS.get(token) : null;
+  if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
+  try {
+    const typesMap = await _leaveLoadTypes();
+    const types = Object.values(typesMap)
+      .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))
+      .map((t) => ({
+        id: t.id,
+        name: String(t.nameTH || t.name || t.id),
+        modes: _leaveParseModes(t),
+        yearlyQuota: Number(t.yearlyQuota || t.quota || 0) || 0
+      }));
+    return res.json({
+      ok: true,
+      types,
+      earliestRetrospective: _leaveEarliestRetrospectiveDate()
+    });
+  } catch (e) {
+    return res.status(500).json({ ok: false, reason: 'error', message: (e && e.message) || String(e) });
+  }
+});
+
+app.post('/api/monitor-leave-submit', async (req, res) => {
+  const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
+  const session = token ? MONITOR_SESSIONS.get(token) : null;
+  if (!session) return res.status(401).json({ ok: false, reason: 'no_session' });
+  const body = req.body || {};
+  const typeId = String(body.type || '').trim();
+  const partial = String(body.partial || 'full').trim();
+  const startDate = String(body.startDate || '').trim();
+  const endDate = String(body.endDate || startDate).trim();
+  const reason = body.reason != null ? String(body.reason).trim() : '';
+  if (!typeId || !_leaveIsIsoDate(startDate) || !_leaveIsIsoDate(endDate)) {
+    return res.status(400).json({ ok: false, reason: 'invalid_input', message: 'กรุณาเลือกประเภทและวันที่ให้ครบ' });
+  }
+  if (startDate > endDate) {
+    return res.status(400).json({ ok: false, reason: 'bad_dates', message: 'วันเริ่มต้นต้องไม่เกินวันสิ้นสุด' });
+  }
+  const earliestRetro = _leaveEarliestRetrospectiveDate();
+  if (startDate < earliestRetro) {
+    return res.status(400).json({
+      ok: false,
+      reason: 'retrospective',
+      message: 'ไม่สามารถขอลาย้อนหลังเกิน ' + LEAVE_RETRO_MAX_DAYS + ' วัน หรือ ' + LEAVE_RETRO_MAX_MONTHS + ' เดือน'
+    });
+  }
+  try {
+    const u = await findUserForMonitor(session.username);
+    if (!u) return res.status(404).json({ ok: false, reason: 'no_user' });
+    const uid = u.id;
+    const types = await _leaveLoadTypes();
+    const typeDef = types[typeId];
+    if (!typeDef) return res.status(400).json({ ok: false, reason: 'bad_type', message: 'ประเภทการลาไม่ถูกต้อง' });
+    const modes = _leaveParseModes(typeDef).map((m) => String(m).toLowerCase());
+    if (!modes.includes(String(partial).toLowerCase())) {
+      return res.status(400).json({ ok: false, reason: 'bad_partial', message: 'รูปแบบการลาไม่รองรับสำหรับประเภทนี้' });
+    }
+    const dup = await _leaveCheckDuplicateApi(uid, startDate, endDate, partial);
+    if (dup.hasDuplicate) {
+      return res.status(409).json({
+        ok: false,
+        reason: 'duplicate',
+        message: 'มีคำขอลาซ้ำในช่วงวันที่นี้แล้ว (' + (dup.status || 'รอดำเนินการ') + ')',
+        conflictDates: dup.conflictDates
+      });
+    }
+    const holidaySet = await _leaveHolidaySetApi();
+    const durationDays = _leaveComputeDurationDays(startDate, endDate, partial, holidaySet);
+    if (!durationDays || durationDays <= 0) {
+      return res.status(400).json({ ok: false, reason: 'no_workdays', message: 'ไม่มีวันทำงานในช่วงที่เลือก (อาจเป็นวันหยุด/เสาร์-อาทิตย์)' });
+    }
+    const typeName = String(typeDef.nameTH || typeDef.name || typeId);
+    const leaveDoc = {
+      userId: uid,
+      lineUserId: String(u.lineUserId || ''),
+      type: typeId,
+      partial: partial,
+      startDate: startDate,
+      endDate: endDate,
+      durationDays: durationDays,
+      status: 'pending',
+      userName: String(u.fullname || session.fullname || session.username || ''),
+      userAvatar: String(u.avatar || u.linePictureUrl || ''),
+      userDept: String(u.department || ''),
+      reason: reason
+    };
+    const leaveId = await _leaveCreateLeaveDoc(leaveDoc);
+    await _leaveNotifySubmittedApi(leaveDoc, leaveId, typeName);
+    return res.json({ ok: true, leaveId, durationDays, typeName });
+  } catch (e) {
+    return res.status(500).json({ ok: false, reason: 'error', message: (e && e.message) || String(e) });
+  }
+});
+
 app.get('/api/monitor-my-leaves', async (req, res) => {
   const token = (req.headers['x-monitor-token'] || req.query.token || '').trim();
   const session = token ? MONITOR_SESSIONS.get(token) : null;
