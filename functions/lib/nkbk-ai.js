@@ -6,6 +6,18 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { buildMemberInterestRatesContextLines } = require('./member-interest-rates.js');
+const {
+  loadMemberDownloadSections,
+  buildMemberDownloadsContextLines
+} = require('./member-downloads.js');
+const { buildMemberPaymentContextLines } = require('./member-payment.js');
+const {
+  loadMemberStaffDirectory,
+  buildMemberStaffContextLines
+} = require('./member-staff.js');
+const { enrichPublicMemberChatReply } = require('./member-chat-enrich.js');
+const { memberChatPageLinkPromptLines } = require('./member-chat-format.js');
 
 const DESKTOP_AI_CONFIG_DOC = 'desktop_ai';
 const AI_CHAT_CONFIG_DOC = 'ai_chat';
@@ -3329,30 +3341,120 @@ function startOfDay(d) {
   return x;
 }
 
+/** ค่าเริ่มต้นช่องทางติดต่อ — sync กับ public-cms/site-config.js + หน้า /contact */
+const CMS_CONTACT_DEFAULTS = {
+  contactPagePath: '/contact',
+  hoursTh: 'วันจันทร์–วันศุกร์: 08.30 น.-16.30 น.',
+  phoneDisplay: '042-420750',
+  email: 'support@nkbkcoop.com',
+  address: '919 หมู่ 5 ต.โพธิ์ชัย อ.เมืองหนองคาย จ.หนองคาย 43000',
+  fax: '042-420740',
+  mobile: ['087-8604004', '089-8619198'],
+  facebook: 'https://www.facebook.com/sahakon.nkbk',
+  line: 'https://page.line.me/117kkqhx?openQrModal=true',
+  youtube: 'https://www.youtube.com/@nkbkcoop',
+  mapUrl: 'https://maps.app.goo.gl/FhT4ThAC2VPwt7dm9'
+};
+
+function normalizeCoopTimeDot(value, fallback) {
+  const raw = value != null ? String(value).trim() : '';
+  if (!raw) return fallback;
+  return raw.replace(':', '.');
+}
+
+function buildMemberWorkHoursLine(org) {
+  const start = normalizeCoopTimeDot(org && org.attendanceWorkStart, '08.30');
+  const end = normalizeCoopTimeDot(org && org.attendanceWorkEnd, '16.30');
+  const ct = (org && org.contact) || {};
+  const hoursLabel = ct.hoursTh || CMS_CONTACT_DEFAULTS.hoursTh;
+  return `[เวลาทำการสหกรณ์] ${hoursLabel} (เปิด ${start} น.-${end} น. วันจันทร์-ศุกร์)`;
+}
+
+function buildMemberContactContextLines(org, cmsSite) {
+  const site = cmsSite && typeof cmsSite === 'object' ? cmsSite : {};
+  const ct = site.contact || (org && org.contact) || {};
+  const lines = [
+    'ข้อมูลช่องทางติดต่อเดียวกับหน้า [ติดต่อเรา](/contact)',
+    'หน้าติดต่อ: [ติดต่อเรา](/contact)'
+  ];
+  const hours = ct.hoursTh || CMS_CONTACT_DEFAULTS.hoursTh;
+  lines.push('เวลาทำการ: ' + hours);
+  const phone =
+    site.phoneDisplay ||
+    site.phone ||
+    (org && (org.phoneDisplay || org.phone || org.contactPhone)) ||
+    CMS_CONTACT_DEFAULTS.phoneDisplay;
+  lines.push('โทรศัพท์: ' + String(phone).trim());
+  const fax = ct.fax || CMS_CONTACT_DEFAULTS.fax;
+  if (fax) lines.push('แฟกซ์: ' + String(fax).trim());
+  const mobile = Array.isArray(ct.mobile) ? ct.mobile : CMS_CONTACT_DEFAULTS.mobile;
+  if (mobile.length) lines.push('มือถือ: ' + mobile.join(', '));
+  const email =
+    site.email ||
+    (org && (org.email || org.contactEmail)) ||
+    CMS_CONTACT_DEFAULTS.email;
+  if (email) lines.push('อีเมล: ' + String(email).trim());
+  const address =
+    site.address ||
+    (org && org.address) ||
+    CMS_CONTACT_DEFAULTS.address;
+  if (address) lines.push('ที่อยู่: ' + String(address).trim());
+  const facebook = site.facebook || CMS_CONTACT_DEFAULTS.facebook;
+  const lineUrl = site.line || CMS_CONTACT_DEFAULTS.line;
+  const youtube = site.youtube || CMS_CONTACT_DEFAULTS.youtube;
+  const mapUrl = site.mapUrl || CMS_CONTACT_DEFAULTS.mapUrl;
+  if (facebook) lines.push('Facebook: ' + facebook);
+  if (lineUrl) lines.push('LINE Official: ' + lineUrl);
+  if (youtube) lines.push('YouTube: ' + youtube);
+  if (mapUrl) lines.push('แผนที่: ' + mapUrl);
+  return lines;
+}
+
 async function buildPublicMemberDataContext(db) {
+  const bundle = await loadPublicMemberContextBundle(db);
+  return bundle.contextStr;
+}
+
+async function loadPublicMemberContextBundle(db) {
   const sections = [];
+  let org = {};
+  let cmsSite = {};
   try {
     const orgSnap = await db.collection('config').doc('org').get();
-    const org = orgSnap.exists ? orgSnap.data() || {} : {};
-    const workStart = org.attendanceWorkStart ? String(org.attendanceWorkStart).trim() : '';
-    if (workStart) sections.push('[เวลาทำการสหกรณ์] เปิด ' + workStart + ' น.');
-    const contact = [];
-    if (org.phone || org.contactPhone) contact.push('โทร: ' + String(org.phone || org.contactPhone).trim());
-    if (org.email || org.contactEmail) contact.push('อีเมล: ' + String(org.email || org.contactEmail).trim());
-    if (org.address) contact.push('ที่อยู่: ' + String(org.address).trim());
-    if (contact.length) sections.push('[ติดต่อสหกรณ์]\n' + contact.join('\n'));
+    org = orgSnap.exists ? orgSnap.data() || {} : {};
   } catch (e) {
     console.warn('[public-member-chat] org context:', e.message);
   }
   try {
+    const cmsSnap = await db.collection('cms_site').doc('settings').get();
+    cmsSite = cmsSnap.exists ? cmsSnap.data() || {} : {};
+  } catch (e) {
+    console.warn('[public-member-chat] cms_site context:', e.message);
+  }
+  const downloadPatches = cmsSite.downloadPatches || [];
+  const downloadSections = await loadMemberDownloadSections(db, downloadPatches);
+  const staffDirectory = await loadMemberStaffDirectory(db, org);
+  sections.push(buildMemberWorkHoursLine({ ...cmsSite, ...org, contact: { ...(cmsSite.contact || {}), ...(org.contact || {}) } }));
+  sections.push('[ช่องทางติดต่อสหกรณ์]\n' + buildMemberContactContextLines(org, cmsSite).join('\n'));
+  sections.push('[แจ้งโอนเงิน]\n' + buildMemberPaymentContextLines(cmsSite).join('\n'));
+  sections.push('[ทำเนียบเจ้าหน้าที่และกรรมการ]\n' + buildMemberStaffContextLines(staffDirectory).join('\n'));
+  sections.push('[อัตราดอกเบี้ย]\n' + buildMemberInterestRatesContextLines(cmsSite).join('\n'));
+  if (downloadSections.length) {
+    sections.push('[แบบฟอร์มดาวน์โหลด]\n' + buildMemberDownloadsContextLines(downloadSections).join('\n'));
+  }
+  let holidaysDocs = [];
+  try {
     const holSnap = await db.collection('holidays').limit(80).get();
-    const holidaysDocs = holSnap.docs.map((doc) => ({ id: doc.id, ...(doc.data() || {}) }));
+    holidaysDocs = holSnap.docs.map((doc) => ({ id: doc.id, ...(doc.data() || {}) }));
     const holidayLines = buildCoopHolidayContextLines(holidaysDocs, { futureOnly: false });
-    sections.push('[วันหยุด/วันหยุดสหกรณ์]\n' + holidayLines.join('\n'));
+    sections.push('[วันหยุด/วันหยุดขัตฤกษ์]\n' + holidayLines.join('\n'));
   } catch (e) {
     console.warn('[public-member-chat] holidays context:', e.message);
   }
-  return sections.length ? sections.join('\n\n') : '(ไม่มีข้อมูลเพิ่มเติมจากระบบ — ตอบจากกฎสมาชิกและความรู้ทั่วไปเกี่ยวกับสหกรณ์)';
+  const contextStr = sections.length
+    ? sections.join('\n\n')
+    : '(ไม่มีข้อมูลเพิ่มเติมจากระบบ — ตอบจากกฎสมาชิกและความรู้ทั่วไปเกี่ยวกับสหกรณ์)';
+  return { contextStr, cmsSite, downloadSections, holidaysDocs, staffDirectory };
 }
 
 function buildPublicMemberSystemPrompt(lineCfg, dataContextStr) {
@@ -3362,9 +3464,19 @@ function buildPublicMemberSystemPrompt(lineCfg, dataContextStr) {
   const rules = lineRulesToPrompt(lineCfg, 'member') || 'ให้บริการสมาชิกสหกรณ์อย่างสุภาพ ไม่เปิดเผยข้อมูลภายใน';
   const parts = [
     `คุณคือ ${name} — ผู้ช่วยบริการสมาชิกสหกรณ์ออมทรัพย์สาธารณสุขหนองคาย จำกัด`,
-    'ผู้ใช้เป็นสมาชิกหรือผู้สนใจบริการสหกรณ์ — **ไม่จำเป็นต้องผูกบัญชีหรือเข้าสู่ระบบ**',
     `ใช้คำลงท้าย ${particle} พูดสั้น กระชับ เหมาะกับแชทบนเว็บไซต์`,
-    'ห้ามเปิดเผยข้อมูลภายใน เช่น รายชื่อเจ้าหน้าที่ วันลา เข้างาน ระบบ IT',
+    'เมื่อพูดถึงวันหยุดนักขัตฤกษ์/พิเศษ ให้ใช้คำว่า "วันหยุดขัตฤกษ์" ไม่ใช้คำว่า "วันหยุดสหกรณ์"',
+    'เมื่อถามเวลาทำการ ให้แจ้งช่วงเวลาเปิด-ปิดครบ เช่น 08.30 น.-16.30 น. และหยุดเสาร์-อาทิตย์',
+    'เมื่อถามช่องทางติดต่อ (ทั่วไป) ให้ตอบจาก [ช่องทางติดต่อสหกรณ์] และแนะนำ [ติดต่อเรา](/contact)',
+    'เมื่อถามแจ้งโอน/โอนเงิน/ชำระเงิน ให้ตอบจาก [แจ้งโอนเงิน] และแนะนำกรอกแบบฟอร์มที่ [แจ้งโอนเงิน](/infrom-payment) — ห้ามลิงก์ไป [ติดต่อเรา](/contact)',
+    'เมื่อถามอัตราดอกเบี้ย ให้ตอบจาก [อัตราดอกเบี้ย] สั้นๆ 1-2 ประโยงตามประเภทที่ถาม (เงินฝาก / เงินกู้) — ห้ามพิมพ์ตารางเอง',
+    'เมื่อถามวันหยุด ให้ตอบจาก [วันหยุด/วันหยุดขัตฤกษ์] สั้นๆ 1-2 ประโยง — ห้ามพิมพ์ตารางรายการวันหยุดเอง',
+    'เมื่อถามแบบฟอร์ม/ดาวน์โหลด ให้ตอบจาก [แบบฟอร์มดาวน์โหลด] แนะนำชื่อแบบฟอร์มที่ตรงที่สุด หรือดูเพิ่มเติมที่ [ดาวน์โหลด](/download) — ห้ามใส่ URL ไฟล์',
+    'เมื่อถามติดต่อเจ้าหน้าที่/ฝ่าย ให้แนะนำ [ทำเนียบฝ่ายจัดการ](/management)',
+    'เมื่อถามประธาน/กรรมการ/คณะกรรมการ ให้แนะนำ [คณะกรรมการ](/team) — ห้ามลิงก์ไป [ทำเนียบฝ่ายจัดการ](/management)',
+    'เมื่อถามประธาน/กรรมการ/เจ้าหน้าที่เฉพาะคน ตอบสั้นๆ 1 ประโยง — ระบบจะแสดงการ์ดรูป ชื่อ ตำแหน่ง เบอร์โทรให้ ห้ามพิมพ์ชื่อ-เบอร์ซ้ำ',
+    ...memberChatPageLinkPromptLines(),
+    'ห้ามเปิดเผยข้อมูลภายใน เช่น วันลา เข้างาน รหัสผ่าน ระบบ IT ที่ไม่เกี่ยวกับการติดต่อสาธารณะ',
     'ห้ามบอกยอดเงินฝาก/เงินกู้จริงถ้าไม่มีใน context — แนะนำติดต่อสหกรณ์',
     '## สมองสมาชิกสหกรณ์\n' + rules
   ];
@@ -3391,24 +3503,36 @@ async function runPublicMemberChat(db, payload) {
           content: String(h.content).slice(0, 3000)
         }))
     : [];
-  const dataContextStr = await buildPublicMemberDataContext(db);
-  const systemContent = buildPublicMemberSystemPrompt(lineRaw, dataContextStr);
+  const ctxBundle = await loadPublicMemberContextBundle(db);
+  const systemContent = buildPublicMemberSystemPrompt(lineRaw, ctxBundle.contextStr);
   const messages = [
     { role: 'system', content: systemContent },
     ...history,
     { role: 'user', content: message }
   ];
-  const reply = await callOpenAIChat(
+  const rawReply = await callOpenAIChat(
     lineRaw.openaiApiKey,
     lineRaw.model || 'gpt-4o-mini',
     messages,
     800,
     { temperature: 0.65 }
   );
-  return {
-    reply: reply.length > 4000 ? reply.slice(0, 3997) + '...' : reply,
+  const trimmedReply = rawReply.length > 4000 ? rawReply.slice(0, 3997) + '...' : rawReply;
+  const enriched = enrichPublicMemberChatReply(
+    message,
+    trimmedReply,
+    ctxBundle.cmsSite,
+    ctxBundle.downloadSections,
+    ctxBundle.holidaysDocs,
+    ctxBundle.staffDirectory
+  );
+  const result = {
+    reply: enriched.reply,
     name: (lineRaw.name || 'โมเน่').trim()
   };
+  if (enriched.html) result.html = enriched.html;
+  if (enriched.downloads && enriched.downloads.length) result.downloads = enriched.downloads;
+  return result;
 }
 
 async function getPublicMemberChatStatus(db) {
@@ -3418,8 +3542,8 @@ async function getPublicMemberChatStatus(db) {
   const gender = lineRaw && lineRaw.gender ? String(lineRaw.gender) : 'female';
   const greeting =
     gender === 'male'
-      ? `สวัสดีครับ ผม${name} ยินดีให้บริการสมาชิกสหกรณ์ครับ มีอะไรให้ช่วยไหมครับ?`
-      : `สวัสดีค่ะ ดิฉัน${name} ยินดีให้บริการสมาชิกสหกรณ์ค่ะ มีอะไรให้ช่วยไหมคะ?`;
+      ? `สวัสดีครับ น้อง${name} ยินดีให้บริการสมาชิกสหกรณ์ครับ มีอะไรให้ช่วยไหมครับ?`
+      : `สวัสดีค่ะ น้อง${name} ยินดีให้บริการสมาชิกสหกรณ์ค่ะ มีอะไรให้ช่วยไหมคะ?`;
   return { enabled, name, gender, greeting };
 }
 

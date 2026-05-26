@@ -67,10 +67,17 @@ console.log('[prepare-functions-deploy] copied monitor-api -> functions/monitor-
 const libSrc = path.join(root, 'lib');
 const libDest = path.join(functionsDir, 'lib');
 fs.mkdirSync(libDest, { recursive: true });
-for (const name of ['nkbk-ai.js', 'nkbk-ai-routes.js']) {
+for (const name of ['nkbk-ai.js', 'nkbk-ai-routes.js', 'member-chat-inbox.js', 'member-interest-rates.js', 'member-downloads.js', 'member-payment.js', 'member-staff.js', 'member-chat-enrich.js', 'member-chat-format.js', 'member-holidays.js']) {
   fs.copyFileSync(path.join(libSrc, name), path.join(libDest, name));
 }
 console.log('[prepare-functions-deploy] copied lib/nkbk-ai*.js -> functions/lib');
+
+const thaiHolSrc = path.join(root, 'thai-public-holidays.json');
+const thaiHolDest = path.join(functionsDir, 'thai-public-holidays.json');
+if (fs.existsSync(thaiHolSrc)) {
+  fs.copyFileSync(thaiHolSrc, thaiHolDest);
+  console.log('[prepare-functions-deploy] copied thai-public-holidays.json -> functions/');
+}
 
 
 

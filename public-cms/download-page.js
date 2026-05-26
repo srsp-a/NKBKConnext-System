@@ -40,6 +40,17 @@ function stripUpdateFromTitle(title) {
     .trim();
 }
 
+function stripNewBadgeFromTitle(title) {
+  return String(title || '')
+    .replace(/\s*\(\s*New\s*!\s*\)/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeDownloadTitle(title) {
+  return stripNewBadgeFromTitle(stripUpdateFromTitle(title));
+}
+
 function isUsableDownloadUrl(url) {
   return !!(url && url !== '#' && !/^javascript:/i.test(url));
 }
@@ -71,7 +82,7 @@ function parseDownloadSections(html) {
         const updatedAt = parseFileUpdatedAt(rawTitle, description);
         return {
           id: slugDownloadId(rawTitle),
-          title: stripUpdateFromTitle(rawTitle),
+          title: normalizeDownloadTitle(rawTitle),
           description,
           fileUrl,
           updatedAt
@@ -108,6 +119,10 @@ function escapeDownloadHtml(s) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function renderDownloadDocIcon() {
+  return window.KbIcon ? KbIcon.svg('file-text', 20) : '';
 }
 
 function renderDownloadBtn(item) {
@@ -178,7 +193,10 @@ function renderDownloadTable(sections, countMap) {
           return `
 <tr data-download-id="${escapeDownloadHtml(it.id)}" data-search="${escapeDownloadHtml(searchText)}">
   <td class="kb-download-col-doc">
-    <div class="kb-download-title">${escapeDownloadHtml(it.title)}</div>
+    <div class="kb-download-title-row">
+      <span class="kb-download-doc-icon" aria-hidden="true">${renderDownloadDocIcon()}</span>
+      <div class="kb-download-title">${escapeDownloadHtml(it.title)}</div>
+    </div>
     ${note}
   </td>
   <td class="kb-download-col-btn">${renderDownloadActionCell(it, dlCount)}</td>

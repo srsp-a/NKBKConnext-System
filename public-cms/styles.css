@@ -1,7 +1,7 @@
 /* NKBK — modern pink theme (dark pink primary) */
 
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Noto+Sans:wght@400;500;600;700&display=swap');
-@import url('/v2.css?v=34');
+@import url('/v2.css?v=46');
 
 :root {
   --kb-primary: #c2185b;
@@ -79,7 +79,8 @@ body.kb-site .kb-link-more,
 body.kb-site .kb-tier1-links a,
 body.kb-site .kb-contact-card-value a,
 body.kb-site .kb-contact-map-link,
-body.kb-site .kb-contact-form-privacy a {
+body.kb-site .kb-contact-form-privacy a,
+body.kb-site .kb-team-modal-link {
   position: relative;
   display: inline-block;
   text-decoration: none !important;
@@ -96,7 +97,8 @@ body.kb-site .kb-link-more::after,
 body.kb-site .kb-tier1-links a::after,
 body.kb-site .kb-contact-card-value a::after,
 body.kb-site .kb-contact-map-link::after,
-body.kb-site .kb-contact-form-privacy a::after {
+body.kb-site .kb-contact-form-privacy a::after,
+body.kb-site .kb-team-modal-link::after {
   content: '';
   position: absolute;
   left: 0;
@@ -115,7 +117,8 @@ body.kb-site .kb-news-card-cta::after,
 body.kb-site .kb-link-more::after,
 body.kb-site .kb-contact-card-value a::after,
 body.kb-site .kb-contact-map-link::after,
-body.kb-site .kb-contact-form-privacy a::after {
+body.kb-site .kb-contact-form-privacy a::after,
+body.kb-site .kb-team-modal-link::after {
   background: var(--kb-primary);
 }
 body.kb-site .kb-footer-body ul a:hover {
@@ -127,7 +130,8 @@ body.kb-site .kb-news-card:hover .kb-news-card-cta,
 body.kb-site .kb-link-more:hover,
 body.kb-site .kb-contact-card-value a:hover,
 body.kb-site .kb-contact-map-link:hover,
-body.kb-site .kb-contact-form-privacy a:hover {
+body.kb-site .kb-contact-form-privacy a:hover,
+body.kb-site .kb-team-modal-link:hover {
   color: var(--kb-primary) !important;
 }
 body.kb-site .kb-footer-body ul a:hover::after,
@@ -138,7 +142,8 @@ body.kb-site .kb-link-more:hover::after,
 body.kb-site .kb-tier1-links a:hover::after,
 body.kb-site .kb-contact-card-value a:hover::after,
 body.kb-site .kb-contact-map-link:hover::after,
-body.kb-site .kb-contact-form-privacy a:hover::after {
+body.kb-site .kb-contact-form-privacy a:hover::after,
+body.kb-site .kb-team-modal-link:hover::after {
   width: 100%;
 }
 
@@ -1166,9 +1171,28 @@ html[lang='en'] .kb-brand {
 
 /* News page sidebar polish */
 .kb-layout .kb-sidebar {
-  position: sticky;
-  top: 1rem;
   box-shadow: var(--kb-shadow-soft);
+  z-index: 2;
+  background: var(--kb-white);
+}
+@media (min-width: 993px) {
+  .kb-layout .kb-sidebar,
+  .kb-layout--news #newsSidebar {
+    position: sticky;
+    top: var(--kb-header-sticky-top, calc(var(--kb-header-offset, 102px) + 0.75rem));
+  }
+  .kb-legal-sidebar {
+    position: sticky;
+    top: var(--kb-header-sticky-top, calc(var(--kb-header-offset, 102px) + 0.75rem));
+    height: fit-content;
+    max-height: calc(100vh - var(--kb-header-sticky-top, 114px) - 1.5rem);
+    z-index: 2;
+  }
+  .kb-legal-sidebar-card {
+    max-height: calc(100vh - var(--kb-header-sticky-top, 114px) - 1.5rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
 }
 .kb-layout .kb-sidebar li a {
   border-radius: 8px;
@@ -1536,15 +1560,17 @@ html[lang='en'] .kb-brand {
 .pdf-viewer {
   margin: 1.25rem auto;
   max-width: min(100%, 794px);
+  width: 100%;
   border: 1px solid var(--kb-border);
   border-radius: var(--kb-radius);
   overflow: hidden;
-  background: #525659;
+  background: #f4f6f8;
   box-shadow: var(--kb-shadow);
 }
-.pdf-viewer--a4,
-.pdf-viewer:has(iframe[src*='.pdf']) {
+.pdf-viewer--a4:not(.pdf-viewer--canvas):not(.pdf-viewer--mobile-scale),
+.pdf-viewer:has(iframe[src*='.pdf']):not(.pdf-viewer--canvas) {
   aspect-ratio: 210 / 297;
+  background: #525659;
 }
 .pdf-viewer iframe {
   width: 100%;
@@ -1553,9 +1579,101 @@ html[lang='en'] .kb-brand {
   border: 0;
   display: block;
 }
+.pdf-viewer-loading,
+.pdf-viewer-error {
+  margin: 0;
+  padding: 1.25rem;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--kb-muted);
+}
+.pdf-viewer-open {
+  display: block;
+  margin: 0;
+  padding: 0.65rem 1rem;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--kb-primary, #c2185b);
+  background: #fff;
+  border-top: 1px solid var(--kb-border);
+  text-decoration: none !important;
+}
+.pdf-viewer-open:hover {
+  background: #fdf6f8;
+}
+.pdf-viewer--canvas {
+  aspect-ratio: auto;
+  height: auto;
+  overflow: visible;
+  background: #e8eaed;
+}
+.pdf-viewer-pages {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+}
+.pdf-viewer-page {
+  display: block;
+  width: 100% !important;
+  height: auto !important;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  border-radius: 2px;
+}
+.pdf-viewer--mobile-scale {
+  aspect-ratio: auto;
+  overflow: hidden;
+  position: relative;
+  background: #525659;
+}
+.pdf-viewer-scaler {
+  transform-origin: top left;
+  will-change: transform;
+}
+.pdf-viewer--mobile-scale .pdf-viewer-scaler iframe {
+  min-height: 0;
+  border: 0;
+  display: block;
+}
+.kb-prose iframe,
+.kb-prose embed,
+.kb-prose object {
+  max-width: 100%;
+  width: 100%;
+  border: 0;
+}
 @media (min-width: 768px) {
   .pdf-viewer iframe {
     min-height: 0;
+  }
+}
+@media (max-width: 767px) {
+  .kb-article {
+    padding: 1rem;
+    overflow-x: clip;
+  }
+  .kb-container:has(.kb-article) {
+    padding-inline: 0.75rem;
+  }
+  .pdf-viewer {
+    max-width: 100%;
+    margin-inline: 0;
+    border-radius: 10px;
+  }
+  .pdf-viewer--a4:not(.pdf-viewer--canvas):not(.pdf-viewer--mobile-scale) {
+    aspect-ratio: auto;
+    min-height: calc((100vw - 2rem) * 297 / 210);
+    height: calc((100vw - 2rem) * 297 / 210);
+  }
+  .pdf-viewer--a4:not(.pdf-viewer--canvas):not(.pdf-viewer--mobile-scale) iframe {
+    min-height: 0;
+    height: 100%;
+  }
+  .pdf-viewer-pages {
+    padding: 6px;
+    gap: 6px;
   }
 }
 
@@ -1665,11 +1783,33 @@ html[lang='en'] .kb-brand {
   .kb-layout {
     grid-template-columns: 1fr;
   }
-  .kb-layout--news .kb-news-main,
+  .kb-layout--news {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+  .kb-layout--news .kb-news-main {
+    order: 2;
+    width: 100%;
+    min-width: 0;
+    grid-column: auto;
+    grid-row: auto;
+  }
   .kb-layout--news #newsSidebar,
   .kb-layout--news .kb-sidebar {
-    grid-column: 1;
+    order: 1;
+    width: 100%;
+    grid-column: auto;
     grid-row: auto;
+  }
+  .kb-layout .kb-sidebar {
+    position: static;
+    top: auto;
+  }
+  .kb-news-main,
+  .kb-news-list--grid {
+    min-width: 0;
+    overflow: hidden;
   }
   .kb-footer-body {
     padding: 1.75rem 0 1.5rem;

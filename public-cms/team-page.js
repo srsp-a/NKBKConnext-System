@@ -90,17 +90,42 @@ function sortMembers(members, positionOrder) {
   });
 }
 
+const TEAM_DEFAULT_INTERNAL_PHONE = '042-420750';
+
+function teamInternalPhone(user) {
+  const u = user && typeof user === 'object' ? user : {};
+  let phone = String(u.internalPhone || '').trim();
+  let ext = String(u.internalPhoneExt || '').trim();
+  if (!ext && phone && /กด/.test(phone)) {
+    const m = phone.match(/^(.+?)\s+กด\s*(.+)$/);
+    if (m) {
+      phone = m[1].trim();
+      ext = m[2].trim();
+    }
+  }
+  if (!phone) phone = TEAM_DEFAULT_INTERNAL_PHONE;
+  if (ext.startsWith('กด')) ext = ext.replace(/^กด\s*/, '').trim();
+  if (!ext) return phone;
+  return `${phone} กด ${ext}`;
+}
+
+function teamShowsInternalPhone(user) {
+  return user && user.showInternalPhoneOnTeam === true;
+}
+
 function renderMemberCard(member, opts) {
   const large = opts && opts.large;
   const cls = large ? 'kb-team-card kb-team-card--chair' : 'kb-team-card';
   const expired = isExpiredTerm(member);
+  const name = member.fullname || 'ไม่ระบุ';
+  const memberId = member.id ? escapeTeamHtml(String(member.id)) : '';
   return `
-<article class="${cls}">
-  <div class="kb-team-card-photo">
+<article class="${cls}" data-member-id="${memberId}">
+  <button type="button" class="kb-team-card-photo kb-team-card-photo--clickable" data-team-member-open="${memberId}" aria-label="ดูข้อมูล ${escapeTeamHtml(name)}">
     ${teamAvatarHtml(member)}
     <span class="kb-team-card-fallback"${member.avatar ? ' hidden' : ''}>${teamAvatarFallback(member)}</span>
-  </div>
-  <h4 class="kb-team-card-name">${escapeTeamHtml(member.fullname || 'ไม่ระบุ')}</h4>
+  </button>
+  <h4 class="kb-team-card-name">${escapeTeamHtml(name)}</h4>
   <p class="kb-team-card-role">${escapeTeamHtml(member._boardPosition || 'กรรมการ')}</p>
   ${expired ? '<span class="kb-team-card-badge">หมดวาระ</span>' : ''}
 </article>`;
@@ -131,6 +156,7 @@ function renderTeamChart(state) {
     });
 
   members = sortMembers(members, positionOrder);
+  state.currentMembers = members;
 
   if (!members.length) {
     return `<div class="kb-team-empty">
@@ -258,11 +284,167 @@ function pickActiveCommitteeSet(org) {
 
 function bindTeamPage(root, getState, rerender) {
   root.addEventListener('click', (e) => {
+    const memberBtn = e.target.closest('[data-team-member-open]');
+    if (memberBtn) {
+      const memberId = memberBtn.getAttribute('data-team-member-open');
+      const st = getState();
+      const member = (st.currentMembers || []).find((m) => String(m.id) === String(memberId));
+      if (member) openTeamMemberModal(member);
+      return;
+    }
     const btn = e.target.closest('[data-board]');
     if (!btn) return;
     const st = getState();
     st.selectedBoard = btn.getAttribute('data-board');
     rerender();
+  });
+}
+
+function teamTelHref(phone) {
+  const digits = String(phone || '').replace(/[^\d+]/g, '');
+  return digits || '';
+}
+
+function renderTeamMemberModalPhoto(member) {
+  const src = member.avatar || '';
+  const pos = member.avatarPosition || 'center center';
+  const name = member.fullname || 'ไม่ระบุ';
+  if (src) {
+    return `<img src="${escapeTeamHtml(src)}" alt="" class="kb-team-modal-photo-img" style="object-position:${escapeTeamHtml(pos)}" loading="lazy">`;
+  }
+  return `<span class="kb-team-modal-photo-fallback" aria-hidden="true">${escapeTeamHtml((name.charAt(0) || 'U').toUpperCase())}</span>`;
+}
+
+function renderTeamMemberModalBody(member) {
+  const name = member.fullname || 'ไม่ระบุ';
+  const role = member._boardPosition || member.committeePosition || 'กรรมการ';
+  const email = (member.email || '').trim();
+  const phone = (member.phone || '').trim();
+  const showInternal = teamShowsInternalPhone(member);
+  const internalPhone = showInternal ? teamInternalPhone(member) : '';
+  const emailRow = email
+    ? `<div class="kb-team-modal-row">
+  <span class="kb-team-modal-label">อีเมล</span>
+  <a class="kb-team-modal-value kb-team-modal-link" href="mailto:${escapeTeamHtml(email)}">${escapeTeamHtml(email)}</a>
+</div>`
+    : '';
+  const phoneRow = phone
+    ? `<div class="kb-team-modal-row">
+  <span class="kb-team-modal-label">โทรศัพท์</span>
+  <a class="kb-team-modal-value kb-team-modal-link" href="tel:${escapeTeamHtml(teamTelHref(phone))}">${escapeTeamHtml(phone)}</a>
+</div>`
+    : '';
+  const internalRow = internalPhone
+    ? `<div class="kb-team-modal-row">
+  <span class="kb-team-modal-label">เบอร์โทร</span>
+  <span class="kb-team-modal-value">${escapeTeamHtml(internalPhone)}</span>
+</div>`
+    : '';
+  const contactEmpty = !email && !phone && !internalPhone
+    ? '<p class="kb-team-modal-empty">ยังไม่มีข้อมูลติดต่อ</p>'
+    : '';
+
+  return `
+<div class="kb-team-modal-layout">
+  <div class="kb-team-modal-photo">${renderTeamMemberModalPhoto(member)}</div>
+  <div class="kb-team-modal-info">
+    <h2 id="kb-team-modal-name" class="kb-team-modal-name">${escapeTeamHtml(name)}</h2>
+    <p class="kb-team-modal-role">${escapeTeamHtml(role)}</p>
+    <div class="kb-team-modal-contact">${emailRow}${phoneRow}${internalRow}${contactEmpty}</div>
+  </div>
+</div>`;
+}
+
+function ensureTeamMemberModal() {
+  let modal = document.getElementById('kb-team-member-modal');
+  if (modal) return modal;
+
+  modal = document.createElement('div');
+  modal.id = 'kb-team-member-modal';
+  modal.className = 'kb-team-modal';
+  modal.hidden = true;
+  modal.innerHTML = `
+<div class="kb-team-modal-backdrop" data-team-modal-close tabindex="-1"></div>
+<div class="kb-team-modal-panel" role="dialog" aria-modal="true" aria-labelledby="kb-team-modal-name">
+  <button type="button" class="kb-team-modal-close" data-team-modal-close aria-label="ปิด">&times;</button>
+  <div class="kb-team-modal-body"></div>
+</div>`;
+  document.body.appendChild(modal);
+  return modal;
+}
+
+let teamModalLastFocus = null;
+let teamModalFocusTrapHandler = null;
+
+function bindTeamMemberModalFocus(modal) {
+  const panel = modal.querySelector('.kb-team-modal-panel');
+  if (!panel) return;
+  const focusable = panel.querySelectorAll(
+    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  );
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (teamModalFocusTrapHandler) {
+    modal.removeEventListener('keydown', teamModalFocusTrapHandler);
+  }
+  teamModalFocusTrapHandler = (e) => {
+    if (e.key !== 'Tab') return;
+    if (e.shiftKey) {
+      if (document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else if (document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
+  modal.addEventListener('keydown', teamModalFocusTrapHandler);
+}
+
+function closeTeamMemberModal(modal) {
+  if (!modal) return;
+  modal.hidden = true;
+  document.body.classList.remove('kb-team-modal-open');
+  if (teamModalFocusTrapHandler) {
+    modal.removeEventListener('keydown', teamModalFocusTrapHandler);
+    teamModalFocusTrapHandler = null;
+  }
+  if (teamModalLastFocus && typeof teamModalLastFocus.focus === 'function') {
+    teamModalLastFocus.focus();
+  }
+  teamModalLastFocus = null;
+}
+
+function openTeamMemberModal(member) {
+  const modal = ensureTeamMemberModal();
+  const body = modal.querySelector('.kb-team-modal-body');
+  if (!body) return;
+  teamModalLastFocus = document.activeElement;
+  body.innerHTML = renderTeamMemberModalBody(member);
+  modal.hidden = false;
+  document.body.classList.add('kb-team-modal-open');
+  bindTeamMemberModalFocus(modal);
+  modal.querySelector('.kb-team-modal-close')?.focus();
+}
+
+let teamModalListenersBound = false;
+
+function bindTeamMemberModal() {
+  if (teamModalListenersBound) return;
+  teamModalListenersBound = true;
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('[data-team-modal-close]')) return;
+    const modal = document.getElementById('kb-team-member-modal');
+    if (modal && !modal.hidden) closeTeamMemberModal(modal);
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const modal = document.getElementById('kb-team-member-modal');
+    if (modal && !modal.hidden) closeTeamMemberModal(modal);
   });
 }
 
@@ -273,8 +455,11 @@ async function initTeamPage(main) {
     org,
     users,
     selectedSet: pickActiveCommitteeSet(org),
-    selectedBoard: boards[0] || ''
+    selectedBoard: boards[0] || '',
+    currentMembers: []
   };
+
+  bindTeamMemberModal();
 
   const paint = () => {
     main.innerHTML = renderTeamShell(state);

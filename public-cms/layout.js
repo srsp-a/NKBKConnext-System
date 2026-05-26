@@ -291,6 +291,12 @@
     if (!wrap || document.body.classList.contains('kb-home')) return;
 
     const gapPx = readPageHeadGapPx();
+    const wrapBottom = Math.ceil(wrap.getBoundingClientRect().bottom);
+    const stickyTop = wrapBottom + 12;
+    if (stickyTop > 0) {
+      document.documentElement.style.setProperty('--kb-header-sticky-top', stickyTop + 'px');
+    }
+
     let offset = 0;
 
     if (pill) {
@@ -301,8 +307,7 @@
         return;
       }
     } else {
-      const wr = wrap.getBoundingClientRect();
-      offset = Math.ceil(wr.bottom + gapPx);
+      offset = Math.ceil(wrapBottom + gapPx);
     }
     if (offset > 0) {
       document.documentElement.style.setProperty('--kb-header-offset', offset + 'px');
@@ -572,12 +577,12 @@
     if (!document.querySelector('link[href*="member-chat-widget.css"]')) {
       const link = document.createElement('link');
       link.rel = 'stylesheet';
-      link.href = '/member-chat-widget.css?v=2';
+      link.href = '/member-chat-widget.css?v=18';
       document.head.appendChild(link);
     }
     if (!document.querySelector('script[src*="member-chat-widget.js"]')) {
       const script = document.createElement('script');
-      script.src = '/member-chat-widget.js?v=2';
+      script.src = '/member-chat-widget.js?v=16';
       script.defer = true;
       document.body.appendChild(script);
     }

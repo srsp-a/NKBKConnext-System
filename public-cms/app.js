@@ -1,4 +1,4 @@
-﻿function t(key) {
+function t(key) {
   return window.CmsI18n ? CmsI18n.t(key) : key;
 }
 
@@ -128,19 +128,86 @@ function isPdfUrl(url) {
   }
 }
 
-/** URL สำหรับ iframe PDF — แสดงเต็มหน้าแบบ A4 แนวตั้ง */
+function isMobilePdfView() {
+  return window.KbPdfMobile ? KbPdfMobile.isMobile() : window.matchMedia('(max-width: 767px)').matches;
+}
+
+function absolutePdfUrl(url) {
+  try {
+    return new URL(String(url || '').split('#')[0], location.origin).href;
+  } catch {
+    return String(url || '').split('#')[0];
+  }
+}
+
+function extractPdfUrl(src, el) {
+  const raw = String(src || '').trim();
+  if (isPdfUrl(raw)) return absolutePdfUrl(raw);
+  const gview = raw.match(/[?&]url=([^&]+)/i);
+  if (gview) {
+    try {
+      return decodeURIComponent(gview[1]);
+    } catch {
+      return gview[1];
+    }
+  }
+  const wrap = el && el.closest ? el.closest('.pdf-viewer') : null;
+  if (wrap && wrap.dataset.pdfUrl) return wrap.dataset.pdfUrl;
+  return '';
+}
+
+/** URL สำหรับ iframe PDF บน desktop */
 function pdfIframeSrc(url) {
-  const base = String(url || '').split('#')[0];
-  return `${base}#page=1&view=Fit`;
+  const abs = absolutePdfUrl(url);
+  if (!abs) return '';
+  return `${abs}#page=1&view=FitH&zoom=page-width&toolbar=1`;
+}
+
+function mountPdfIframe(wrap, url) {
+  wrap.classList.remove('pdf-viewer--canvas', 'pdf-viewer--mobile-scale');
+  wrap.dataset.pdfUrl = absolutePdfUrl(url);
+  if (wrap.querySelector('iframe')) {
+    const iframe = wrap.querySelector('iframe');
+    iframe.src = pdfIframeSrc(url);
+    return;
+  }
+  wrap.innerHTML = '';
+  const iframe = document.createElement('iframe');
+  iframe.src = pdfIframeSrc(url);
+  iframe.title = 'PDF';
+  iframe.loading = 'lazy';
+  wrap.appendChild(iframe);
+}
+
+function mountPdfViewer(wrap, url) {
+  const abs = absolutePdfUrl(url);
+  if (!abs) return;
+  wrap.className = 'pdf-viewer pdf-viewer--a4';
+  wrap.dataset.pdfUrl = abs;
+  if (isMobilePdfView() && window.KbPdfMobile) {
+    KbPdfMobile.renderMobilePdf(wrap, abs);
+    return;
+  }
+  mountPdfIframe(wrap, abs);
 }
 
 function normalizePdfViewers(root) {
   if (!root) return;
-  root.querySelectorAll('.pdf-viewer iframe').forEach((iframe) => {
-    const src = iframe.getAttribute('src') || '';
-    if (!isPdfUrl(src)) return;
-    const next = pdfIframeSrc(src);
-    if (src !== next) iframe.setAttribute('src', next);
+  root.querySelectorAll('.pdf-viewer[data-pdf-url]').forEach((wrap) => {
+    mountPdfViewer(wrap, wrap.dataset.pdfUrl);
+  });
+  root.querySelectorAll('iframe[src]').forEach((iframe) => {
+    if (iframe.closest('.pdf-viewer--canvas, .pdf-viewer--mobile-scale')) return;
+    const pdfUrl = extractPdfUrl(iframe.getAttribute('src'), iframe);
+    if (!pdfUrl) return;
+    let wrap = iframe.closest('.pdf-viewer');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.className = 'pdf-viewer pdf-viewer--a4';
+      iframe.parentNode.insertBefore(wrap, iframe);
+      wrap.appendChild(iframe);
+    }
+    mountPdfViewer(wrap, pdfUrl);
   });
 }
 
@@ -155,19 +222,27 @@ function enhancePostContent(root) {
     if (!isPdfUrl(href) && !isPdfemb && !inPdfBlock) return;
     const wrap = document.createElement('div');
     wrap.className = 'pdf-viewer pdf-viewer--a4';
-    const iframe = document.createElement('iframe');
-    iframe.src = pdfIframeSrc(href);
-    iframe.title = (a.textContent || 'PDF').trim() || 'PDF';
-    iframe.loading = 'lazy';
-    wrap.appendChild(iframe);
     const parent = a.parentElement;
     if (parent && parent.tagName === 'P' && parent.childNodes.length === 1) {
       parent.replaceWith(wrap);
     } else {
       a.replaceWith(wrap);
     }
+    mountPdfViewer(wrap, href);
   });
   normalizePdfViewers(root);
+  if (!root.dataset.pdfResizeBound) {
+    root.dataset.pdfResizeBound = '1';
+    var lastMobilePdf = isMobilePdfView();
+    window.addEventListener('resize', function () {
+      var nowMobile = isMobilePdfView();
+      if (nowMobile === lastMobilePdf) return;
+      lastMobilePdf = nowMobile;
+      window.requestAnimationFrame(function () {
+        normalizePdfViewers(root);
+      });
+    });
+  }
 }
 
 function rewriteContentLinks(root) {
@@ -859,7 +934,7 @@ function loadScriptOnce(src) {
 async function ensureLegalScripts() {
   if (window.CmsLegalPage) return;
   await loadScriptOnce('/legal-content.js?v=4');
-  await loadScriptOnce('/legal-pages.js?v=6');
+  await loadScriptOnce('/legal-pages.js?v=7');
 }
 
 async function initFaqPage(main) {

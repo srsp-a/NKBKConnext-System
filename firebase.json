@@ -64,6 +64,10 @@
       ],
       "rewrites": [
         {
+          "source": "/api/cms-pdf",
+          "function": "monitorApi"
+        },
+        {
           "source": "/api/public-cms-chat",
           "function": "monitorApi"
         },

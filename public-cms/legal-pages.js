@@ -79,7 +79,6 @@ function renderFaqPage() {
   return `
 <div class="kb-page-body kb-page-body--legal kb-page-body--faq">
   <div class="kb-container kb-legal-wrap">
-    <p class="kb-legal-intro">${escapeLegalHtml(pack.intro || '')}</p>
     <div class="kb-legal-layout">
       <aside class="kb-legal-sidebar" aria-label="${escapeLegalHtml(legalT('tocLabel'))}">
         <div class="kb-legal-sidebar-card">
@@ -88,6 +87,7 @@ function renderFaqPage() {
         </div>
       </aside>
       <div class="kb-legal-main">
+        <p class="kb-legal-intro">${escapeLegalHtml(pack.intro || '')}</p>
         <div class="kb-faq-search-wrap">
           <label class="kb-faq-search-label" for="kb-faq-search">${escapeLegalHtml(legalT('searchLabel'))}</label>
           <input type="search" id="kb-faq-search" class="kb-faq-search" placeholder="${escapeLegalHtml(legalT('searchPlaceholder'))}" autocomplete="off">
@@ -126,8 +126,6 @@ function renderDocPage(type) {
   return `
 <div class="kb-page-body kb-page-body--legal kb-page-body--${type}">
   <div class="kb-container kb-legal-wrap">
-    <p class="kb-legal-intro">${escapeLegalHtml(pack.intro || '')}</p>
-    ${updated || ''}
     <div class="kb-legal-layout">
       <aside class="kb-legal-sidebar" aria-label="${escapeLegalHtml(legalT('tocLabel'))}">
         <div class="kb-legal-sidebar-card">
@@ -136,6 +134,8 @@ function renderDocPage(type) {
         </div>
       </aside>
       <div class="kb-legal-main kb-legal-doc">
+        <p class="kb-legal-intro">${escapeLegalHtml(pack.intro || '')}</p>
+        ${updated || ''}
         ${body}
         ${renderLegalCta()}
       </div>

@@ -5,6 +5,9 @@
 const https = require('https');
 const aiImageGen = require('./ai-image-gen.js');
 const { buildCoopHolidayContextLines } = require('./coop-holidays.js');
+const { buildMemberWorkHoursLine, buildMemberContactContextLines } = require('./member-context.js');
+const { buildMemberInterestRatesContextLines } = require('./member-interest-rates.js');
+const { parseDownloadSections, buildMemberDownloadsContextLines } = require('./member-downloads.js');
 
 const pendingImageJobs = new Set();
 
@@ -144,7 +147,9 @@ const SYSTEM_PROMPT_TEMPLATE = `คุณคือ {{name}} — {{gender_instruc
 - [ผู้จัดการ] ← เฉพาะคนที่ position หรือ role = "ผู้จัดการ" (มีได้ 1 คน) — ตอบชื่อจากส่วนนี้เท่านั้น อย่าดึงจากรายชื่อเจ้าหน้าที่
 - [ประธานฯ] ← เฉพาะประธานหลัก (มีได้ 1 คน) — ตอบชื่อจากส่วนนี้เท่านั้น
 - [วันลาคงเหลือของผู้นี้] ← leave_balances (doc = userId_ปีพ.ศ. ฟิลด์ items ตามประเภทลา) — ใช้ตอบ "วันลาเหลือเท่าไหร่/ลาป่วยเหลือกี่วัน" เท่านั้น
-- [วันหยุด/วันหยุดสหกรณ์] ← holidays + รายการ static
+- [วันหยุด/วันหยุดขัตฤกษ์] ← holidays + รายการ static
+- [อัตราดอกเบี้ย] ← cms_site/settings.interestRates (sync หน้าแรกเว็บ) — ใช้ตอบอัตราดอกเบี้ยฝาก/กู้ % ต่อปี (สมาชิก)
+- [แบบฟอร์มดาวน์โหลด] ← cms_pages/7934 (sync หน้า /download) — แบบฟอร์มและเอกสาร PDF (สมาชิก)
 - [เวลาทำการเข้างาน] ← config/org (attendanceWorkStart)
 - [ประเภทการลา] ← leave_types (โควต้า/ปี — ใช้ตอบประเภทมีอะไรบ้าง ไม่ใช้แทนวันลาคงเหลือ)
 - [โครงสร้างองค์กร] ← config/org (departments, units, positions, กรรมการ)
@@ -393,7 +398,7 @@ async function buildDataContext(deps, lineUserId, audience) {
   const safe = (p) => p.catch(() => null);
 
   // วันหยุด, ประเภทลา, config องค์กร/ลา, config AI (สำหรับตั้งค่าผู้จัดการ/ประธานโดยตรง)
-  const [holidaysList, leaveTypesList, orgCfg, leaveCfg, usersList, programsList, systemsList, leavesList, aiChatCfg] = await Promise.all([
+  const [holidaysList, leaveTypesList, orgCfg, leaveCfg, usersList, programsList, systemsList, leavesList, aiChatCfg, cmsSiteCfg, downloadPageCfg] = await Promise.all([
     safe(firebaseGetCollection('holidays')),
     safe(firebaseGetCollection('leave_types')),
     safe(firebaseGet('config', 'org')),
@@ -402,7 +407,9 @@ async function buildDataContext(deps, lineUserId, audience) {
     safe(firebaseGetCollection('programs', { pageSize: 300 })),
     safe(firebaseGetCollection('systems', { pageSize: 300 })),
     safe(firebaseGetCollection('leaves', { pageSize: 500 })),
-    safe(firebaseGet('config', 'ai_chat'))
+    safe(firebaseGet('config', 'ai_chat')),
+    safe(firebaseGet('cms_site', 'settings')),
+    safe(firebaseGet('cms_pages', '7934'))
   ]);
 
   const holidays = Array.isArray(holidaysList) ? holidaysList : [];
@@ -419,23 +426,24 @@ async function buildDataContext(deps, lineUserId, audience) {
     futureOnly: !isMemberBrain,
     maxItems: isMemberBrain ? null : 25
   });
-  sections.push('[วันหยุด/วันหยุดสหกรณ์]\n' + holidayLines.join('\n'));
+  sections.push('[วันหยุด/วันหยุดขัตฤกษ์]\n' + holidayLines.join('\n'));
 
   // ---- เวลาทำการ (จาก config/org) ----
   const workStart = (orgCfg && orgCfg.attendanceWorkStart) ? String(orgCfg.attendanceWorkStart).trim() : '';
-  if (workStart) {
-    sections.push(isMemberBrain
-      ? '[เวลาทำการสหกรณ์] เปิด ' + workStart + ' น. (อ้างอิงจากระบบ)'
-      : '[เวลาทำการเข้างาน] เริ่ม ' + workStart + ' น. (อ้างอิงจากระบบเข้า-ออกงาน)');
+  if (isMemberBrain) {
+    sections.push(buildMemberWorkHoursLine(orgCfg || {}));
+  } else if (workStart) {
+    sections.push('[เวลาทำการเข้างาน] เริ่ม ' + workStart + ' น. (อ้างอิงจากระบบเข้า-ออกงาน)');
   }
 
   if (isMemberBrain) {
-    if (orgCfg) {
-      const contactLines = [];
-      if (orgCfg.phone || orgCfg.contactPhone) contactLines.push('โทร: ' + String(orgCfg.phone || orgCfg.contactPhone).trim());
-      if (orgCfg.email || orgCfg.contactEmail) contactLines.push('อีเมล: ' + String(orgCfg.email || orgCfg.contactEmail).trim());
-      if (orgCfg.address) contactLines.push('ที่อยู่: ' + String(orgCfg.address).trim());
-      if (contactLines.length) sections.push('[ติดต่อสหกรณ์]\n' + contactLines.join('\n'));
+    const cmsSite = cmsSiteCfg && typeof cmsSiteCfg === 'object' ? cmsSiteCfg : {};
+    sections.push('[ช่องทางติดต่อสหกรณ์]\n' + buildMemberContactContextLines(orgCfg || {}, cmsSite).join('\n'));
+    sections.push('[อัตราดอกเบี้ย]\n' + buildMemberInterestRatesContextLines(cmsSite).join('\n'));
+    const downloadHtml = downloadPageCfg && downloadPageCfg.contentHtml ? String(downloadPageCfg.contentHtml) : '';
+    const downloadSections = parseDownloadSections(downloadHtml, cmsSite.downloadPatches || []);
+    if (downloadSections.length) {
+      sections.push('[แบบฟอร์มดาวน์โหลด]\n' + buildMemberDownloadsContextLines(downloadSections).join('\n'));
     }
     if (user) {
       const nm = (user.fullname || user.nameTH || user.displayName || user.name || '').trim();

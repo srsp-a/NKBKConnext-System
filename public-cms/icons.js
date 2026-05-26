@@ -17,6 +17,8 @@
       '<path d="M7 10h10"/><path d="M17 10l-3-3"/><path d="M17 10l-3 3"/><path d="M17 14H7"/><path d="M7 14l3 3"/><path d="M7 14l3-3"/>',
     download:
       '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>',
+    'file-text':
+      '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
     news:
       '<path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-4 0V4"/><path d="M10 6h8"/><path d="M10 10h8"/><path d="M10 14h5"/>',
     phone:

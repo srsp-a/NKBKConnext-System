@@ -798,12 +798,12 @@ function pushWebConnectToAdmin(url, database, username, password, opts) {
 }
 
 function pushCurrentWebFromDom(opts) {
-  let url = (webUrl && webUrl.value) ? webUrl.value.trim() : '';
+    let url = (webUrl && webUrl.value) ? webUrl.value.trim() : '';
   if (!url) return;
   if (!/^https?:\/\//i.test(url)) url = 'http://' + url;
-  const database = (webDatabase && webDatabase.value) ? webDatabase.value.trim() : '';
-  const username = (webUsername && webUsername.value) ? webUsername.value : '';
-  const password = (webPassword && webPassword.value) ? webPassword.value : '';
+    const database = (webDatabase && webDatabase.value) ? webDatabase.value.trim() : '';
+    const username = (webUsername && webUsername.value) ? webUsername.value : '';
+    const password = (webPassword && webPassword.value) ? webPassword.value : '';
   pushWebConnectToAdmin(url, database, username, password, opts);
 }
 
@@ -1192,19 +1192,19 @@ function bindWebappHub() {
   if (btnSave) {
     btnSave.addEventListener('click', () => {
       let url = (webUrl && webUrl.value) ? webUrl.value.trim() : '';
-      if (!url) {
-        if (webResult) {
-          webResult.className = 'nas-result error';
-          webResult.textContent = 'กรุณาระบุ URL';
-        }
-        return;
+    if (!url) {
+      if (webResult) {
+        webResult.className = 'nas-result error';
+        webResult.textContent = 'กรุณาระบุ URL';
       }
-      if (!/^https?:\/\//i.test(url)) url = 'http://' + url;
+      return;
+    }
+    if (!/^https?:\/\//i.test(url)) url = 'http://' + url;
       const database = (webDatabase && webDatabase.value) ? webDatabase.value.trim() : '';
       const username = (webUsername && webUsername.value) ? webUsername.value : '';
       const password = (webPassword && webPassword.value) ? webPassword.value : '';
       if (!username || !password) {
-        if (webResult) {
+      if (webResult) {
           webResult.className = 'nas-result error';
           webResult.textContent = 'กรุณาระบุชื่อผู้ใช้และรหัสผ่าน';
         }
@@ -1923,7 +1923,7 @@ async function submitLeaveRequest() {
   if (resEl) resEl.textContent = 'กำลังส่งคำขอ...';
   try {
     const res = await window.__nkbkAuthFetch('/api/monitor-leave-submit', {
-      method: 'POST',
+    method: 'POST',
       body: JSON.stringify({ type, partial, startDate, endDate, reason })
     });
     const data = await res.json().catch(() => ({ ok: false }));
@@ -2207,7 +2207,7 @@ function renderNotifBadge(unread) {
     badge.hidden = false;
     badge.textContent = unread > 99 ? '99+' : String(unread);
     bell.classList.add('has-unread');
-  } else {
+      } else {
     badge.hidden = true;
     badge.textContent = '0';
     bell.classList.remove('has-unread');

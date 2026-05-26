@@ -8,6 +8,8 @@ const MGMT_DEPT_COLORS = [
   { from: '#c026d3', to: '#a21caf', text: '#86198f', line: '#f5d0fe' }
 ];
 
+let mgmtAllUsers = [];
+
 function escapeMgmtHtml(s) {
   return String(s)
     .replace(/&/g, '&amp;')
@@ -20,14 +22,23 @@ function mgmtUserId(u) {
   return u.id || u._firestoreDocId || u.uid || '';
 }
 
+function mgmtAvatarSrc(user) {
+  return (user.avatar || user.userAvatar || user.lineAvatar || '').trim();
+}
+
+function mgmtAvatarPosition(user) {
+  return (user.avatarPosition || 'center center').trim();
+}
+
 function mgmtAvatarHtml(user, size) {
-  const src = user.userAvatar || user.lineAvatar || user.avatar || '';
+  const src = mgmtAvatarSrc(user);
+  const pos = mgmtAvatarPosition(user);
   const name = user.fullname || 'U';
   if (!src) {
     return `<span class="kb-mgmt-card-initial" aria-hidden="true">${escapeMgmtHtml(name.charAt(0))}</span>`;
   }
   const px = (size || 16) * 4;
-  return `<img src="${escapeMgmtHtml(src)}" alt="" class="kb-mgmt-card-img" loading="lazy" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=c2185b&color=fff&size=${px}';">`;
+  return `<img src="${escapeMgmtHtml(src)}" alt="" class="kb-mgmt-card-img" style="object-position:${escapeMgmtHtml(pos)}" loading="lazy" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=c2185b&color=fff&size=${px}';">`;
 }
 
 function mgmtPositionJob(u) {
@@ -35,6 +46,25 @@ function mgmtPositionJob(u) {
   const job = (u.job || '').trim();
   if (!job || job === 'งานทั้งหมด' || pos.includes(job)) return pos;
   return `${pos} ${job}`.trim();
+}
+
+const MGMT_DEFAULT_INTERNAL_PHONE = '042-420750';
+
+function mgmtInternalPhone(user) {
+  const u = user && typeof user === 'object' ? user : {};
+  let phone = String(u.internalPhone || '').trim();
+  let ext = String(u.internalPhoneExt || '').trim();
+  if (!ext && phone && /กด/.test(phone)) {
+    const m = phone.match(/^(.+?)\s+กด\s*(.+)$/);
+    if (m) {
+      phone = m[1].trim();
+      ext = m[2].trim();
+    }
+  }
+  if (!phone) phone = MGMT_DEFAULT_INTERNAL_PHONE;
+  if (ext.startsWith('กด')) ext = ext.replace(/^กด\s*/, '').trim();
+  if (!ext) return phone;
+  return `${phone} กด ${ext}`;
 }
 
 function renderMgmtPersonCard(user, opts) {
@@ -47,10 +77,14 @@ function renderMgmtPersonCard(user, opts) {
         ? 'kb-mgmt-card kb-mgmt-card--sm'
         : 'kb-mgmt-card';
   const style = accent ? ` style="--kb-mgmt-accent:${accent}"` : '';
+  const name = user.fullname || 'ไม่ระบุ';
+  const memberId = escapeMgmtHtml(String(mgmtUserId(user)));
   return `
-<article class="${cls}"${style}>
-  <div class="kb-mgmt-card-photo">${mgmtAvatarHtml(user, size === 'lg' ? 20 : size === 'sm' ? 12 : 16)}</div>
-  <h4 class="kb-mgmt-card-name">${escapeMgmtHtml(user.fullname || 'ไม่ระบุ')}</h4>
+<article class="${cls}"${style} data-member-id="${memberId}">
+  <button type="button" class="kb-mgmt-card-photo kb-mgmt-card-photo--clickable" data-mgmt-member-open="${memberId}" aria-label="ดูข้อมูล ${escapeMgmtHtml(name)}">
+    ${mgmtAvatarHtml(user, size === 'lg' ? 20 : size === 'sm' ? 12 : 16)}
+  </button>
+  <h4 class="kb-mgmt-card-name">${escapeMgmtHtml(name)}</h4>
   <p class="kb-mgmt-card-role">${escapeMgmtHtml(mgmtPositionJob(user))}</p>
 </article>`;
 }
@@ -59,7 +93,7 @@ function buildUsersByDept(users) {
   const map = {};
   users.forEach((u) => {
     const pos = u.position || '';
-    if (pos.includes('ผู้จัดการ') && !pos.includes('รอง')) return;
+    if (pos.includes('ผู้จัดการ')) return;
     const dept = u.department || 'ไม่ระบุฝ่าย';
     if (!map[dept]) map[dept] = [];
     map[dept].push(u);
@@ -183,9 +217,167 @@ async function fetchManagementData() {
   return { departments, users };
 }
 
+function mgmtTelHref(phone) {
+  const digits = String(phone || '').replace(/[^\d+]/g, '');
+  return digits || '';
+}
+
+function renderMgmtMemberModalPhoto(member) {
+  const src = mgmtAvatarSrc(member);
+  const pos = mgmtAvatarPosition(member);
+  const name = member.fullname || 'ไม่ระบุ';
+  if (src) {
+    return `<img src="${escapeMgmtHtml(src)}" alt="" class="kb-team-modal-photo-img" style="object-position:${escapeMgmtHtml(pos)}" loading="lazy">`;
+  }
+  return `<span class="kb-team-modal-photo-fallback" aria-hidden="true">${escapeMgmtHtml((name.charAt(0) || 'U').toUpperCase())}</span>`;
+}
+
+function renderMgmtMemberModalBody(member) {
+  const name = member.fullname || 'ไม่ระบุ';
+  const role = mgmtPositionJob(member) || member.position || 'เจ้าหน้าที่';
+  const email = (member.email || '').trim();
+  const phone = (member.phone || '').trim();
+  const internalPhone = mgmtInternalPhone(member);
+  const emailRow = email
+    ? `<div class="kb-team-modal-row">
+  <span class="kb-team-modal-label">อีเมล</span>
+  <a class="kb-team-modal-value kb-team-modal-link" href="mailto:${escapeMgmtHtml(email)}">${escapeMgmtHtml(email)}</a>
+</div>`
+    : '';
+  const phoneRow = phone
+    ? `<div class="kb-team-modal-row">
+  <span class="kb-team-modal-label">โทรศัพท์</span>
+  <a class="kb-team-modal-value kb-team-modal-link" href="tel:${escapeMgmtHtml(mgmtTelHref(phone))}">${escapeMgmtHtml(phone)}</a>
+</div>`
+    : '';
+  const internalRow = `<div class="kb-team-modal-row">
+  <span class="kb-team-modal-label">เบอร์โทร</span>
+  <span class="kb-team-modal-value">${escapeMgmtHtml(internalPhone)}</span>
+</div>`;
+  const contactEmpty = !email && !phone && !internalPhone
+    ? '<p class="kb-team-modal-empty">ยังไม่มีข้อมูลติดต่อ</p>'
+    : '';
+
+  return `
+<div class="kb-team-modal-layout">
+  <div class="kb-team-modal-photo">${renderMgmtMemberModalPhoto(member)}</div>
+  <div class="kb-team-modal-info">
+    <h2 id="kb-team-modal-name" class="kb-team-modal-name">${escapeMgmtHtml(name)}</h2>
+    <p class="kb-team-modal-role">${escapeMgmtHtml(role)}</p>
+    <div class="kb-team-modal-contact">${emailRow}${phoneRow}${internalRow}${contactEmpty}</div>
+  </div>
+</div>`;
+}
+
+function ensureMgmtMemberModal() {
+  let modal = document.getElementById('kb-team-member-modal');
+  if (modal) return modal;
+
+  modal = document.createElement('div');
+  modal.id = 'kb-team-member-modal';
+  modal.className = 'kb-team-modal';
+  modal.hidden = true;
+  modal.innerHTML = `
+<div class="kb-team-modal-backdrop" data-team-modal-close tabindex="-1"></div>
+<div class="kb-team-modal-panel" role="dialog" aria-modal="true" aria-labelledby="kb-team-modal-name">
+  <button type="button" class="kb-team-modal-close" data-team-modal-close aria-label="ปิด">&times;</button>
+  <div class="kb-team-modal-body"></div>
+</div>`;
+  document.body.appendChild(modal);
+  return modal;
+}
+
+let mgmtModalLastFocus = null;
+let mgmtModalFocusTrapHandler = null;
+
+function bindMgmtMemberModalFocus(modal) {
+  const panel = modal.querySelector('.kb-team-modal-panel');
+  if (!panel) return;
+  const focusable = panel.querySelectorAll(
+    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  );
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (mgmtModalFocusTrapHandler) {
+    modal.removeEventListener('keydown', mgmtModalFocusTrapHandler);
+  }
+  mgmtModalFocusTrapHandler = (e) => {
+    if (e.key !== 'Tab') return;
+    if (e.shiftKey) {
+      if (document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else if (document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
+  modal.addEventListener('keydown', mgmtModalFocusTrapHandler);
+}
+
+function closeMgmtMemberModal(modal) {
+  if (!modal) return;
+  modal.hidden = true;
+  document.body.classList.remove('kb-team-modal-open');
+  if (mgmtModalFocusTrapHandler) {
+    modal.removeEventListener('keydown', mgmtModalFocusTrapHandler);
+    mgmtModalFocusTrapHandler = null;
+  }
+  if (mgmtModalLastFocus && typeof mgmtModalLastFocus.focus === 'function') {
+    mgmtModalLastFocus.focus();
+  }
+  mgmtModalLastFocus = null;
+}
+
+function openMgmtMemberModal(member) {
+  const modal = ensureMgmtMemberModal();
+  const body = modal.querySelector('.kb-team-modal-body');
+  if (!body) return;
+  mgmtModalLastFocus = document.activeElement;
+  body.innerHTML = renderMgmtMemberModalBody(member);
+  modal.hidden = false;
+  document.body.classList.add('kb-team-modal-open');
+  bindMgmtMemberModalFocus(modal);
+  modal.querySelector('.kb-team-modal-close')?.focus();
+}
+
+let mgmtModalListenersBound = false;
+
+function bindMgmtMemberModal() {
+  if (mgmtModalListenersBound) return;
+  mgmtModalListenersBound = true;
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('[data-team-modal-close]')) return;
+    const modal = document.getElementById('kb-team-member-modal');
+    if (modal && !modal.hidden) closeMgmtMemberModal(modal);
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const modal = document.getElementById('kb-team-member-modal');
+    if (modal && !modal.hidden) closeMgmtMemberModal(modal);
+  });
+}
+
+function bindManagementPage(root) {
+  root.addEventListener('click', (e) => {
+    const memberBtn = e.target.closest('[data-mgmt-member-open]');
+    if (!memberBtn) return;
+    const memberId = memberBtn.getAttribute('data-mgmt-member-open');
+    const member = mgmtAllUsers.find((m) => String(mgmtUserId(m)) === String(memberId));
+    if (member) openMgmtMemberModal(member);
+  });
+}
+
 async function initManagementPage(main) {
   const { departments, users } = await fetchManagementData();
+  mgmtAllUsers = users;
+  bindMgmtMemberModal();
   main.innerHTML = renderManagementPage(departments, users);
+  bindManagementPage(main);
 }
 
 window.CmsManagementPage = {
