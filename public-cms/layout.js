@@ -577,7 +577,7 @@
     if (!document.querySelector('link[href*="member-chat-widget.css"]')) {
       const link = document.createElement('link');
       link.rel = 'stylesheet';
-      link.href = '/member-chat-widget.css?v=28';
+      link.href = '/member-chat-widget.css?v=29';
       document.head.appendChild(link);
     }
     if (!document.querySelector('script[src*="monee-chat-notify-sound.js"]')) {
@@ -587,7 +587,7 @@
     }
     if (!document.querySelector('script[src*="member-chat-widget.js"]')) {
       const script = document.createElement('script');
-      script.src = '/member-chat-widget.js?v=28';
+      script.src = '/member-chat-widget.js?v=29';
       script.defer = true;
       document.body.appendChild(script);
     }

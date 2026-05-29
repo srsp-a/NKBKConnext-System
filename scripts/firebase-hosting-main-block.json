@@ -1,0 +1,223 @@
+{
+  "target": "main",
+  "public": "public-cms",
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "ignore": [
+    "firebase.json",
+    "**/.*",
+    "**/node_modules/**"
+  ],
+  "headers": [
+    {
+      "source": "**/*.html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
+      ]
+    },
+    {
+      "source": "/desktop-app-updates/**",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/**",
+      "function": {
+        "functionId": "monitorApi",
+        "region": "asia-southeast1"
+      }
+    },
+    {
+      "source": "/n/**",
+      "function": {
+        "functionId": "cmsOg",
+        "region": "asia-southeast1"
+      }
+    },
+    {
+      "source": "/page/**",
+      "function": {
+        "functionId": "cmsOg",
+        "region": "asia-southeast1"
+      }
+    },
+    {
+      "source": "/news",
+      "function": {
+        "functionId": "cmsOg",
+        "region": "asia-southeast1"
+      }
+    },
+    {
+      "source": "/download",
+      "function": {
+        "functionId": "cmsOg",
+        "region": "asia-southeast1"
+      }
+    },
+    {
+      "source": "/about-us",
+      "function": {
+        "functionId": "cmsOg",
+        "region": "asia-southeast1"
+      }
+    },
+    {
+      "source": "/team",
+      "function": {
+        "functionId": "cmsOg",
+        "region": "asia-southeast1"
+      }
+    },
+    {
+      "source": "/management",
+      "function": {
+        "functionId": "cmsOg",
+        "region": "asia-southeast1"
+      }
+    },
+    {
+      "source": "/contact",
+      "function": {
+        "functionId": "cmsOg",
+        "region": "asia-southeast1"
+      }
+    },
+    {
+      "source": "/infrom-payment",
+      "function": {
+        "functionId": "cmsOg",
+        "region": "asia-southeast1"
+      }
+    },
+    {
+      "source": "/infrom-payment-line",
+      "function": {
+        "functionId": "cmsOg",
+        "region": "asia-southeast1"
+      }
+    },
+    {
+      "source": "/app",
+      "function": {
+        "functionId": "cmsOg",
+        "region": "asia-southeast1"
+      }
+    },
+    {
+      "source": "/faq",
+      "function": {
+        "functionId": "cmsOg",
+        "region": "asia-southeast1"
+      }
+    },
+    {
+      "source": "/terms",
+      "function": {
+        "functionId": "cmsOg",
+        "region": "asia-southeast1"
+      }
+    },
+    {
+      "source": "/privacy-policy",
+      "function": {
+        "functionId": "cmsOg",
+        "region": "asia-southeast1"
+      }
+    },
+    {
+      "source": "/pdpa",
+      "function": {
+        "functionId": "cmsOg",
+        "region": "asia-southeast1"
+      }
+    },
+    {
+      "source": "**",
+      "function": {
+        "functionId": "cmsOg",
+        "region": "asia-southeast1"
+      }
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/page/7934",
+      "destination": "/download",
+      "type": 301
+    },
+    {
+      "source": "/page/241",
+      "destination": "/about-us",
+      "type": 301
+    },
+    {
+      "source": "/page/420",
+      "destination": "/team",
+      "type": 301
+    },
+    {
+      "source": "/page/8929",
+      "destination": "/management",
+      "type": 301
+    },
+    {
+      "source": "/page/354",
+      "destination": "/contact",
+      "type": 301
+    },
+    {
+      "source": "/page/9304",
+      "destination": "/infrom-payment",
+      "type": 301
+    },
+    {
+      "source": "/page/9208",
+      "destination": "/app",
+      "type": 301
+    },
+    {
+      "source": "/page/294",
+      "destination": "/faq",
+      "type": 301
+    },
+    {
+      "source": "/page/525",
+      "destination": "/terms",
+      "type": 301
+    },
+    {
+      "source": "/page/3",
+      "destination": "/privacy-policy",
+      "type": 301
+    },
+    {
+      "source": "/terms-conditions",
+      "destination": "/terms",
+      "type": 301
+    },
+    {
+      "source": "/news.html",
+      "destination": "/news",
+      "type": 301
+    },
+    {
+      "source": "/index.html",
+      "destination": "/",
+      "type": 301
+    }
+  ]
+}

@@ -11,12 +11,15 @@ const firebase = JSON.parse(fs.readFileSync(firebasePath, 'utf8'));
 const apiTargets = new Set(['monitor', 'line']);
 const kept = firebase.hosting.filter((h) => apiTargets.has(h.target));
 
+const mainBlockPath = path.join(__dirname, 'firebase-hosting-main-block.json');
+const mainHosting = JSON.parse(fs.readFileSync(mainBlockPath, 'utf8'));
+
 const staticHosting = config.sites.map((site) => ({
   target: site.target,
   public: site.itSrc || `hosting-dist/${site.target}`,
   ...block
 }));
 
-firebase.hosting = [...kept, ...staticHosting];
+firebase.hosting = [...kept, mainHosting, ...staticHosting];
 fs.writeFileSync(firebasePath, JSON.stringify(firebase, null, 2) + '\n');
 console.log('[merge-firebase-hosting] hosting targets:', firebase.hosting.map((h) => h.target).join(', '));

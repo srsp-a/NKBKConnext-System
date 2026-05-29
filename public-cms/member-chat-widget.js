@@ -3,8 +3,15 @@
 
   const STORAGE_KEY = 'nkbk_cms_chat_history';
   const CONV_KEY = 'nkbk_cms_conversation_id';
-  const API_BASE = '/api/public-cms-chat';
   const POLL_MS = 3000;
+
+  function chatApiRoot() {
+    const host = (location.hostname || '').toLowerCase();
+    if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:3333';
+    return 'https://monitor-api.nkbkcoop.com';
+  }
+
+  const API_BASE = chatApiRoot() + '/api/public-cms-chat';
 
   const QUICK_PROMPTS = [
     'เวลาทำการสหกรณ์',
