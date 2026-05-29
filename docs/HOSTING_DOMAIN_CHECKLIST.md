@@ -1,4 +1,4 @@
-# Checklist โดเมน Hosting (อัปเดต 2026-05-19)
+# Checklist โดเมน Hosting (อัปเดต 2026-05-25)
 
 ## สถานะตรวจจากเครือข่าย
 
@@ -14,7 +14,14 @@
 | queue / random / q / qauto / payment | OK | Firebase Hosting |
 | api-line.nkbkcoop.com | OK | LINE API + webhook |
 | monitor-api.nkbkcoop.com | OK | Monitor API |
-| **nkbkcoop.com** | **ยังเป็น WordPress** | CMS ทดสอบที่ `admin-panel-nkbkcoop-cbf10.web.app` |
+| **nkbkcoop.com** | **OK — CMS Firebase** | โดเมนหลักเว็บองค์กร · `/nkbkcoopmg` ดาวน์โหลดโปรแกรม |
+| admin-panel-nkbkcoop-cbf10.web.app | OK | alias ทดสอบ / fallback |
+| **meetdoc.nkbkcoop.com** | **รอ deploy** | พอร์ทัลวาระ/รายงานประชุม (กรรมการ) · Hosting `meetdoc-nkbkcoop` |
+
+## Storage rules (meeting-docs PDF)
+
+- กฎ `meeting-docs/**` อยู่ใน [`storage.rules`](../storage.rules) แล้ว
+- Deploy ต้องใช้บัญชี Owner โปรเจกต์: `firebase login` แล้ว `firebase deploy --only storage` (SA ได้ 403)
 
 ## NAS ปิดแล้ว
 
@@ -23,4 +30,4 @@
 - [x] Monitor API → monitor-api
 - [x] Firestore backup 30 วัน — `FIRESTORE_BACKUP.md`
 - [x] CMS ข่าว 440 รายการ migrate จบ (2026-05-19)
-- [ ] สลับ nkbkcoop.com จาก WordPress → Firebase CMS
+- [x] สลับ nkbkcoop.com จาก WordPress → Firebase CMS (2026-05-25)

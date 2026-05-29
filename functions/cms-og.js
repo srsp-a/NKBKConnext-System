@@ -5,7 +5,7 @@
 const admin = require('firebase-admin');
 
 const SITE_ORIGIN =
-  process.env.CMS_PUBLIC_ORIGIN || 'https://admin-panel-nkbkcoop-cbf10.web.app';
+  process.env.CMS_PUBLIC_ORIGIN || 'https://nkbkcoop.com';
 const DEFAULT_OG_IMAGE =
   'https://res.cloudinary.com/dzs7zbikj/image/upload/c_pad,b_white,w_1200,h_630,f_jpg,q_auto/v1770613894/site-config/vd64o0efi0hdpetkzyrf.png';
 const SITE_NAME = 'NKBKCOOP';
@@ -46,9 +46,47 @@ const STATIC_PAGE_IDS = {
 };
 
 function isBot(ua) {
-  return /facebookexternalhit|Facebot|Twitterbot|WhatsApp|LinkedInBot|Slackbot|TelegramBot|Discordbot|bingpreview|Googlebot/i.test(
-    ua || ''
-  );
+  const s = String(ua || '');
+  // In-app browsers (LINE / WhatsApp WebView) are real visitors — not preview crawlers.
+  if (/Mozilla\/5\.0/i.test(s) && (/Line\/\d/i.test(s) || /WhatsApp\/\d/i.test(s))) {
+    return false;
+  }
+  if (
+    /facebookexternalhit|Facebot|Twitterbot|LinkedInBot|Slackbot|TelegramBot|Discordbot|bingpreview|Googlebot/i.test(
+      s
+    )
+  ) {
+    return true;
+  }
+  if (/Linespider|LineBot|line-poker/i.test(s)) return true;
+  if (/WhatsApp/i.test(s)) return true;
+  if (/Line/i.test(s)) return true;
+  return false;
+}
+
+async function getStaffContactOgMeta(db, staffId, shortCode) {
+  const staffContactAvailability = require('./lib/staff-contact-availability');
+  const staffContactPrompts = require('./lib/staff-contact-prompts');
+  const info = await staffContactAvailability.evaluateContactAvailability(db, staffId);
+  if (!info.ok || !info.staff) return null;
+  const title = info.staff.contactTitle || staffContactPrompts.staffContactTitle(info.staff);
+  const name = info.staff.name || title;
+  const desc =
+    'ติดต่อ' +
+    title +
+    ' ผ่านน้องโมเน่ — สหกรณ์ออมทรัพย์สาธารณสุขหนองคาย จำกัด';
+  const avatar = info.staff.avatar || info.prefillAvatar || '';
+  const image = avatar && /^https?:\/\//i.test(avatar) ? avatar : DEFAULT_OG_IMAGE;
+  const code = String(shortCode || info.staff.shortCode || '').trim().toLowerCase();
+  const url = code
+    ? SITE_ORIGIN.replace(/\/$/, '') + '/' + code
+    : SITE_ORIGIN.replace(/\/$/, '') + '/management?contact=' + encodeURIComponent(staffId);
+  return {
+    title: 'ติดต่อ ' + title + ' — ' + SITE_NAME,
+    description: desc,
+    image: absoluteImage(image),
+    url
+  };
 }
 
 function esc(s) {
@@ -161,6 +199,31 @@ async function proxyShell(reqPath) {
 async function cmsOgHandler(req, res) {
   const path = (req.path || '/').split('?')[0];
   const ua = req.get('user-agent') || '';
+
+  const shortMatch = path.match(/^\/([a-z0-9]{5})\/?$/i);
+  if (shortMatch) {
+    try {
+      if (!admin.apps.length) admin.initializeApp();
+      const db = admin.firestore();
+      const staffContactLinks = require('./lib/staff-contact-links');
+      const staffId = await staffContactLinks.resolveStaffIdByShortCode(db, shortMatch[1]);
+      if (staffId) {
+        if (isBot(ua)) {
+          const meta = await getStaffContactOgMeta(db, staffId, shortMatch[1]);
+          if (meta) {
+            res.set('Cache-Control', 'public, max-age=600');
+            return res.status(200).send(ogHtml(meta));
+          }
+        }
+        const dest =
+          SITE_ORIGIN.replace(/\/$/, '') + '/management?contact=' + encodeURIComponent(staffId);
+        return res.redirect(302, dest);
+      }
+    } catch (e) {
+      console.error('cmsOg short contact', e.message);
+    }
+  }
+
   const postMatch = path.match(/^\/n\/(\d+)\/?$/i);
 
   if (isBot(ua)) {

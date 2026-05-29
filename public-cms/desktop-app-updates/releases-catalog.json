@@ -1,0 +1,29 @@
+{
+  "productName": "NKBKConnext System",
+  "futureAppName": "NKBKCOOPMG",
+  "fileProductName": "NKBKConnext System",
+  "productTagline": "โปรแกรมสำหรับคอมพิวเตอร์ — ลางาน อนุมัติ แชท Monee และข้อมูลงาน",
+  "latestVersion": "1.0.39",
+  "basePath": "/desktop-app-updates",
+  "releases": [
+    {
+      "version": "1.0.39"
+    }
+  ],
+  "futurePlatforms": [
+    {
+      "id": "ios",
+      "label": "NKBKCOOPMG · iOS",
+      "icon": "apple",
+      "status": "coming_soon",
+      "statusText": "เร็วๆ นี้"
+    },
+    {
+      "id": "android",
+      "label": "NKBKCOOPMG · Android",
+      "icon": "android",
+      "status": "coming_soon",
+      "statusText": "เร็วๆ นี้"
+    }
+  ]
+}

@@ -35,12 +35,14 @@
     "url": "https://github.com/srsp-a/NKBKConnext-System.git"
   },
   "dependencies": {
+    "canvas": "^3.2.3",
     "electron-updater": "^6.1.7",
     "express": "^4.18.2",
     "firebase-admin": "^12.7.0",
     "jszip": "^3.10.1",
     "mammoth": "^1.12.0",
     "pdf-parse": "^1.1.4",
+    "pdfjs-dist": "^5.7.284",
     "systeminformation": "^5.21.20",
     "xlsx": "^0.18.5"
   },
@@ -112,7 +114,7 @@
     },
     "publish": {
       "provider": "generic",
-      "url": "https://admin-panel-nkbkcoop-cbf10.web.app/desktop-app-updates/"
+      "url": "https://nkbkcoop.com/desktop-app-updates/"
     }
   }
 }

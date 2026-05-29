@@ -85,6 +85,13 @@
       "domain": "ai.nkbkcoop.com",
       "itSrc": "ai-web",
       "shared": false
+    },
+    {
+      "target": "meetdoc",
+      "siteId": "meetdoc-nkbkcoop",
+      "domain": "meetdoc.nkbkcoop.com",
+      "src": "meetdoc",
+      "shared": true
     }
   ]
 }

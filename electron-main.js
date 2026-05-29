@@ -48,7 +48,7 @@ let tray = null;
 let serverProcess = null;
 
 /** เมื่อโหลด /api/config ไม่ได้ — โฟลเดอร์ค่าเริ่มต้นบน Firebase Hosting (โปรเจกต์หลัก) */
-const FALLBACK_DESKTOP_UPDATE_FEED_URL = 'https://admin-panel-nkbkcoop-cbf10.web.app/desktop-app-updates/';
+const FALLBACK_DESKTOP_UPDATE_FEED_URL = 'https://nkbkcoop.com/desktop-app-updates/';
 
 if (process.platform === 'win32') {
   try {

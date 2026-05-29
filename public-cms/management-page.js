@@ -48,6 +48,12 @@ function mgmtPositionJob(u) {
   return `${pos} ${job}`.trim();
 }
 
+function mgmtDeptHeadTitle(deptName) {
+  return `หัวหน้า ${deptName || ''}`.trim();
+}
+
+let mgmtRoleOverrides = {};
+
 const MGMT_DEFAULT_INTERNAL_PHONE = '042-420750';
 
 function mgmtInternalPhone(user) {
@@ -79,13 +85,14 @@ function renderMgmtPersonCard(user, opts) {
   const style = accent ? ` style="--kb-mgmt-accent:${accent}"` : '';
   const name = user.fullname || 'ไม่ระบุ';
   const memberId = escapeMgmtHtml(String(mgmtUserId(user)));
+  const role = (opts && opts.roleOverride) || mgmtPositionJob(user);
   return `
 <article class="${cls}"${style} data-member-id="${memberId}">
   <button type="button" class="kb-mgmt-card-photo kb-mgmt-card-photo--clickable" data-mgmt-member-open="${memberId}" aria-label="ดูข้อมูล ${escapeMgmtHtml(name)}">
     ${mgmtAvatarHtml(user, size === 'lg' ? 20 : size === 'sm' ? 12 : 16)}
   </button>
   <h4 class="kb-mgmt-card-name">${escapeMgmtHtml(name)}</h4>
-  <p class="kb-mgmt-card-role">${escapeMgmtHtml(mgmtPositionJob(user))}</p>
+  <p class="kb-mgmt-card-role">${escapeMgmtHtml(role)}</p>
 </article>`;
 }
 
@@ -110,6 +117,27 @@ function buildUsersByDept(users) {
     });
   });
   return map;
+}
+
+function buildMgmtRoleOverrides(departments, users) {
+  const overrides = {};
+  departments.forEach((dept) => {
+    const deptUsers = users.filter((u) => (u.department || '') === dept.name);
+    const deptHead =
+      (dept.headUserId && users.find((u) => mgmtUserId(u) === dept.headUserId)) ||
+      deptUsers.find((u) => mgmtUserId(u) === dept.headUserId) ||
+      deptUsers.find((u) => (u.position || '').includes('หัวหน้า'));
+    if (deptHead) {
+      overrides[mgmtUserId(deptHead)] = mgmtDeptHeadTitle(dept.name);
+    }
+  });
+  return overrides;
+}
+
+function mgmtDisplayRole(member) {
+  const id = mgmtUserId(member);
+  if (id && mgmtRoleOverrides[id]) return mgmtRoleOverrides[id];
+  return mgmtPositionJob(member) || member.position || 'เจ้าหน้าที่';
 }
 
 function renderManagementChart(departments, users) {
@@ -141,11 +169,10 @@ function renderManagementChart(departments, users) {
     departments.forEach((dept, idx) => {
       const c = MGMT_DEPT_COLORS[idx % MGMT_DEPT_COLORS.length];
       const deptUsers = usersByDept[dept.name] || [];
-      const deptHead = deptUsers.find(
-        (u) =>
-          (u.position || '').includes('หัวหน้า') ||
-          mgmtUserId(u) === dept.headUserId
-      );
+      const deptHead =
+        (dept.headUserId && users.find((u) => mgmtUserId(u) === dept.headUserId)) ||
+        deptUsers.find((u) => mgmtUserId(u) === dept.headUserId) ||
+        deptUsers.find((u) => (u.position || '').includes('หัวหน้า'));
       const headId = deptHead ? mgmtUserId(deptHead) : '';
       const staff = deptUsers.filter((u) => mgmtUserId(u) !== headId);
 
@@ -155,7 +182,7 @@ function renderManagementChart(departments, users) {
       if (deptHead || staff.length) {
         html += '<div class="kb-mgmt-dept-body">';
         if (deptHead) {
-          html += `<div class="kb-mgmt-dept-head">${renderMgmtPersonCard(deptHead, { size: 'md', accent: c.text })}</div>`;
+          html += `<div class="kb-mgmt-dept-head">${renderMgmtPersonCard(deptHead, { size: 'md', accent: c.text, roleOverride: mgmtDeptHeadTitle(dept.name) })}</div>`;
           if (staff.length) html += '<div class="kb-mgmt-dept-line" aria-hidden="true"></div>';
         }
         if (staff.length) {
@@ -232,12 +259,31 @@ function renderMgmtMemberModalPhoto(member) {
   return `<span class="kb-team-modal-photo-fallback" aria-hidden="true">${escapeMgmtHtml((name.charAt(0) || 'U').toUpperCase())}</span>`;
 }
 
+function mgmtShowsPublicPhone(user) {
+  if (user && user.showPhoneOnPublic === true) return true;
+  if (user && user.showPhoneOnPublic === false) return false;
+  return user && user.group === 'เจ้าหน้าที่';
+}
+
+function mgmtShowsInternalPhone(user) {
+  if (user && user.showInternalPhoneOnPublic === true) return true;
+  if (user && user.showInternalPhoneOnPublic === false) return false;
+  if (user && user.showInternalPhoneOnTeam === true) return true;
+  if (user && user.showInternalPhoneOnTeam === false) return false;
+  return user && user.group === 'เจ้าหน้าที่';
+}
+
+function mgmtShowsEmail(user) {
+  return !!(user && user.showEmailOnPublic === true);
+}
+
 function renderMgmtMemberModalBody(member) {
   const name = member.fullname || 'ไม่ระบุ';
-  const role = mgmtPositionJob(member) || member.position || 'เจ้าหน้าที่';
-  const email = (member.email || '').trim();
-  const phone = (member.phone || '').trim();
-  const internalPhone = mgmtInternalPhone(member);
+  const memberId = mgmtUserId(member);
+  const role = mgmtDisplayRole(member);
+  const email = mgmtShowsEmail(member) ? (member.email || '').trim() : '';
+  const phone = mgmtShowsPublicPhone(member) ? (member.phone || '').trim() : '';
+  const internalPhone = mgmtShowsInternalPhone(member) ? mgmtInternalPhone(member) : '';
   const emailRow = email
     ? `<div class="kb-team-modal-row">
   <span class="kb-team-modal-label">อีเมล</span>
@@ -250,10 +296,12 @@ function renderMgmtMemberModalBody(member) {
   <a class="kb-team-modal-value kb-team-modal-link" href="tel:${escapeMgmtHtml(mgmtTelHref(phone))}">${escapeMgmtHtml(phone)}</a>
 </div>`
     : '';
-  const internalRow = `<div class="kb-team-modal-row">
+  const internalRow = internalPhone
+    ? `<div class="kb-team-modal-row">
   <span class="kb-team-modal-label">เบอร์โทร</span>
   <span class="kb-team-modal-value">${escapeMgmtHtml(internalPhone)}</span>
-</div>`;
+</div>`
+    : '';
   const contactEmpty = !email && !phone && !internalPhone
     ? '<p class="kb-team-modal-empty">ยังไม่มีข้อมูลติดต่อ</p>'
     : '';
@@ -265,6 +313,14 @@ function renderMgmtMemberModalBody(member) {
     <h2 id="kb-team-modal-name" class="kb-team-modal-name">${escapeMgmtHtml(name)}</h2>
     <p class="kb-team-modal-role">${escapeMgmtHtml(role)}</p>
     <div class="kb-team-modal-contact">${emailRow}${phoneRow}${internalRow}${contactEmpty}</div>
+    <div class="kb-team-modal-actions">
+      <button type="button" class="kb-team-modal-contact-btn" data-mgmt-contact-staff="${escapeMgmtHtml(String(memberId))}" data-mgmt-contact-name="${escapeMgmtHtml(name)}" data-mgmt-contact-title="${escapeMgmtHtml(role)}">
+        <span class="kb-team-modal-contact-btn-icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </span>
+        ติดต่อเจ้าหน้าที่
+      </button>
+    </div>
   </div>
 </div>`;
 }
@@ -372,12 +428,65 @@ function bindManagementPage(root) {
   });
 }
 
+function bindMgmtContactStaff() {
+  if (window.__mgmtContactStaffBound) return;
+  window.__mgmtContactStaffBound = true;
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-mgmt-contact-staff]');
+    if (!btn) return;
+    e.preventDefault();
+    const staffId = btn.getAttribute('data-mgmt-contact-staff');
+    const staffName = btn.getAttribute('data-mgmt-contact-name') || '';
+    const contactTitle = btn.getAttribute('data-mgmt-contact-title') || '';
+    const modal = document.getElementById('kb-team-member-modal');
+    if (modal && !modal.hidden) closeMgmtMemberModal(modal);
+    function tryOpen(tries) {
+      if (window.NkbkMemberChat && typeof window.NkbkMemberChat.open === 'function') {
+        window.NkbkMemberChat.open({
+          staffId: staffId,
+          staffName: staffName,
+          contactTitle: contactTitle,
+          prefill: contactTitle
+            ? 'สวัสดีครับ/ค่ะ ต้องการติดต่อ' + contactTitle + ' เรื่อง '
+            : 'สวัสดีครับ/ค่ะ ต้องการติดต่อเจ้าหน้าที่ เรื่อง '
+        });
+        return;
+      }
+      if (tries > 40) return;
+      setTimeout(function () {
+        tryOpen(tries + 1);
+      }, 150);
+    }
+    tryOpen(0);
+  });
+}
+
+function tryOpenStaffContactFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const staffId = params.get('contact') || params.get('staff');
+  if (!staffId) return;
+  function tryOpen(tries) {
+    if (window.NkbkMemberChat && typeof window.NkbkMemberChat.open === 'function') {
+      window.NkbkMemberChat.open({ staffId: staffId });
+      return;
+    }
+    if (tries > 50) return;
+    setTimeout(function () {
+      tryOpen(tries + 1);
+    }, 200);
+  }
+  tryOpen(0);
+}
+
 async function initManagementPage(main) {
   const { departments, users } = await fetchManagementData();
   mgmtAllUsers = users;
+  mgmtRoleOverrides = buildMgmtRoleOverrides(departments, users);
   bindMgmtMemberModal();
+  bindMgmtContactStaff();
   main.innerHTML = renderManagementPage(departments, users);
   bindManagementPage(main);
+  tryOpenStaffContactFromUrl();
 }
 
 window.CmsManagementPage = {

@@ -30,8 +30,101 @@ const DEFAULT_TEMPLATES = {
   password_reset: {
     subject: '[{{org_name}}] รีเซ็ตรหัสผ่าน',
     html: '<p>รหัสผ่านชั่วคราว: {{temp_password}}</p>'
+  },
+  meeting_scheduled: {
+    subject: '[{{org_name}}] กำหนดการประชุม — {{meeting_title}}',
+    html: meetingEmailHtml('📅 กำหนดการประชุม', '#4F46E5', '#EEF2FF', '#4F46E5', [
+      ['หัวข้อ', '{{meeting_title}}'],
+      ['วันที่', '{{meeting_date}}'],
+      ['เวลา', '{{meeting_time}}'],
+      ['คณะ', '{{committee_board}}'],
+      ['สถานที่', '{{location}}']
+    ], 'ดูรายละเอียดและเอกสารได้ที่ลิงก์ด้านล่าง', true)
+  },
+  meeting_reminder: {
+    subject: '[{{org_name}}] เตือนการประชุม — {{meeting_title}}',
+    html: meetingEmailHtml('⏰ เตือนการประชุม', '#EA580C', '#FFEDD5', '#EA580C', [
+      ['หัวข้อ', '{{meeting_title}}'],
+      ['วันที่', '{{meeting_date}}'],
+      ['คณะ', '{{committee_board}}']
+    ], 'โปรดเตรียมตัวเข้าร่วมประชุมตามกำหนด', true)
+  },
+  meeting_reminder_day_before: {
+    subject: '[{{org_name}}] พรุ่งนี้มีการประชุม — {{meeting_title}}',
+    html: meetingEmailHtml('📌 พรุ่งนี้มีการประชุม', '#DC2626', '#FEE2E2', '#DC2626', [
+      ['หัวข้อ', '{{meeting_title}}'],
+      ['วันที่', '{{meeting_date}}'],
+      ['เวลา', '{{meeting_time}}']
+    ], 'เตือนวันก่อนประชุม (D-1)', true)
+  },
+  meeting_approval_step1: {
+    subject: '[{{org_name}}] รอผู้จัดการอนุมัติรายงาน — {{meeting_title}}',
+    html: meetingEmailHtml('✅ รออนุมัติ (ผู้จัดการ)', '#D97706', '#FEF3C7', '#D97706', [
+      ['หัวข้อ', '{{meeting_title}}'],
+      ['คณะ', '{{committee_board}}'],
+      ['ขั้นตอน', '{{step_label}}']
+    ], 'กรุณาเข้าระบบ Meetdoc เพื่อพิจารณาอนุมัติ', true)
+  },
+  meeting_approval_step2: {
+    subject: '[{{org_name}}] รอเลขาคณะอนุมัติ — {{meeting_title}}',
+    html: meetingEmailHtml('✅ รออนุมัติ (เลขาคณะ)', '#0891B2', '#CFFAFE', '#0891B2', [
+      ['หัวข้อ', '{{meeting_title}}'],
+      ['คณะ', '{{committee_board}}']
+    ], 'กรุณาเข้าระบบ Meetdoc เพื่อพิจารณาอนุมัติ', true)
+  },
+  meeting_approval_step3: {
+    subject: '[{{org_name}}] รอประธานอนุมัติ — {{meeting_title}}',
+    html: meetingEmailHtml('✅ รออนุมัติ (ประธานคณะ)', '#7C3AED', '#EDE9FE', '#7C3AED', [
+      ['หัวข้อ', '{{meeting_title}}'],
+      ['คณะ', '{{committee_board}}']
+    ], 'กรุณาเข้าระบบ Meetdoc เพื่อพิจารณาอนุมัติ', true)
+  },
+  meeting_approved: {
+    subject: '[{{org_name}}] อนุมัติรายงานครบแล้ว — {{meeting_title}}',
+    html: meetingEmailHtml('🎉 อนุมัติครบ 3 ขั้น', '#059669', '#D1FAE5', '#059669', [
+      ['หัวข้อ', '{{meeting_title}}'],
+      ['วันที่ประชุม', '{{meeting_date}}']
+    ], 'รายงานการประชุมได้รับการอนุมัติครบถ้วนแล้ว', true)
+  },
+  meeting_revision: {
+    subject: '[{{org_name}}] ส่งกลับแก้รายงาน — {{meeting_title}}',
+    html: meetingEmailHtml('↩️ ส่งกลับแก้รายงาน', '#DC2626', '#FEE2E2', '#DC2626', [
+      ['หัวข้อ', '{{meeting_title}}'],
+      ['คณะ', '{{committee_board}}']
+    ], 'กรุณาแก้ไขรายงานและส่งเข้าสายอนุมัติอีกครั้ง', true)
   }
 };
+
+function meetingEmailHtml(title, headerColor, boxBg, borderColor, rows, footerText, withLink) {
+  let rowsHtml = '';
+  (rows || []).forEach(([label, val]) => {
+    rowsHtml += '<p style="margin:6px 0"><strong>' + label + ':</strong> ' + val + '</p>';
+  });
+  const linkBlock = withLink
+    ? '<p style="margin-top:20px"><a href="{{meetdoc_url}}" style="display:inline-block;background:' +
+      headerColor +
+      ';color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">เปิดใน Meetdoc</a></p>'
+    : '';
+  return (
+    '<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:Sarabun,sans-serif;margin:0;padding:20px;background:#f5f5f5}.container{max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.08)}.header{padding:28px;text-align:center;color:#fff}.content{padding:28px}.info-box{padding:16px;margin:16px 0;border-left:4px solid ' +
+    borderColor +
+    ';border-radius:0 8px 8px 0;background:' +
+    boxBg +
+    '}.footer{background:#f9fafb;padding:16px;text-align:center;font-size:12px;color:#6b7280}</style></head><body><div class="container"><div class="header" style="background:linear-gradient(135deg,' +
+    headerColor +
+    ',' +
+    headerColor +
+    'dd)"><h1 style="margin:0;font-size:22px">' +
+    title +
+    '</h1></div><div class="content"><p>เรียน ท่านที่เกี่ยวข้อง,</p><div class="info-box">' +
+    rowsHtml +
+    '</div><p>' +
+    footerText +
+    '</p>' +
+    linkBlock +
+    '</div><div class="footer">{{org_name}}</div></div></body></html>'
+  );
+}
 
 function json(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });

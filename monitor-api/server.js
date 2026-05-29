@@ -935,6 +935,38 @@ async function findUserForMonitor(sessionName) {
   return user || null;
 }
 
+function avatarFromMonitorUser(user) {
+  if (!user) return { avatar: '', avatarPosition: 'center center' };
+  return {
+    avatar: String(user.avatar || user.userAvatar || user.lineAvatar || user.linePictureUrl || '').trim(),
+    avatarPosition: String(user.avatarPosition || 'center center').trim() || 'center center'
+  };
+}
+
+function buildContactFromUser(user) {
+  if (!user) {
+    return { phone: '', internalPhone: '', internalPhoneExt: '', signature: '', birthDate: '' };
+  }
+  return {
+    phone: String(user.phone || '').trim(),
+    internalPhone: String(user.internalPhone || '').trim(),
+    internalPhoneExt: String(user.internalPhoneExt || '').trim(),
+    signature: String(user.signature || '').trim(),
+    birthDate: String(user.birthDate || user.birthday || '').trim()
+  };
+}
+
+function calcAgeText(birthDateStr) {
+  if (!birthDateStr) return '';
+  const birth = new Date(birthDateStr);
+  if (Number.isNaN(birth.getTime())) return '';
+  const now = new Date();
+  let age = now.getFullYear() - birth.getFullYear();
+  const md = now.getMonth() - birth.getMonth();
+  if (md < 0 || (md === 0 && now.getDate() < birth.getDate())) age -= 1;
+  return age >= 0 ? age + ' ปี' : '';
+}
+
 function buildWorkFromUser(user) {
   if (!user) {
     return {
@@ -2636,6 +2668,10 @@ app.get('/api/monitor-me', async (req, res) => {
   let email = session.email || '';
   let group = session.group || '';
   let role = session.role || '';
+  let avatar = '';
+  let avatarPosition = 'center center';
+  let contact = buildContactFromUser(null);
+  let ageText = '';
   let work = buildWorkFromUser(null);
   let todayAttendance = {
     date: getBangkokDateId(),
@@ -2645,13 +2681,19 @@ app.get('/api/monitor-me', async (req, res) => {
     lateText: '',
     lateLevel: null
   };
+  let user = null;
   try {
-    const user = await findUserForMonitor(session.username);
+    user = await findUserForMonitor(session.username);
     if (user) {
       fullname = user.fullname != null ? String(user.fullname).trim() : fullname;
       email = user.email != null ? String(user.email).trim() : email;
       group = user.group != null ? String(user.group).trim() : group;
       role = user.role != null ? String(user.role).trim() : role;
+      const av = avatarFromMonitorUser(user);
+      avatar = av.avatar;
+      avatarPosition = av.avatarPosition;
+      contact = buildContactFromUser(user);
+      ageText = calcAgeText(contact.birthDate);
       work = buildWorkFromUser(user);
       todayAttendance = await buildTodayAttendance(user);
     }
@@ -2665,9 +2707,87 @@ app.get('/api/monitor-me', async (req, res) => {
     email,
     group,
     role,
+    avatar,
+    avatarPosition,
+    phone: contact.phone,
+    internalPhone: contact.internalPhone,
+    internalPhoneExt: contact.internalPhoneExt,
+    signature: contact.signature,
+    nickname: user && user.nickname != null ? String(user.nickname).trim() : '',
+    birthDate: contact.birthDate,
+    ageText,
     work,
     todayAttendance
   });
+});
+
+// =====================================================
+// POST /api/monitor-profile-avatar
+// =====================================================
+app.post('/api/monitor-profile-avatar', async (req, res) => {
+  const token = (req.headers['x-monitor-token'] || '').trim();
+  const session = token ? await getMonitorSession(token) : null;
+  if (!session) return res.status(401).json({ ok: false, message: 'กรุณาเข้าสู่ระบบใหม่' });
+  const avatar = String((req.body && req.body.avatar) || '').trim();
+  const avatarPublicId = String((req.body && (req.body.avatar_public_id || req.body.avatarPublicId)) || '').trim();
+  const avatarPosition = String((req.body && req.body.avatarPosition) || 'center center').trim() || 'center center';
+  if (!avatar || !/^https:\/\//i.test(avatar)) {
+    return res.status(400).json({ ok: false, message: 'กรุณาระบุ URL รูปโปรไฟล์ที่ถูกต้อง' });
+  }
+  try {
+    const user = await findUserForMonitor(session.username);
+    if (!user || !user.id) return res.status(404).json({ ok: false, message: 'ไม่พบบัญชีผู้ใช้' });
+    const patch = { avatar, avatarPosition };
+    if (avatarPublicId) patch.avatar_public_id = avatarPublicId;
+    await firebaseSet('users', user.id, patch);
+    return res.json({ ok: true, message: 'อัปเดตรูปโปรไฟล์แล้ว', avatar, avatarPosition });
+  } catch (e) {
+    console.error('monitor-profile-avatar:', e.message);
+    return res.status(500).json({ ok: false, message: e.message || 'บันทึกไม่สำเร็จ' });
+  }
+});
+
+// =====================================================
+// POST /api/monitor-profile-update
+// =====================================================
+app.post('/api/monitor-profile-update', async (req, res) => {
+  const token = (req.headers['x-monitor-token'] || '').trim();
+  const session = token ? await getMonitorSession(token) : null;
+  if (!session) return res.status(401).json({ ok: false, message: 'กรุณาเข้าสู่ระบบใหม่' });
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  try {
+    const user = await findUserForMonitor(session.username);
+    if (!user || !user.id) return res.status(404).json({ ok: false, message: 'ไม่พบบัญชีผู้ใช้' });
+    const patch = {};
+    if (body.employmentStart !== undefined) patch.employmentStart = String(body.employmentStart || '').trim();
+    if (body.birthDate !== undefined) patch.birthDate = String(body.birthDate || '').trim();
+    if (body.phone !== undefined) patch.phone = String(body.phone || '').trim() || null;
+    if (body.nickname !== undefined) patch.nickname = String(body.nickname || '').trim() || null;
+    if (body.signature !== undefined) {
+      const sig = String(body.signature || '').trim();
+      patch.signature = sig || null;
+    }
+    if (!Object.keys(patch).length) {
+      return res.status(400).json({ ok: false, message: 'ไม่มีข้อมูลที่จะอัปเดต' });
+    }
+    await firebaseSet('users', user.id, patch);
+    const updated = await findUserForMonitor(session.username);
+    const contact = buildContactFromUser(updated);
+    return res.json({
+      ok: true,
+      message: 'บันทึกข้อมูลแล้ว',
+      employmentStart: updated && updated.employmentStart ? String(updated.employmentStart).trim() : '',
+      birthDate: contact.birthDate,
+      ageText: calcAgeText(contact.birthDate),
+      phone: contact.phone,
+      nickname: updated && updated.nickname != null ? String(updated.nickname).trim() : '',
+      signature: contact.signature,
+      work: buildWorkFromUser(updated)
+    });
+  } catch (e) {
+    console.error('monitor-profile-update:', e.message);
+    return res.status(500).json({ ok: false, message: e.message || 'บันทึกไม่สำเร็จ' });
+  }
 });
 
 // =====================================================
@@ -3157,6 +3277,122 @@ app.get('/api/line-login-callback', async (req, res) => {
 });
 
 // =====================================================
+// POST /api/admin-login-resolve — หาอีเมลผู้ดูแลจาก username (หน้า admin web)
+// =====================================================
+const ADMIN_PANEL_SUPER_UID = 'yPyuxPnu9tQmK89OH4NrUBjJ3jb2';
+
+function isAdminPanelRole(role) {
+  const r = String(role || '').trim();
+  return r === 'ผู้ดูแลระบบ' || r === 'แอดมิน' || /^admin$/i.test(r);
+}
+
+function adminPanelUserPayload(user) {
+  const u = user && typeof user === 'object' ? user : {};
+  return {
+    ok: true,
+    email: String(u.email || '').trim(),
+    role: String(u.role || '').trim() || 'ผู้ดูแลระบบ',
+    fullname: String(u.fullname || u.name || '').trim(),
+    username: String(u.username || '').trim(),
+    avatar: String(u.avatar || u.userAvatar || '').trim(),
+    avatarPosition: String(u.avatarPosition || 'center center').trim() || 'center center'
+  };
+}
+
+async function resolveAdminPanelLoginUser(userInput) {
+  const raw = String(userInput || '').trim();
+  if (!raw) return null;
+
+  if (raw === ADMIN_PANEL_SUPER_UID) {
+    try {
+      const byDoc = await firebaseGet('users', raw);
+      if (byDoc) return byDoc;
+      const all = await firebaseGetCollection('users', { pageSize: 400 });
+      const hit = (all || []).find(
+        (u) =>
+          u &&
+          (String(u.id || '') === raw ||
+            String(u.uid || '') === raw ||
+            String(u.authUid || '') === raw ||
+            String(u.firebaseUid || '') === raw)
+      );
+      if (hit) return hit;
+    } catch (e) {
+      console.warn('[admin-login-resolve] super uid:', e.message);
+    }
+    return {
+      email: 'gloszilla@gmail.com',
+      role: 'ผู้ดูแลระบบ',
+      fullname: 'ว่าที่ ร.ต.สรวิชญ์ ชัยเวทย์',
+      username: 'admin'
+    };
+  }
+
+  let user = null;
+  try {
+    user = await firebaseGet('users', raw);
+    if (!user && raw.includes('@')) {
+      user = await firebaseQuery('users', 'email', raw);
+      if (!user) {
+        const all = await firebaseGetCollection('users', { pageSize: 400 });
+        const lower = raw.toLowerCase();
+        user = (all || []).find((u) => u && String(u.email || '').toLowerCase() === lower);
+      }
+    }
+    if (!user) user = await firebaseQuery('users', 'username', raw);
+    if (!user) {
+      const all = await firebaseGetCollection('users', { pageSize: 400 });
+      const lower = raw.toLowerCase();
+      user = (all || []).find((u) => {
+        if (!u) return false;
+        if (String(u.username || '').toLowerCase() === lower) return true;
+        if (String(u.id || '') === raw || String(u.uid || '') === raw) return true;
+        if (String(u.authUid || '') === raw || String(u.firebaseUid || '') === raw) return true;
+        return false;
+      });
+    }
+    if (!user && !raw.includes('@')) {
+      const admins = await firebaseQueryAll('users', 'role', 'ผู้ดูแลระบบ', 80);
+      const lower = raw.toLowerCase();
+      user = (admins || []).find((u) => u && String(u.username || '').toLowerCase() === lower);
+    }
+  } catch (e) {
+    console.warn('[admin-login-resolve] lookup:', e.message);
+    return null;
+  }
+  return user || null;
+}
+
+app.post('/api/admin-login-resolve', async (req, res) => {
+  try {
+    const userInput = (req.body && (req.body.user || req.body.username || req.body.email)) || '';
+    const user = await resolveAdminPanelLoginUser(userInput);
+    if (!user) {
+      return res.status(200).json({ ok: false, message: 'ไม่พบผู้ใช้หรือไม่มีอีเมลในระบบ' });
+    }
+    const role = String(user.role || '').trim();
+    if (!isAdminPanelRole(role)) {
+      return res.status(200).json({ ok: false, message: 'บัญชีนี้ไม่มีสิทธิ์ผู้ดูแลระบบ' });
+    }
+    const email = String(user.email || '').trim();
+    if (!email.includes('@') && userInput !== ADMIN_PANEL_SUPER_UID) {
+      return res.status(200).json({ ok: false, message: 'ไม่พบอีเมลสำหรับเข้าสู่ระบบ' });
+    }
+    return res.status(200).json(adminPanelUserPayload(user));
+  } catch (e) {
+    const msg = String((e && e.message) || e || '');
+    console.error('[admin-login-resolve]', msg);
+    if (msg.includes('timed out')) {
+      return res.status(503).json({
+        ok: false,
+        message: 'เซิร์ฟเวอร์เชื่อมต่อฐานข้อมูลไม่ได้ — ลองใหม่หรือใช้เข้าสู่ระบบด้วย Google'
+      });
+    }
+    return res.status(500).json({ ok: false, message: 'เกิดข้อผิดพลาด กรุณาลองใหม่' });
+  }
+});
+
+// =====================================================
 // POST /api/monitor-login
 // =====================================================
 app.post('/api/monitor-login', async (req, res) => {
@@ -3549,6 +3785,24 @@ if (usePassengerSocket) {
     console.log(`[Monitor API] listen(${port}) — โหลดเป็นโมดูล (ให้ Passenger hook ถ้ามี)`);
     logRoutesHint(_basePathHint);
   });
+}
+
+try {
+  const { registerMeetdocRoutes } = require(path.join(__dirname, '..', 'lib', 'meetdoc-routes'));
+  registerMeetdocRoutes(app, {
+    getMonitorSession,
+    warmupAdmin: () => getMonitorAdminFirestore()
+  });
+} catch (e) {
+  try {
+    const { registerMeetdocRoutes } = require('./lib/meetdoc-routes');
+    registerMeetdocRoutes(app, {
+      getMonitorSession,
+      warmupAdmin: () => getMonitorAdminFirestore()
+    });
+  } catch (e2) {
+    console.warn('[Monitor API] Meetdoc routes not loaded:', e.message, e2.message);
+  }
 }
 
 module.exports = app;

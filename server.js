@@ -3380,11 +3380,21 @@ async function proxyMonitorToRemote(req, res, apiPath) {
   const bases = [remoteBase];
   const fb = getMonitorApiUrlFallback();
   if (fb && fb !== remoteBase) bases.push(fb);
+  let pathOnly = '';
   let queryStr = '';
-  try { const u = new URL(req.originalUrl, 'http://x'); queryStr = u.search || ''; } catch (_) {}
+  try {
+    const u = new URL(req.originalUrl || req.url || '', 'http://x');
+    pathOnly = u.pathname || '';
+    queryStr = u.search || '';
+  } catch (_) {
+    pathOnly = String(apiPath || '');
+  }
+  if (!pathOnly || pathOnly.indexOf('/api/') !== 0) {
+    pathOnly = String(apiPath || '').replace(/:id/g, String((req.params && req.params.id) || ''));
+  }
   for (const base of bases) {
     try {
-      const url = base.replace(/\/$/, '') + apiPath + queryStr;
+      const url = base.replace(/\/$/, '') + pathOnly + queryStr;
       const headers = { 'X-Monitor-Token': token };
       let bodyStr = null;
       if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
@@ -4189,6 +4199,7 @@ app.get('/api/monitor-notifications', async (req, res) => {
     const uid = u._docId || u.id;
     const role = String(u.role || '').trim();
     const position = String(u.position || '').trim();
+    const group = String(u.group || u.userGroup || '').trim();
     const map = new Map();
     const add = (doc) => {
       if (!doc || !doc.id) return;
@@ -4198,8 +4209,9 @@ app.get('/api/monitor-notifications', async (req, res) => {
     qMine.forEach((d) => add({ id: d.id, ...d.data() }));
     const qBc = await db.collection('notifications').where('targetType', '==', 'broadcast').limit(100).get();
     qBc.forEach((d) => add({ id: d.id, ...d.data() }));
-    if (role) {
-      const qr = await db.collection('notifications').where('targetType', '==', 'role').where('targetValue', '==', role).limit(100).get();
+    const roleTargets = new Set([role, group].filter(Boolean));
+    for (const rv of roleTargets) {
+      const qr = await db.collection('notifications').where('targetType', '==', 'role').where('targetValue', '==', rv).limit(100).get();
       qr.forEach((d) => add({ id: d.id, ...d.data() }));
     }
     if (position) {

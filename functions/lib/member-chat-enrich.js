@@ -9,6 +9,7 @@ const {
 const {
   pickDownloadActions,
   isDownloadIntent,
+  isGenericDownloadQuery,
   stripDownloadMarkers
 } = require('./member-downloads.js');
 const {
@@ -76,10 +77,10 @@ function enrichPublicMemberChatReply(message, reply, cmsSite, downloadSections, 
   const wantDownloads =
     !paymentIntent &&
     !isStaffContactIntent(message, staffDirectory) &&
+    !isGenericDownloadQuery(message) &&
     (isDownloadIntent(message) ||
-      isDownloadIntent(text) ||
       /แบบฟอร์ม|ดาวน์โหลด|pdf|สมัครสมาชิก/i.test(message) ||
-      /แบบฟอร์ม|ดาวน์โหลด|pdf/i.test(text));
+      (/แบบฟอร์ม|ดาวน์โหลด|pdf/i.test(text) && !isGenericDownloadQuery(message)));
 
   if (wantDownloads && downloadSections && downloadSections.length) {
     const downloads = pickDownloadActions(message, text, downloadSections, 1);

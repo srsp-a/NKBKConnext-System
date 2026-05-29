@@ -110,7 +110,11 @@ function teamInternalPhone(user) {
 }
 
 function teamShowsInternalPhone(user) {
-  return user && user.showInternalPhoneOnTeam === true;
+  if (user && user.showInternalPhoneOnPublic === true) return true;
+  if (user && user.showInternalPhoneOnPublic === false) return false;
+  if (user && user.showInternalPhoneOnTeam === true) return true;
+  if (user && user.showInternalPhoneOnTeam === false) return false;
+  return user && user.group === 'เจ้าหน้าที่';
 }
 
 function renderMemberCard(member, opts) {
@@ -315,11 +319,21 @@ function renderTeamMemberModalPhoto(member) {
   return `<span class="kb-team-modal-photo-fallback" aria-hidden="true">${escapeTeamHtml((name.charAt(0) || 'U').toUpperCase())}</span>`;
 }
 
+function teamShowsPublicPhone(user) {
+  if (user && user.showPhoneOnPublic === true) return true;
+  if (user && user.showPhoneOnPublic === false) return false;
+  return user && user.group === 'เจ้าหน้าที่';
+}
+
+function teamShowsEmail(user) {
+  return !!(user && user.showEmailOnPublic === true);
+}
+
 function renderTeamMemberModalBody(member) {
   const name = member.fullname || 'ไม่ระบุ';
   const role = member._boardPosition || member.committeePosition || 'กรรมการ';
-  const email = (member.email || '').trim();
-  const phone = (member.phone || '').trim();
+  const email = teamShowsEmail(member) ? (member.email || '').trim() : '';
+  const phone = teamShowsPublicPhone(member) ? (member.phone || '').trim() : '';
   const showInternal = teamShowsInternalPhone(member);
   const internalPhone = showInternal ? teamInternalPhone(member) : '';
   const emailRow = email

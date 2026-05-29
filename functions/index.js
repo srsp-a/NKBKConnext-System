@@ -14,6 +14,8 @@ const { onRequest } = require('firebase-functions/v2/https');
 
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 
+const { onDocumentUpdated } = require('firebase-functions/v2/firestore');
+
 const { setGlobalOptions } = require('firebase-functions/v2');
 
 
@@ -202,6 +204,76 @@ exports.lineCronAttendanceAutoFetch = onSchedule(
     await line.ensureBootstrapped();
 
     await line.runAttendanceAutoFetchServer();
+
+  }
+
+);
+
+
+
+// --- Meeting docs reminders + workflow notify ---
+
+const meetingNotify = require('./lib/meeting-notify');
+
+const meetingCron = require('./lib/meeting-cron-reminders');
+
+
+
+exports.meetingCronReminders = onSchedule(
+
+  { ...cronOpts, schedule: '0 8 * * *' },
+
+  async () => {
+
+    await line.ensureBootstrapped();
+
+    if (typeof line.pushMessage === 'function') {
+
+      meetingNotify.setLinePusher(line.pushMessage);
+
+    }
+
+    const summary = await meetingCron.runDailyReminders();
+
+    console.log('[meetingCronReminders]', JSON.stringify(summary));
+
+  }
+
+);
+
+
+
+exports.onCommitteeMeetingUpdated = onDocumentUpdated(
+
+  {
+
+    document: 'committee_meetings/{meetingId}',
+
+    region: 'asia-southeast1'
+
+  },
+
+  async (event) => {
+
+    const before = event.data.before.data();
+
+    const after = event.data.after.data();
+
+    if (!before || !after || before.status === after.status) return;
+
+    await line.ensureBootstrapped();
+
+    if (typeof line.pushMessage === 'function') {
+
+      meetingNotify.setLinePusher(line.pushMessage);
+
+    }
+
+    const meetingId = event.params.meetingId;
+
+    const result = await meetingNotify.onWorkflowStatusChange(meetingId, before, after);
+
+    console.log('[onCommitteeMeetingUpdated]', meetingId, before.status, '->', after.status, result);
 
   }
 

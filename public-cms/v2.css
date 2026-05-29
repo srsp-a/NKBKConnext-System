@@ -3141,6 +3141,47 @@ body.kb-team-modal-open {
   font-size: 0.88rem;
   color: var(--kb-muted);
 }
+.kb-team-modal-actions {
+  margin-top: 1.1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  width: 100%;
+}
+.kb-team-modal-contact-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.72rem 1rem;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ec4899 0%, #db2777 45%, #be185d 100%);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(219, 39, 119, 0.28);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+.kb-team-modal-contact-btn:hover,
+.kb-team-modal-contact-btn:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 26px rgba(219, 39, 119, 0.34);
+  filter: brightness(1.03);
+}
+.kb-team-modal-contact-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.kb-team-modal-contact-hint {
+  margin: 0.55rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--kb-muted);
+  text-align: center;
+}
 @media (max-width: 540px) {
   .kb-team-modal-body {
     padding: 1.15rem;

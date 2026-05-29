@@ -2776,6 +2776,200 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // --- Meetdoc portal API ---
+  function loadMeetdocApi() {
+    try {
+      return require('../lib/meetdoc-api');
+    } catch (_) {
+      try {
+        return require('../../lib/meetdoc-api');
+      } catch (e2) {
+        return null;
+      }
+    }
+  }
+
+  function meetdocToken(req, body) {
+    const b = body || {};
+    return String(req.headers['x-meetdoc-token'] || b.token || '').trim();
+  }
+
+  function jsonMeetdoc(res, status, obj) {
+    res.writeHead(status);
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.end(JSON.stringify(obj));
+  }
+
+  if (pathname.endsWith('/api/meetdoc-exchange') && req.method === 'POST') {
+    (async () => {
+      try {
+        const api = loadMeetdocApi();
+        if (!api) {
+          jsonMeetdoc(res, 503, { ok: false, message: 'Meetdoc API unavailable' });
+          return;
+        }
+        const body = (req.rawBody || Buffer.alloc(0)).toString('utf-8');
+        const data = JSON.parse(body || '{}');
+        const monitorToken = String(data.monitorToken || req.headers['x-monitor-token'] || '').trim();
+        const session = monitorToken ? MONITOR_SESSIONS.get(monitorToken) : null;
+        const result = await api.exchangeFromMonitorSession(session);
+        jsonMeetdoc(res, 200, result);
+      } catch (e) {
+        jsonMeetdoc(res, 500, { ok: false, message: e.message });
+      }
+    })();
+    return;
+  }
+
+  if (pathname.endsWith('/api/meetdoc-login') && req.method === 'POST') {
+    (async () => {
+      try {
+        const api = loadMeetdocApi();
+        if (!api) {
+          jsonMeetdoc(res, 503, { ok: false, message: 'Meetdoc API unavailable' });
+          return;
+        }
+        const body = (req.rawBody || Buffer.alloc(0)).toString('utf-8');
+        const data = JSON.parse(body || '{}');
+        const result = await api.loginWithPin(data.username, data.pin);
+        jsonMeetdoc(res, 200, result);
+      } catch (e) {
+        console.error('meetdoc-login:', e.message);
+        jsonMeetdoc(res, 500, { ok: false, message: 'เกิดข้อผิดพลาด' });
+      }
+    })();
+    return;
+  }
+
+  if (pathname.endsWith('/api/meetdoc-line-login') && req.method === 'POST') {
+    (async () => {
+      try {
+        const api = loadMeetdocApi();
+        if (!api) {
+          jsonMeetdoc(res, 503, { ok: false, message: 'Meetdoc API unavailable' });
+          return;
+        }
+        const body = (req.rawBody || Buffer.alloc(0)).toString('utf-8');
+        const data = JSON.parse(body || '{}');
+        const result = await api.loginWithLine(data.lineUserId);
+        jsonMeetdoc(res, 200, result);
+      } catch (e) {
+        jsonMeetdoc(res, 500, { ok: false, message: e.message });
+      }
+    })();
+    return;
+  }
+
+  if (pathname.endsWith('/api/meetdoc-line-link') && req.method === 'POST') {
+    (async () => {
+      try {
+        const api = loadMeetdocApi();
+        const body = (req.rawBody || Buffer.alloc(0)).toString('utf-8');
+        const data = JSON.parse(body || '{}');
+        const result = await api.linkLineAccount(data.lineUserId, data.username);
+        jsonMeetdoc(res, 200, result);
+      } catch (e) {
+        jsonMeetdoc(res, 500, { ok: false, message: e.message });
+      }
+    })();
+    return;
+  }
+
+  if (pathname.endsWith('/api/meetdoc/meetings') && req.method === 'GET') {
+    (async () => {
+      try {
+        const api = loadMeetdocApi();
+        const q = url.parse(req.url, true).query || {};
+        const token = meetdocToken(req, q);
+        const result = await api.listMeetings(token, { queue: q.queue === 'approval' });
+        jsonMeetdoc(res, result.ok ? 200 : 401, result);
+      } catch (e) {
+        jsonMeetdoc(res, 500, { ok: false, message: e.message });
+      }
+    })();
+    return;
+  }
+
+  const meetdocMeetingMatch = pathname.match(/\/api\/meetdoc\/meetings\/([^/]+)(?:\/(file|approve|reject))?$/);
+  if (meetdocMeetingMatch && req.method === 'GET' && !meetdocMeetingMatch[2]) {
+    (async () => {
+      try {
+        const api = loadMeetdocApi();
+        const token = meetdocToken(req, url.parse(req.url, true).query);
+        const result = await api.getMeeting(token, meetdocMeetingMatch[1]);
+        jsonMeetdoc(res, result.ok ? 200 : 404, result);
+      } catch (e) {
+        jsonMeetdoc(res, 500, { ok: false, message: e.message });
+      }
+    })();
+    return;
+  }
+
+  if (meetdocMeetingMatch && meetdocMeetingMatch[2] === 'file' && req.method === 'GET') {
+    (async () => {
+      try {
+        const api = loadMeetdocApi();
+        const q = url.parse(req.url, true).query || {};
+        const token = meetdocToken(req, q);
+        const kind = q.kind || 'agenda';
+        const result = await api.getSignedFileUrl(token, meetdocMeetingMatch[1], kind);
+        jsonMeetdoc(res, result.ok ? 200 : 404, result);
+      } catch (e) {
+        jsonMeetdoc(res, 500, { ok: false, message: e.message });
+      }
+    })();
+    return;
+  }
+
+  if (meetdocMeetingMatch && meetdocMeetingMatch[2] === 'approve' && req.method === 'POST') {
+    (async () => {
+      try {
+        const api = loadMeetdocApi();
+        const body = (req.rawBody || Buffer.alloc(0)).toString('utf-8');
+        const data = JSON.parse(body || '{}');
+        const token = meetdocToken(req, data);
+        const result = await api.approveMeeting(token, meetdocMeetingMatch[1], data.step);
+        jsonMeetdoc(res, result.ok ? 200 : 400, result);
+      } catch (e) {
+        jsonMeetdoc(res, 500, { ok: false, message: e.message });
+      }
+    })();
+    return;
+  }
+
+  if (meetdocMeetingMatch && meetdocMeetingMatch[2] === 'reject' && req.method === 'POST') {
+    (async () => {
+      try {
+        const api = loadMeetdocApi();
+        const body = (req.rawBody || Buffer.alloc(0)).toString('utf-8');
+        const data = JSON.parse(body || '{}');
+        const token = meetdocToken(req, data);
+        const result = await api.rejectMeeting(token, meetdocMeetingMatch[1]);
+        jsonMeetdoc(res, result.ok ? 200 : 400, result);
+      } catch (e) {
+        jsonMeetdoc(res, 500, { ok: false, message: e.message });
+      }
+    })();
+    return;
+  }
+
+  if (pathname.endsWith('/api/meetdoc/firebase-token') && req.method === 'POST') {
+    (async () => {
+      try {
+        const api = loadMeetdocApi();
+        const body = (req.rawBody || Buffer.alloc(0)).toString('utf-8');
+        const data = JSON.parse(body || '{}');
+        const token = meetdocToken(req, data);
+        const result = await api.createFirebaseCustomToken(token);
+        jsonMeetdoc(res, result.ok ? 200 : 403, result);
+      } catch (e) {
+        console.error('meetdoc/firebase-token:', e.message);
+        jsonMeetdoc(res, 500, { ok: false, message: e.message });
+      }
+    })();
+    return;
+  }
+
   // API: Installer login — ชื่อผู้ใช้ + รหัส PIN (6 หลัก) เพื่อดึงข้อมูลเครื่องที่กำหนดให้
   if (pathname.endsWith('/api/installer-login') && req.method === 'POST') {
     (async () => {
@@ -3572,7 +3766,8 @@ module.exports = {
   loadAutoReplyRules,
   runAttendanceNotify,
   runAttendanceScanNotifyQueue,
-  runAttendanceAutoFetchServer
+  runAttendanceAutoFetchServer,
+  pushMessage
 };
 
 if (!IS_SERVERLESS) {

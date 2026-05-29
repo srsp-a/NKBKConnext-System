@@ -25,191 +25,6 @@
   ],
   "hosting": [
     {
-      "target": "main",
-      "public": "public-cms",
-      "cleanUrls": true,
-      "trailingSlash": false,
-      "ignore": [
-        "firebase.json",
-        "**/.*",
-        "**/node_modules/**"
-      ],
-      "headers": [
-        {
-          "source": "**/*.html",
-          "headers": [
-            {
-              "key": "Content-Type",
-              "value": "text/html; charset=utf-8"
-            },
-            {
-              "key": "Cache-Control",
-              "value": "no-cache"
-            }
-          ]
-        },
-        {
-          "source": "/desktop-app-updates/**",
-          "headers": [
-            {
-              "key": "Cache-Control",
-              "value": "no-cache"
-            },
-            {
-              "key": "Access-Control-Allow-Origin",
-              "value": "*"
-            }
-          ]
-        }
-      ],
-      "rewrites": [
-        {
-          "source": "/api/cms-pdf",
-          "function": "monitorApi"
-        },
-        {
-          "source": "/api/public-cms-chat",
-          "function": "monitorApi"
-        },
-        {
-          "source": "/api/public-cms-chat/**",
-          "function": "monitorApi"
-        },
-        {
-          "source": "/n/**",
-          "function": "cmsOg"
-        },
-        {
-          "source": "/page/**",
-          "function": "cmsOg"
-        },
-        {
-          "source": "/news",
-          "function": "cmsOg"
-        },
-        {
-          "source": "/download",
-          "function": "cmsOg"
-        },
-        {
-          "source": "/about-us",
-          "function": "cmsOg"
-        },
-        {
-          "source": "/team",
-          "function": "cmsOg"
-        },
-        {
-          "source": "/management",
-          "function": "cmsOg"
-        },
-        {
-          "source": "/contact",
-          "function": "cmsOg"
-        },
-        {
-          "source": "/infrom-payment",
-          "function": "cmsOg"
-        },
-        {
-          "source": "/infrom-payment-line",
-          "function": "cmsOg"
-        },
-        {
-          "source": "/app",
-          "function": "cmsOg"
-        },
-        {
-          "source": "/faq",
-          "function": "cmsOg"
-        },
-        {
-          "source": "/terms",
-          "function": "cmsOg"
-        },
-        {
-          "source": "/privacy-policy",
-          "function": "cmsOg"
-        },
-        {
-          "source": "/pdpa",
-          "function": "cmsOg"
-        }
-      ],
-      "redirects": [
-        {
-          "source": "/page/7934",
-          "destination": "/download",
-          "type": 301
-        },
-        {
-          "source": "/page/241",
-          "destination": "/about-us",
-          "type": 301
-        },
-        {
-          "source": "/page/420",
-          "destination": "/team",
-          "type": 301
-        },
-        {
-          "source": "/page/8929",
-          "destination": "/management",
-          "type": 301
-        },
-        {
-          "source": "/page/354",
-          "destination": "/contact",
-          "type": 301
-        },
-        {
-          "source": "/page/9304",
-          "destination": "/infrom-payment",
-          "type": 301
-        },
-        {
-          "source": "/page/9208",
-          "destination": "/app",
-          "type": 301
-        },
-        {
-          "source": "/page/294",
-          "destination": "/faq",
-          "type": 301
-        },
-        {
-          "source": "/page/525",
-          "destination": "/terms",
-          "type": 301
-        },
-        {
-          "source": "/page/3",
-          "destination": "/privacy-policy",
-          "type": 301
-        },
-        {
-          "source": "/terms-conditions",
-          "destination": "/terms",
-          "type": 301
-        },
-        {
-          "source": "/pdpa",
-          "destination": "/privacy-policy",
-          "type": 301
-        },
-        {
-          "source": "/news.html",
-          "destination": "/news",
-          "type": 301
-        },
-        {
-          "source": "/index.html",
-          "destination": "/",
-          "type": 301
-        }
-      ]
-    },
-    {
       "target": "monitor",
       "public": "monitor-api/public",
       "ignore": [
@@ -231,11 +46,17 @@
       "rewrites": [
         {
           "source": "/",
-          "function": "monitorApi"
+          "function": {
+            "functionId": "monitorApi",
+            "region": "asia-southeast1"
+          }
         },
         {
           "source": "/api/**",
-          "function": "monitorApi"
+          "function": {
+            "functionId": "monitorApi",
+            "region": "asia-southeast1"
+          }
         },
         {
           "source": "/workstations.html",
@@ -254,7 +75,10 @@
       "rewrites": [
         {
           "source": "**",
-          "function": "lineApi"
+          "function": {
+            "functionId": "lineApi",
+            "region": "asia-southeast1"
+          }
         }
       ]
     },
@@ -279,14 +103,6 @@
       ],
       "rewrites": [
         {
-          "source": "/line/**",
-          "destination": "/line/index.html"
-        },
-        {
-          "source": "/api/**",
-          "function": "monitorApi"
-        },
-        {
           "source": "**",
           "destination": "/index.html"
         }
@@ -309,6 +125,12 @@
               "value": "no-cache"
             }
           ]
+        }
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
         }
       ]
     },
@@ -502,7 +324,27 @@
       ],
       "headers": [
         {
-          "source": "**",
+          "source": "**/*.html",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "target": "meetdoc",
+      "public": "hosting-dist/meetdoc",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "headers": [
+        {
+          "source": "**/*.html",
           "headers": [
             {
               "key": "Cache-Control",
@@ -513,12 +355,8 @@
       ],
       "rewrites": [
         {
-          "source": "/library",
+          "source": "**",
           "destination": "/index.html"
-        },
-        {
-          "source": "/api/**",
-          "function": "monitorApi"
         }
       ]
     }

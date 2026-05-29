@@ -577,14 +577,25 @@
     if (!document.querySelector('link[href*="member-chat-widget.css"]')) {
       const link = document.createElement('link');
       link.rel = 'stylesheet';
-      link.href = '/member-chat-widget.css?v=18';
+      link.href = '/member-chat-widget.css?v=28';
       document.head.appendChild(link);
+    }
+    if (!document.querySelector('script[src*="monee-chat-notify-sound.js"]')) {
+      const soundScript = document.createElement('script');
+      soundScript.src = '/monee-chat-notify-sound.js?v=20260527monee11';
+      document.body.appendChild(soundScript);
     }
     if (!document.querySelector('script[src*="member-chat-widget.js"]')) {
       const script = document.createElement('script');
-      script.src = '/member-chat-widget.js?v=16';
+      script.src = '/member-chat-widget.js?v=28';
       script.defer = true;
       document.body.appendChild(script);
+    }
+    if (!document.querySelector('script[src*="analytics.js"]')) {
+      const analyticsScript = document.createElement('script');
+      analyticsScript.src = '/analytics.js?v=2';
+      analyticsScript.defer = true;
+      document.body.appendChild(analyticsScript);
     }
   }
 

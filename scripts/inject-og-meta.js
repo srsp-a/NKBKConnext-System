@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const CMS_DIR = path.join(__dirname, '..', 'public-cms');
-const ORIGIN = 'https://admin-panel-nkbkcoop-cbf10.web.app';
+const ORIGIN = 'https://nkbkcoop.com';
 const IMG =
   'https://res.cloudinary.com/dzs7zbikj/image/upload/c_pad,b_white,w_1200,h_630,f_jpg,q_auto/v1770613894/site-config/vd64o0efi0hdpetkzyrf.png';
 const DESC =

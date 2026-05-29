@@ -1,8 +1,8 @@
-version: 1.0.19
+version: 1.0.39
 files:
-  - url: NKBKConnext System Setup 1.0.19.exe
-    sha512: YHYWTU17sGBu6JzUq2eJJYMT4TS+6SxgLeDO+t6ZYzY4/lffQXeHvH41xGl4ujYC8xI43RgJpHomnjACv4Yh0Q==
-    size: 91244976
-path: NKBKConnext System Setup 1.0.19.exe
-sha512: YHYWTU17sGBu6JzUq2eJJYMT4TS+6SxgLeDO+t6ZYzY4/lffQXeHvH41xGl4ujYC8xI43RgJpHomnjACv4Yh0Q==
-releaseDate: '2026-05-26T09:47:57.663Z'
+  - url: NKBKConnext System Setup 1.0.39.exe
+    sha512: OIbSsBwxNmdSHQFHX8iMJHC+XIhaER6kmnWAyGKeRNhmwRkgD8fnr2Rn/3f90L30bULtGMSqNwjahy6F0TBeJw==
+    size: 91321496
+path: NKBKConnext System Setup 1.0.39.exe
+sha512: OIbSsBwxNmdSHQFHX8iMJHC+XIhaER6kmnWAyGKeRNhmwRkgD8fnr2Rn/3f90L30bULtGMSqNwjahy6F0TBeJw==
+releaseDate: '2026-05-27T10:22:23.636Z'

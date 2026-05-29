@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Meetdoc — วาระ/รายงานประชุม</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="meeting-docs.css?v=7">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+<body>
+  <div id="loadingScreen" class="screen active">
+    <div class="loader"><i class="fas fa-file-lines"></i></div>
+    <p>กำลังโหลด Meetdoc…</p>
+  </div>
+
+  <div id="loginScreen" class="screen">
+    <div class="card login-card">
+      <div class="brand">
+        <i class="fas fa-landmark"></i>
+        <h1>Meetdoc</h1>
+        <p>วาระและรายงานการประชุมคณะกรรมการ</p>
+      </div>
+      <button type="button" id="btnLineLogin" class="btn btn-line"><i class="fab fa-line"></i> เข้าสู่ระบบด้วย LINE</button>
+      <div class="divider"><span>หรือ</span></div>
+      <label class="lbl">ชื่อผู้ใช้</label>
+      <input type="text" id="inpUsername" class="inp" placeholder="ชื่อผู้ใช้ในระบบ" autocomplete="username">
+      <label class="lbl">รหัส PIN (6 หลัก)</label>
+      <input type="password" id="inpPin" class="inp" maxlength="6" inputmode="numeric" placeholder="••••••" autocomplete="current-password">
+      <button type="button" id="btnPinLogin" class="btn btn-primary">เข้าสู่ระบบ</button>
+      <p id="loginError" class="error hidden"></p>
+      <p class="hint">กรรมการ/ผู้อนุมัติ — ดูและอนุมัติ · ผู้ดูแล/ผู้รับผิดชอบ — จัดการวาระ รายงาน มติ (เหมือน Admin)</p>
+    </div>
+  </div>
+
+  <div id="appScreen" class="screen">
+    <header class="topbar">
+      <div>
+        <p class="topbar-sub">สวัสดี</p>
+        <h2 id="headerName">—</h2>
+        <span id="headerRole" class="role-badge">—</span>
+      </div>
+      <button type="button" id="btnLogout" class="icon-btn" title="ออกจากระบบ"><i class="fas fa-sign-out-alt"></i></button>
+    </header>
+    <nav class="tabs" id="mainTabs">
+      <button type="button" data-tab="home" class="tab active">รายการ</button>
+      <button type="button" data-tab="queue" class="tab" id="tabQueue">รออนุมัติ</button>
+    </nav>
+    <main id="pageRoot" class="page"></main>
+  </div>
+
+  <div id="manageScreen" class="screen">
+    <header class="manage-topbar">
+      <div>
+        <p class="topbar-sub">Meetdoc — จัดการ</p>
+        <h2 id="manageHeaderName">—</h2>
+        <span id="manageHeaderRole" class="role-badge role-manage">—</span>
+      </div>
+      <button type="button" id="btnManageLogout" class="icon-btn" title="ออกจากระบบ"><i class="fas fa-sign-out-alt"></i></button>
+    </header>
+    <section id="meetingdocs-section" class="manage-body">
+      <div id="meetingdocs-root">
+        <p class="manage-loading"><i class="fas fa-spinner fa-spin mr-2"></i>กำลังโหลด…</p>
+      </div>
+    </section>
+  </div>
+
+  <div id="detailScreen" class="screen">
+    <header class="topbar detail-top">
+      <button type="button" id="btnBack" class="icon-btn"><i class="fas fa-arrow-left"></i></button>
+      <h2 id="detailTitle">รายละเอียด</h2>
+    </header>
+    <main id="detailRoot" class="page"></main>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.6.11/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.11/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.11/firebase-storage-compat.js"></script>
+  <script src="auth.js"></script>
+  <script src="manage-bootstrap.js"></script>
+  <script src="meeting-docs.js?v=7"></script>
+  <script src="app.js"></script>
+</body>
+</html>

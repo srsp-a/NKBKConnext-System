@@ -132,10 +132,39 @@ async function loadMemberDownloadSections(db, downloadPatches) {
   }
 }
 
+const GENERIC_DOWNLOAD_PHRASES = [
+  /^แบบฟอร์มดาวน์โหลด$/,
+  /^ดาวน์โหลดแบบฟอร์ม$/,
+  /^ดาวน์โหลด$/,
+  /^download\s*forms?$/i,
+  /^download$/,
+  /^แบบฟอร์ม$/,
+  /^เอกสารดาวน์โหลด$/,
+  /^ขอ(?:ดาวน์โหลด)?(?:แบบ)?ฟอร์ม$/,
+  /^อยาก(?:ดาวน์โหลด)?(?:แบบ)?ฟอร์ม$/,
+  /^ต้องการ(?:ดาวน์โหลด)?(?:แบบ)?ฟอร์ม$/
+];
+
+function isGenericDownloadQuery(message) {
+  const raw = String(message || '').trim();
+  if (!raw || !isDownloadIntent(raw)) return false;
+  const norm = raw.replace(/\s+/g, ' ').toLowerCase();
+  if (GENERIC_DOWNLOAD_PHRASES.some((re) => re.test(norm))) return true;
+  const stripped = norm
+    .replace(
+      /แบบฟอร์ม|ดาวน์โหลด|download|forms?|เอกสาร|pdf|ขอ|หน่อย|ค่ะ|ครับ|นะ|please|อยาก|ต้องการ|โหลด/gi,
+      ' '
+    )
+    .replace(/\s+/g, ' ')
+    .trim();
+  return stripped.length < 3;
+}
+
 function buildMemberDownloadsContextLines(sections) {
   const lines = [
     'ข้อมูลเดียวกับหน้าเว็บ [ดาวน์โหลด](/download) — แบบฟอร์มและเอกสาร PDF',
-    'เมื่อสมาชิกต้องการดาวน์โหลด ให้แนะนำชื่อแบบฟอร์มที่ตรงความต้องการที่สุดเพียงรายการเดียว',
+    'เมื่อสมาชิกถามทั่วไปว่าต้องการดาวน์โหลดแบบฟอร์มแต่ยังไม่ระบุชื่อ/เรื่อง ให้ถามกลับว่าต้องการแบบฟอร์มเรื่องอะไร และยกตัวอย่างหมวดจากรายการด้านล่าง — ห้ามเลือกแบบฟอร์มเฉพาะรายการให้เอง',
+    'เมื่อสมาชิกระบุชื่อหรือเรื่องแบบฟอร์มชัดเจนแล้ว จึงแนะนำชื่อแบบฟอร์มที่ตรงที่สุดเพียงรายการเดียว',
     'ห้ามเดา URL ไฟล์ — ใช้เฉพาะรายการด้านล่าง'
   ];
   (sections || []).forEach((sec) => {
@@ -190,16 +219,22 @@ function scoreDownloadMatch(item, haystack) {
 }
 
 function pickDownloadActions(message, reply, sections, maxItems) {
+  if (isGenericDownloadQuery(message)) return [];
   const limit = Math.min(1, Math.max(1, maxItems || 1));
   const userHay = String(message || '').toLowerCase();
   const replyHay = String(reply || '').toLowerCase();
   const items = flattenDownloadItems(sections).filter((it) => isUsableDownloadUrl(it.fileUrl));
   const scored = items
-    .map((it) => ({
-      item: it,
-      score: scoreDownloadMatch(it, userHay) * 3 + scoreDownloadMatch(it, replyHay)
-    }))
-    .filter((x) => x.score >= 4)
+    .map((it) => {
+      const userScore = scoreDownloadMatch(it, userHay);
+      const replyScore = scoreDownloadMatch(it, replyHay);
+      return {
+        item: it,
+        userScore,
+        score: userScore >= 4 ? userScore * 3 + replyScore : userScore
+      };
+    })
+    .filter((x) => x.score >= 4 && x.userScore >= 4)
     .sort((a, b) => b.score - a.score);
 
   if (!scored.length) return [];
@@ -233,6 +268,7 @@ module.exports = {
   flattenDownloadItems,
   pickDownloadActions,
   isDownloadIntent,
+  isGenericDownloadQuery,
   isUsableDownloadUrl,
   stripDownloadMarkers
 };

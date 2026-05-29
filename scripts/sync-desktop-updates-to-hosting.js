@@ -20,7 +20,7 @@ const destDir = path.join(root, 'public-cms', 'desktop-app-updates');
 
 const BASE =
   String(process.env.DESKTOP_UPDATE_PUBLIC_BASE_URL || '').trim().replace(/\/$/, '') ||
-  'https://admin-panel-nkbkcoop-cbf10.web.app/desktop-app-updates';
+  'https://nkbkcoop.com/desktop-app-updates';
 
 /** ชื่อไฟล์ที่เก็บในโฟลเดอร์ปล่อยอัปเดตไว้เสมอ (ไม่ลบตอนซิงก์) */
 const KEEP_IN_DEST = new Set(['README.md', '.gitkeep']);
