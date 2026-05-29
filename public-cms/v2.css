@@ -2856,6 +2856,7 @@ body.kb-page--team #cms-page-content {
   max-width: 100%;
   box-shadow: 0 8px 28px rgba(194, 24, 91, 0.1);
   border: 1px solid rgba(194, 24, 91, 0.08);
+  cursor: pointer;
 }
 .kb-team-card--chair {
   width: 210px;
@@ -2976,7 +2977,7 @@ body.kb-team-modal-open {
 .kb-team-modal {
   position: fixed;
   inset: 0;
-  z-index: 500;
+  z-index: 100050;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3350,6 +3351,7 @@ body.kb-page--management #cms-page-content {
   width: 150px;
   border: 1px solid rgba(194, 24, 91, 0.1);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
 }
 .kb-mgmt-card--lg {
   width: 180px;

@@ -6,6 +6,12 @@
   --kb-chat-shadow: 0 12px 40px rgba(136, 14, 79, 0.28);
   font-family: 'Noto Sans Thai', 'Noto Sans', system-ui, sans-serif;
   z-index: 99990;
+  pointer-events: none;
+}
+
+#kb-member-chat-root .kb-chat-fab,
+#kb-member-chat-root .kb-chat-panel {
+  pointer-events: auto;
 }
 
 .kb-chat-fab {

@@ -420,9 +420,14 @@ function bindMgmtMemberModal() {
 
 function bindManagementPage(root) {
   root.addEventListener('click', (e) => {
-    const memberBtn = e.target.closest('[data-mgmt-member-open]');
-    if (!memberBtn) return;
-    const memberId = memberBtn.getAttribute('data-mgmt-member-open');
+    const btn = e.target.closest('[data-mgmt-member-open]');
+    const card = e.target.closest('.kb-mgmt-card[data-member-id]');
+    const memberId = btn
+      ? btn.getAttribute('data-mgmt-member-open')
+      : card
+        ? card.getAttribute('data-member-id')
+        : '';
+    if (!memberId) return;
     const member = mgmtAllUsers.find((m) => String(mgmtUserId(m)) === String(memberId));
     if (member) openMgmtMemberModal(member);
   });

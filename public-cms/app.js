@@ -873,7 +873,6 @@ async function initAboutPage(main) {
 async function initTeamPage(main) {
   main.innerHTML = CmsLayout.renderLoading();
   try {
-    const page = await fetchPageHtml(TEAM_PAGE_ID);
     const title = t('nav.team') || 'คณะกรรมการสหกรณ์';
     document.title = title + ' — ' + siteTabTitle();
     CmsLayout.setPageTitle(escapeHtml(title), '');

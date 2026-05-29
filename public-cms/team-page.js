@@ -286,14 +286,24 @@ function pickActiveCommitteeSet(org) {
   return sets[sets.length - 1].name;
 }
 
+function resolveTeamMemberFromClick(e, getState) {
+  const btn = e.target.closest('[data-team-member-open]');
+  const card = e.target.closest('.kb-team-card[data-member-id]');
+  const memberId = btn
+    ? btn.getAttribute('data-team-member-open')
+    : card
+      ? card.getAttribute('data-member-id')
+      : '';
+  if (!memberId) return null;
+  const st = getState();
+  return (st.currentMembers || []).find((m) => String(m.id) === String(memberId)) || null;
+}
+
 function bindTeamPage(root, getState, rerender) {
   root.addEventListener('click', (e) => {
-    const memberBtn = e.target.closest('[data-team-member-open]');
-    if (memberBtn) {
-      const memberId = memberBtn.getAttribute('data-team-member-open');
-      const st = getState();
-      const member = (st.currentMembers || []).find((m) => String(m.id) === String(memberId));
-      if (member) openTeamMemberModal(member);
+    const member = resolveTeamMemberFromClick(e, getState);
+    if (member) {
+      openTeamMemberModal(member);
       return;
     }
     const btn = e.target.closest('[data-board]');
